@@ -1,4 +1,5 @@
 <?php
+// Fungsi untuk membina query string pagination
 function build_pagination_query($page_param_name, $page_number) {
     $params = $_GET; // Dapatkan semua parameter URL sedia ada
     
@@ -11,7 +12,20 @@ function build_pagination_query($page_param_name, $page_number) {
         }
     }
     
+    // Pastikan nombor halaman lebih besar daripada 0
+    if ($page_number < 1) {
+        $page_number = 1;
+    }
+    
     $params[$page_param_name] = $page_number; // Tetapkan nombor halaman baru
+    
+    // Buang parameter pagination yang tidak berkaitan untuk tab aktif
+    if ($page_param_name == 'page_returns') {
+        unset($params['page_logs']);
+    } elseif ($page_param_name == 'page_logs') {
+        unset($params['page_returns']);
+    }
+    
     return http_build_query($params); // Bina semula query string
 }
 ?>
@@ -44,7 +58,7 @@ $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' :
 
 
 // =======================================================
-// --- SEKSYEN 1: LAPORAN PEMULANGAN (TAB 1) ---
+// 📦 SEKSYEN 1: LAPORAN PEMULANGAN (TAB 1)
 // =======================================================
 $records = array();
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
@@ -62,6 +76,8 @@ $total_pages_returns = 0;
 $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
+
+// Logik untuk menetapkan nilai bulan/tahun untuk dropdown filter (berdasarkan start_date)
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
@@ -118,8 +134,8 @@ $sql_report = "SELECT
                 ri.reserve_date, ri.return_date, ri.return_condition,
                 COALESCE(tech.name, adm.name) AS technician_name
              " . $sql_base_report . $sql_where_report . " 
-             ORDER BY a.asset_code ASC
-             LIMIT ? OFFSET ?"; // Tambah LIMIT dan OFFSET
+             ORDER BY ri.return_date DESC, ri.id DESC
+             LIMIT ? OFFSET ?"; // *PEMBETULAN ORDER BY: Susun ikut tarikh pemulangan terbaru*
 
 // Salin semula nilai parameter asal (kerana ia 'by reference' dan mungkin berubah)
 $param_values_select = array($report_start_date, $report_end_date);
@@ -146,6 +162,9 @@ $result_report = $stmt_report->get_result();
 $records = $result_report->fetch_all(MYSQLI_ASSOC);
 $stmt_report->close();
 
+// =======================================================
+// 📋 SEKSYEN 2: LOG AKTIVITI (TAB 2)
+// =======================================================
 $logs = array();
 
 // Tetapan Pagination
@@ -204,8 +223,8 @@ if ($stmt_count_log) {
 // 2. Query untuk SELECT (Dapatkan Data)
 $sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address 
              " . $sql_base_log . $sql_where_log . " 
-             ORDER BY timestamp ASC 
-             LIMIT ? OFFSET ?"; // Tambah LIMIT dan OFFSET
+             ORDER BY timestamp DESC 
+             LIMIT ? OFFSET ?"; // Susun ikut timestamp DESC (terbaru di atas)
 
 // Salin semula nilai parameter (sama seperti di atas)
 $param_values_select_log = array($log_start_date, $end_date_sql);
@@ -363,7 +382,9 @@ $stmt_log->close();
                                     <?php for ($m = 1; $m <= 12; $m++) {
                                         $month_name = date('F', mktime(0, 0, 0, $m, 1));
                                         $selected = ($m == $current_month) ? 'selected' : '';
-                                        echo "<option value='$m' $selected>$month_name</option>";
+                                        // Padding bulan dengan 0 jika kurang dari 10
+                                        $month_value = str_pad($m, 2, '0', STR_PAD_LEFT);
+                                        echo "<option value='$month_value' $selected>$month_name</option>";
                                     } ?>
                                 </select>
                             </div>
@@ -583,7 +604,7 @@ $stmt_log->close();
     var monthFilter = document.getElementById('month_filter');
     var yearFilter = document.getElementById('year_filter');
     var categoryFilter = document.getElementById('category_filter');
-    var reportForm = document.getElementById('reportForm');
+    // var reportForm = document.getElementById('reportForm'); // Tidak diperlukan lagi
     var startDateInput = document.getElementById('start_date');
     var endDateInput = document.getElementById('end_date');
     
@@ -594,20 +615,23 @@ $stmt_log->close();
         // Cipta objek URLSearchParams untuk kekalkan filter lain
         var params = new URLSearchParams(window.location.search);
         
-        // Tetapkan tarikh
+        // Kira tarikh mula dan akhir bulan yang dipilih
         var startDate = new Date(year, month - 1, 1);
-        var endDate = new Date(year, month, 0);
+        var endDate = new Date(year, month, 0); // Hari ke-0 bulan berikutnya adalah hari terakhir bulan ini
         
         var formatDate = function(date) {
             var y = date.getFullYear();
-            var m = ('0' (date.getMonth() + 1)).slice(-2);
+            var m = ('0' + (date.getMonth() + 1)).slice(-2); // Bulan bermula dari 0
             var d = ('0' + date.getDate()).slice(-2);
             return y + '-' + m + '-' + d;
         };
+        
+        var newStartDate = formatDate(startDate);
+        var newEndDate = formatDate(endDate);
 
-        // Set nilai pada URL params
-        params.set('start_date', formatDate(startDate));
-        params.set('end_date', formatDate(endDate));
+        // Set nilai pada URL params. Ini adalah penting untuk PHP mengambil data
+        params.set('start_date', newStartDate);
+        params.set('end_date', newEndDate);
         params.set('category_id', categoryFilter.value); // Ambil nilai kategori juga
         params.set('tab', 'returns'); // Pastikan tab betul
         params.delete('page_returns'); // Reset ke halaman 1 bila filter
@@ -620,7 +644,7 @@ $stmt_log->close();
     if (monthFilter) monthFilter.addEventListener('change', updateAndSubmit);
     if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
     if (categoryFilter) categoryFilter.addEventListener('change', updateAndSubmit);
-
+    
     // --- JS UNTUK TAB 2 (ACTIVITY LOG) ---
     flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
     flatpickr("#log_end_date", { dateFormat: "Y-m-d" });

@@ -30,6 +30,29 @@ function safe_unlink($filepath) {
     }
 }
 
+function get_reservation_item_count($conn, $status) {
+    // Hanya kira item yang berstatus 'Pending'
+    $sql = "SELECT COUNT(id) AS count 
+            FROM reservation_items 
+            WHERE status = ?";
+    
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("Prepare failed: (" . $conn->errno . ") " . $conn->error);
+        return 0;
+    }
+    
+    $stmt->bind_param("s", $status);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    return $result ? (int) $result['count'] : 0;
+}
+
+// Dapatkan kiraan yang diperlukan untuk dashboard
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
+
 // --- 2. CATEGORY MANAGEMENT LOGIC ---
 
 // --- TAMBAH KATEGORI ---
@@ -341,7 +364,24 @@ $item_details = $conn->query("
     /* KOD PENTING INI MENOLAKNYA KE BAWAH SEKALI */
     margin-top: auto; 
 }        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
+        /* 5. SIDEBAR BADGE STYLE (Penambahan) */
+.sidebar a .badge {
+    margin-left: auto; /* Tolak badge ke kanan */
+    font-size: 0.75rem;
+    padding: 0.4em 0.6em;
+    font-weight: 700;
+    border-radius: 10px;
+    background-color: #ef4444; /* Merah untuk menarik perhatian */
+    color: white;
+}
+
+/* Pastikan badge tidak hilang apabila item menu di-hover atau aktif */
+.sidebar a.active .badge, .sidebar a:hover .badge {
+    background-color: #ffffff;
+    color: #ef4444; /* Warna terbalik agar kontras */
+}
+
+		.main-content { margin-left: 250px; }
         /* Topbar tidak lagi fixed di desktop, hanya di mobile */
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; } 
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
@@ -440,14 +480,19 @@ $item_details = $conn->query("
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar" id="offcanvasSidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>Dashboard</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php">
+            <i class="fa-solid fa-dolly"></i> Manage Requests
+            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+        </a>
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
@@ -474,7 +519,7 @@ $item_details = $conn->query("
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="card shadow-sm p-4 mb-4">
-                    <h5 class="mb-3"><i class="fa fa-cubes"></i> **1. Add New Item Type & Units**</h5>
+                    <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
                     <p class="text-muted small">Create a new item type and add initial stock in one step.</p>
                     <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                         <input type="hidden" name="add_item_type_and_units" value="1">
@@ -520,7 +565,7 @@ $item_details = $conn->query("
             </div>
             <div class="col-lg-8">
                 <div class="card h-100">
-                    <h5><i class="fa fa-list-check me-2 text-primary"></i> **Item Type Summary**</h5>
+                    <h5><i class="fa fa-list-check me-2 text-primary"></i> Item Type Summary</h5>
                     <p class="text-muted small">Overview of all item types. Click <i class="fa fa-eye"></i> to view individual units.</p>
                     
                     <div class="table-responsive">

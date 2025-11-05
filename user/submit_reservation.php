@@ -14,12 +14,15 @@ $user_id = (int)$_SESSION['user_id'];
 if (!isset($_POST['all_items']) || empty($_POST['all_items'])) { send_error('Tiada item dihantar.'); }
 $items_to_reserve = json_decode($_POST['all_items'], true);
 
+// ✅ Ambil priority dari POST (kalau takde, default 3)
+$priority = isset($_POST['program_type']) ? (int)$_POST['program_type'] : 3;
+
 $conn->begin_transaction();
 
 try {
     // 1. Cipta satu rekod tempahan utama
-    $stmt_res = $conn->prepare("INSERT INTO reservations (user_id, created_at) VALUES (?, NOW())");
-    $stmt_res->bind_param("i", $user_id);
+    $stmt_res = $conn->prepare("INSERT INTO reservations (user_id, created_at, priority) VALUES (?, NOW(), ?)");
+    $stmt_res->bind_param("ii", $user_id, $priority);
     $stmt_res->execute();
     $reserve_id = $conn->insert_id;
     $stmt_res->close();
@@ -28,7 +31,6 @@ try {
     foreach ($items_to_reserve as $item_data) {
         $item_name = $item_data['item_name'];
         
-        // Cari satu item_id wakil untuk nama item ini
         $stmt_find_id = $conn->prepare("SELECT item_id FROM item WHERE item_name = ? LIMIT 1");
         $stmt_find_id->bind_param("s", $item_name);
         $stmt_find_id->execute();
@@ -38,7 +40,6 @@ try {
         if (!$result_id) { throw new Exception("Item '" . htmlspecialchars($item_name) . "' tidak wujud."); }
         $item_id = $result_id['item_id'];
 
-        // Simpan permohonan ke `reservation_items` dengan status 'Pending'
         $stmt_item = $conn->prepare(
             "INSERT INTO reservation_items (reserve_id, item_id, quantity, reserve_date, return_date, reason, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')"
         );

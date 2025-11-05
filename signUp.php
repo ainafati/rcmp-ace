@@ -1,13 +1,14 @@
 <?php
 session_start();
-include 'config.php';
+// Pastikan fail config.php anda betul-betul di direktori yang sama
+include 'config.php'; 
 
-// Check database connection
+// Semak sambungan pangkalan data
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// If form is submitted
+// Jika borang dihantar
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = $_POST['name'];
     $email = $_POST['email'];
@@ -17,12 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $phoneNum = $_POST['phoneNum'];
     $status = 'active';
 
-    // 1. EMAIL DOMAIN VALIDATION
+    // 1. PENGESAHAN DOMAIN EMAIL
     $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my'];
     $is_valid_domain = false;
     $lower_email = strtolower($email);
 
     foreach ($allowed_domains as $domain) {
+        // Semak jika email berakhir dengan domain yang dibenarkan
         if (substr($lower_email, -strlen($domain)) === $domain) {
              $is_valid_domain = true;
              break;
@@ -35,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // 2. PASSWORD VALIDATION
+    // 2. PENGESAHAN KATA LALUAN
     if ($password !== $confirm_password) {
         $_SESSION['error'] = "Passwords do not match!";
         header("Location: signUp.php");
@@ -53,8 +55,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // 3. DUPLICATION CHECK (EMAIL OR IC NUMBER)
-    $stmt = $conn->prepare("SELECT email, ic_num FROM user WHERE email = ? OR ic_num = ?");
+    // 3. SEMAKAN DUPLIKASI MERENTAS SEMUA PERANAN (user, admin, technician)
+    
+    // Union ALL untuk mencari rekod dalam 3 jadual sekaligus
+    $sql_check = "
+        (SELECT 'user' AS role, email, ic_num FROM user WHERE email = ? OR ic_num = ?)
+        UNION ALL
+        (SELECT 'admin' AS role, email, ic_num FROM admin WHERE email = ? OR ic_num = ?)
+        UNION ALL
+        (SELECT 'technician' AS role, email, ic_num FROM technician WHERE email = ? OR ic_num = ?)
+    ";
+
+    $stmt = $conn->prepare($sql_check);
     
     if (!$stmt) {
         $_SESSION['error'] = "Database error (Prepare failed: " . $conn->error . ")";
@@ -62,24 +74,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
     
-    $stmt->bind_param("ss", $email, $ic_num); 
+    // Binding 6 parameters: email, ic_num (untuk setiap 3 SELECT)
+    $stmt->bind_param("ssssss", $email, $ic_num, $email, $ic_num, $email, $ic_num);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
+        
+        // Tetapkan mesej ralat berdasarkan peranan yang ditemui
+        $role_found = strtoupper($row['role']);
+        
         if ($row['email'] === $email) {
-            $_SESSION['error'] = "Email is already registered!";
+            $_SESSION['error'] = "Email is already registered as **" . $role_found . "**.";
         } else if ($row['ic_num'] === $ic_num) {
-            $_SESSION['error'] = "IC Number is already registered!";
+            $_SESSION['error'] = "IC Number is already registered as **" . $role_found . "**.";
         }
+        
         $stmt->close();
         header("Location: signUp.php");
         exit();
     }
     $stmt->close();
 
-    // 4. INSERT NEW USER INTO DATABASE
+    // 4. MASUKKAN PENGGUNA BARU KE DALAM JADUAL 'user'
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     
     $sql = "INSERT INTO user (name, email, ic_num, password, phoneNum, status) VALUES (?, ?, ?, ?, ?, ?)";
@@ -95,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if ($stmt->execute()) {
         $_SESSION['success'] = "Account created successfully. Please log in.";
+        // Simpan butiran log masuk sementara untuk kemudahan log masuk
         $_SESSION['login_attempt_role'] = 'user'; 
         $_SESSION['login_attempt_email'] = $email; 
         header("Location: login.php");
@@ -110,14 +129,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Sign Up - UniKL A.C.E.</title>
+    <title>Sign Up - R-ILMS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* -------------------------------------------------------------------------- */
-        /* GLOBAL & STRUCTURE - ALIGNED WITH LOGIN PAGE */
+        /* GLOBAL & STRUCTURE - Disesuaikan untuk tema UniKL (Navy/Blue) */
         /* -------------------------------------------------------------------------- */
         :root {
             --primary-color: #00285a; /* Dark Navy Blue (UniKL) */
@@ -154,12 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             text-align: center; 
             box-shadow: inset -5px 0 10px rgba(0, 0, 0, 0.2); 
         }
-        .info-panel img { 
-             /* Guna imej logo UniKL di sini jika ada */
-            width: 150px; 
-            margin-bottom: 20px; 
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
-        }
         .info-panel h1 { font-size: 30px; font-weight: 800; margin: 0; letter-spacing: 0.5px; }
         .info-panel p { font-size: 16px; opacity: 0.9; max-width: 350px; line-height: 1.6; margin-top: 15px;}
 
@@ -171,11 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             justify-content: center; 
             background: #fff; 
             padding: 40px; 
-            overflow-y: auto; /* Membenarkan tatal jika form terlalu panjang */
+            overflow-y: auto; 
         }
         .form-container { 
             width: 100%; 
-            max-width: 450px; /* Aligned with login max-width */
+            max-width: 450px; 
         }
         h2 { 
             font-size: 28px; 
@@ -251,7 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             padding: 0; 
             font-size: 13px; 
             color: #64748b; 
-            margin-top: -10px; /* Naikkan sedikit dari input atas */
+            margin-top: -10px; 
             margin-bottom: 25px; 
         }
         #password-requirements li { 
@@ -265,7 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         #password-requirements li i { 
             width: 20px; 
             margin-right: 5px;
-            color: var(--error-color); /* Ikon silang merah lalai */
+            color: var(--error-color); 
         }
         #password-requirements li.valid i { 
             color: var(--success-color); 
@@ -292,7 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             .info-panel {
                 flex: none; 
                 padding: 30px 20px;
-                height: 150px; /* Lebih kecil daripada login page kerana tiada logo besar */
+                height: 150px; 
                 justify-content: center;
             }
             .info-panel h1 { 
@@ -322,8 +335,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <div class="container">
     <div class="info-panel">
-        <h1>Create Your UniKL A.C.E. Account</h1>
-        <p>Join the UniKL Equipment Loaning System to easily borrow and manage technical assets.</p>
+        <h1>Create Your R-ILMS Account</h1>
+        <p>Join the RCMP Inventory Loan Management System to easily borrow and manage technical assets.</p>
     </div>
 
     <div class="form-panel">
@@ -335,26 +348,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" action="signup.php" id="signupForm">
+            <form method="POST" action="signUp.php" id="signupForm">
                 <div class="input-group">
                     <label for="name">Full Name</label>
-                    <input type="text" name="name" id="name" required>
+                    <input type="text" name="name" id="name" required 
+                           value="<?= htmlspecialchars(isset($_POST['name']) ? $_POST['name'] : '') ?>">
                 </div>
                 
                 <div class="input-group">
                     <label for="ic_num">IC Number (12 Digits)</label>
                     <input type="text" name="ic_num" id="ic_num" required 
                             pattern="[0-9]{12}" 
-                            title="IC Number must be 12 digits (e.g., 900101015001)"> 
+                            title="IC Number must be 12 digits (e.g., 900101015001)"
+                            value="<?= htmlspecialchars(isset($_POST['ic_num']) ? $_POST['ic_num'] : '') ?>"> 
                 </div>
 
                 <div class="input-group">
                     <label for="email">Email</label>
-                    <input type="email" name="email" id="email" required placeholder="username@unikl.edu.my">
+                    <input type="email" name="email" id="email" required placeholder="username@unikl.edu.my"
+                            value="<?= htmlspecialchars(isset($_POST['email']) ? $_POST['email'] : '') ?>">
                 </div>
                 <div class="input-group">
                     <label for="phoneNum">Phone Number</label>
-                    <input type="text" name="phoneNum" id="phoneNum" required placeholder="01X-XXXXXXX">
+                    <input type="text" name="phoneNum" id="phoneNum" required placeholder="01X-XXXXXXX"
+                            value="<?= htmlspecialchars(isset($_POST['phoneNum']) ? $_POST['phoneNum'] : '') ?>">
                 </div>
                 <div class="input-group">
                     <label for="password">Password</label>
@@ -388,7 +405,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     const submitBtn = document.getElementById('submitBtn');
     const matchError = document.getElementById('password-match-error');
     
-    // Requirements object (Sama seperti kod asal anda)
+    // Requirements object 
     const reqs = {
         length: { el: document.getElementById('length'), valid: false, regex: /.{8,}/ },
         lowercase: { el: document.getElementById('lowercase'), valid: false, regex: /[a-z]/ },
@@ -419,11 +436,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     function validateConfirmPassword() {
         const passwordsMatch = passwordInput.value === confirmPasswordInput.value && passwordInput.value !== '';
-        if (passwordsMatch) {
+        
+        if (confirmPasswordInput.value === '') {
             matchError.style.display = 'none';
-        } else if (confirmPasswordInput.value !== '' || passwordInput.value !== '') {
-            // Tunjukkan ralat hanya jika salah satu input telah diisi
-            matchError.style.display = 'block';
+        } else if (!passwordsMatch) {
+             matchError.style.display = 'block';
         } else {
             matchError.style.display = 'none';
         }
@@ -434,27 +451,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const isPasswordStrong = validatePassword();
         const doPasswordsMatch = validateConfirmPassword();
         
-        // Menggunakan checkValidity() untuk mengesahkan semua input yang diperlukan
+        // Semak pengesahan HTML5 (required fields, pattern, email type)
         const form = document.getElementById('signupForm');
         const isFormFilled = form.checkValidity();
 
-        // IC Number must also be 12 digits
-        const icInput = document.getElementById('ic_num');
-        const isICValid = icInput.checkValidity();
-        
-        if (isPasswordStrong && doPasswordsMatch && isFormFilled && isICValid) {
+        if (isPasswordStrong && doPasswordsMatch && isFormFilled) {
             submitBtn.disabled = false;
         } else {
             submitBtn.disabled = true;
         }
     }
 
+    // Listener untuk setiap input yang boleh menjejaskan keesahan borang
     passwordInput.addEventListener('input', checkFormValidity);
     confirmPasswordInput.addEventListener('input', checkFormValidity);
     document.getElementById('name').addEventListener('input', checkFormValidity);
     document.getElementById('ic_num').addEventListener('input', checkFormValidity);
     document.getElementById('email').addEventListener('input', checkFormValidity);
     document.getElementById('phoneNum').addEventListener('input', checkFormValidity);
+    
+    // Panggilan awal jika pengguna kembali ke halaman dengan data yang sudah diisi
+    document.addEventListener('DOMContentLoaded', checkFormValidity);
 
 </script>
 

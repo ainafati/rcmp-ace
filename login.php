@@ -8,14 +8,13 @@ if (isset($_SESSION['tech_id'])) { header("Location: technician/dashboard_tech.p
 if (isset($_SESSION['admin_id'])) { header("Location: admin/manageItem_admin.php"); exit(); }
 
 // Check for a failed login attempt OR a successful signup
-// FIX: Use isset() ternary operator for compatibility with older PHP versions (before 7.0)
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
 // Clear session variables after reading
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 
-// Retrieve and clear flash messages using the compatible ternary operator
+// Retrieve and clear flash messages
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
 unset($_SESSION['error'], $_SESSION['success']);
@@ -24,7 +23,7 @@ unset($_SESSION['error'], $_SESSION['success']);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login - UniKL A.C.E. RCMP</title>
+    <title>Login - R-ILMS</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -33,15 +32,15 @@ unset($_SESSION['error'], $_SESSION['success']);
     
 <style>
     /* -------------------------------------------------------------------------- */
-    /* GLOBAL & STRUCTURE (Re-optimized) */
+    /* GLOBAL & STRUCTURE (Using NEW Color Scheme) */
     /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147; /* Dark Navy Blue (UniKL) */
-        --secondary-color: #005a9c; /* Lighter Blue */
-        --accent-color: #f58220; /* UniKL Orange */
-        --light-bg: #f5f8ff; 
+        --primary-color: #002147;      /* Dark Blue (Text, Main Background) */
+        --accent-cyan: #00A3C9;       /* Light Blue/Cyan (Main Accent) */
+        --accent-green: #A7D737;      /* Lime Green (Secondary Accent) */
+        --light-bg: #f5f8ff;    /* Light background */
         --border-color: #e2e8f0;
-        --shadow-light: 0 4px 15px rgba(0, 0, 0, 0.1);
+        --shadow-light: 0 4px 15px rgba(0, 0, 0, 0.08); /* Adjusted shadow */
     }
 
     body, html { 
@@ -54,16 +53,16 @@ unset($_SESSION['error'], $_SESSION['success']);
     }
     .container { 
         display: flex; 
-        height: 100vh; /* Pastikan ia mengisi seluruh pandangan */
+        height: 100vh;
         min-height: 700px;
     }
     
     /* -------------------------------------------------------------------------- */
-    /* INFO PANEL (LEFT) - Less complex shadow */
+    /* INFO PANEL (LEFT) - The main blue panel */
     /* -------------------------------------------------------------------------- */
     .info-panel { 
         flex: 1; 
-        background: var(--primary-color); 
+        background: var(--primary-color); /* Dark Blue Background */
         color: white; 
         display: flex; 
         flex-direction: column; 
@@ -71,7 +70,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         justify-content: center; 
         padding: 40px; 
         text-align: center; 
-        box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2); 
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3); /* Stronger shadow */
         position: relative;
         z-index: 10;
     }
@@ -79,8 +78,23 @@ unset($_SESSION['error'], $_SESSION['success']);
         width: 200px; 
         margin-bottom: 30px; 
     }
-    .info-panel h1 { font-size: 38px; font-weight: 800; margin: 0; letter-spacing: 1px; }
-    .info-panel p { font-size: 16px; opacity: 0.9; max-width: 400px; line-height: 1.6; margin-top: 15px; }
+    .info-panel h1 { 
+        font-size: 38px; 
+        font-weight: 800; 
+        margin: 0; 
+        letter-spacing: 1px;
+    }
+    .info-panel p { 
+        font-size: 16px; 
+        opacity: 0.9; 
+        max-width: 400px; 
+        line-height: 1.6; 
+        margin-top: 15px; 
+    }
+    /* Logo Link Color Adjustment */
+    .form-footer a[href="index.php"] {
+        color: var(--accent-cyan) !important; 
+    }
 
     /* -------------------------------------------------------------------------- */
     /* FORM PANEL (RIGHT) */
@@ -134,7 +148,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     .role-content i { 
         font-size: 30px; 
         margin-bottom: 10px; 
-        color: var(--secondary-color); 
+        color: var(--accent-cyan); /* Icon Color: Cyan */
     }
     .role-content span { 
         display: block; 
@@ -143,12 +157,12 @@ unset($_SESSION['error'], $_SESSION['success']);
         color: #1e293b; 
     }
     .role-card:hover .role-content { 
-        border-color: var(--secondary-color); 
+        border-color: var(--accent-cyan); /* Hover Border: Cyan */
         transform: translateY(-3px);
     }
     .role-card input:checked + .role-content { 
-        border-color: var(--primary-color); 
-        background-color: #f0f4f9; /* Light highlight */
+        border-color: var(--primary-color); /* Checked Border: Dark Blue */
+        background-color: #f0f4f9; 
         transform: translateY(-2px); 
     }
     
@@ -189,8 +203,8 @@ unset($_SESSION['error'], $_SESSION['success']);
         transition: border-color 0.3s, box-shadow 0.3s;
     }
     .input-group input:focus {
-        border-color: var(--accent-color); /* Orange focus */
-        box-shadow: 0 0 0 2px rgba(245, 130, 32, 0.2); 
+        border-color: var(--accent-green); /* Input Focus: Lime Green */
+        box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
         outline: none;
     }
     .toggle-password { 
@@ -203,10 +217,10 @@ unset($_SESSION['error'], $_SESSION['success']);
         font-size: 16px;
     }
     .toggle-password:hover {
-        color: var(--secondary-color);
+        color: var(--accent-cyan); /* Toggle Hover: Cyan */
     }
     .login-btn { 
-        background: var(--primary-color); 
+        background: var(--primary-color); /* Button: Dark Blue */
         color: white; 
         border: none; 
         width: 100%; 
@@ -218,17 +232,25 @@ unset($_SESSION['error'], $_SESSION['success']);
         transition: background-color 0.3s, transform 0.1s;
     }
     .login-btn:hover {
-        background-color: #003a73;
+        background-color: var(--accent-cyan); /* Button Hover: Cyan */
         transform: translateY(-1px);
     }
     .login-btn:active {
         transform: translateY(0);
+        background-color: #0087a3; /* Darker Cyan on press */
     }
     
     /* Footer & Alerts */
     .form-footer { margin-top: 25px; font-size: 14px; text-align: center; }
-    .form-footer a { color: var(--secondary-color); text-decoration: none; font-weight: 600; }
-    .form-footer a:hover { text-decoration: underline; color: var(--accent-color); }
+    .form-footer a { 
+        color: var(--accent-cyan); /* Footer Links: Cyan */
+        text-decoration: none; 
+        font-weight: 600; 
+    }
+    .form-footer a:hover { 
+        text-decoration: underline; 
+        color: var(--primary-color); /* Footer Hover: Dark Blue */
+    }
     .alert-message { 
         border-radius: 8px; 
         padding: 12px; 
@@ -241,6 +263,9 @@ unset($_SESSION['error'], $_SESSION['success']);
     }
     .error-message { color: #842029; background-color: #f8d7da; border: 1px solid #f5c2c7; }
     .success-message { color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; }
+    .instruction #role-title {
+        color: var(--accent-cyan) !important; /* Ensure role title is Cyan */
+    }
 
     /* -------------------------------------------------------------------------- */
     /* RESPONSIVE DESIGN (MOBILE) */
@@ -279,7 +304,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         }
         
         .roles {
-            grid-template-columns: 1fr 1fr; /* 2 columns on small tablets/phones */
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
         .role-content {
@@ -295,7 +320,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     /* For very small phones */
     @media (max-width: 450px) {
         .roles {
-            grid-template-columns: 1fr; /* Back to 1 column if screen is too narrow */
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -305,13 +330,13 @@ unset($_SESSION['error'], $_SESSION['success']);
 <div class="container">
     <div class="info-panel">
         <img src="assets/unikl-logo.png" alt="UniKL Logo">
-        <h1>UniKL A.C.E.</h1>
+        <h1>UniKL R-ILMS</h1>
         <p>Asset Check Effective. IT Department Asset Management Portal. Please select your role to proceed.</p>
     </div>
 
     <div class="form-panel">
         <div class="form-container">
-            <h2>UniKL A.C.E. Login</h2>
+            <h2>UniKL R-ILMS Login</h2>
             
             <div id="role-selection-step">
                 <p class="instruction">Who are you logging in as?</p>
@@ -323,7 +348,7 @@ unset($_SESSION['error'], $_SESSION['success']);
             </div>
 
             <div id="login-details-step">
-                <p class="instruction" style="font-weight: 700;">Log In as <span id="role-title" style="color: var(--secondary-color);"></span></p>
+                <p class="instruction" style="font-weight: 700;">Log In as <span id="role-title" style="color: var(--accent-cyan);"></span></p>
                 
                 <?php if (!empty($errorMessage)): ?>
                     <div class="alert-message error-message"><?= htmlspecialchars($errorMessage); ?></div>
@@ -344,8 +369,7 @@ unset($_SESSION['error'], $_SESSION['success']);
                     <div class="input-group">
                         <label for="password">Password</label>
                         <input type="password" name="password" id="password" required>
-                        <i class="fa-solid fa-eye-slash toggle-password" id="togglePassword"></i> 
-                    </div>
+                        <i class="fa-solid toggle-password" id="togglePassword"></i> </div>
                     
                     <button type="submit" class="login-btn">Log In</button>
                 </form>
@@ -357,7 +381,7 @@ unset($_SESSION['error'], $_SESSION['success']);
             </div>
             
              <div class="form-footer" id="main-footer" style="margin-top: 15px;">
-                <p><a href="index.php"><i class="fa-solid fa-home me-1"></i> Back to Homepage</a></p>
+                 <p><a href="index.php"><i class="fa-solid fa-home me-1"></i> Back to Homepage</a></p>
              </div>
         </div>
     </div>
@@ -409,12 +433,15 @@ unset($_SESSION['error'], $_SESSION['success']);
         
         // --- 3. Password Toggle ---
         togglePassword.addEventListener("click", function () {
-            const type = passwordField.type === "password" ? "text" : "password";
-            passwordField.type = type;
-            this.classList.toggle("fa-eye"); 
+            // 1. Tukar jenis input
+            const isPassword = passwordField.type === "password";
+            passwordField.type = isPassword ? "text" : "password";
+            
+            // 2. Tukar ikon
             this.classList.toggle("fa-eye-slash");
+            this.classList.toggle("fa-eye");
         });
-
+        
         // --- 4. Failed Attempt / Pre-fill Logic ---
         const attemptedRole = '<?= $login_attempt_role ?>';
         if (attemptedRole) {

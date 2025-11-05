@@ -1,7 +1,29 @@
 <?php
 session_start();
 // Pastikan path ke config.php adalah betul (diasumsikan berada di folder atas)
-include '../config.php'; 
+include '../config.php';
+function get_reservation_item_count($conn, $status) {
+    // Hanya kira item yang berstatus 'Pending'
+    $sql = "SELECT COUNT(id) AS count 
+            FROM reservation_items 
+            WHERE status = ?";
+    
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("Prepare failed: (" . $conn->errno . ") " . $conn->error);
+        return 0;
+    }
+    
+    $stmt->bind_param("s", $status);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    return $result ? (int) $result['count'] : 0;
+}
+
+// Dapatkan kiraan yang diperlukan untuk dashboard
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
 
 // Ensure technician is logged in
 if (!isset($_SESSION['tech_id'])) {
@@ -220,12 +242,30 @@ $events_json = json_encode($events);
         .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
+/* 5. SIDEBAR BADGE STYLE (Penambahan) */
+.sidebar a .badge {
+    margin-left: auto; /* Tolak badge ke kanan */
+    font-size: 0.75rem;
+    padding: 0.4em 0.6em;
+    font-weight: 700;
+    border-radius: 10px;
+    background-color: #ef4444; /* Merah untuk menarik perhatian */
+    color: white;
+}
 
+/* Pastikan badge tidak hilang apabila item menu di-hover atau aktif */
+.sidebar a.active .badge, .sidebar a:hover .badge {
+    background-color: #ffffff;
+    color: #ef4444; /* Warna terbalik agar kontras */
+}
         /* 3. MAIN LAYOUT & TOPBAR */
         .main-content { margin-left: 250px; }
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .topbar .technician-profile { display: flex; align-items: center; gap: 12px; }
+.topbar .technician-profile i { 
+    color: #64748b; /* Kelabu */
+}
         .topbar .technician-name { font-weight: 600; font-size: 15px; color: #334155; }
         .container-fluid { padding: 30px; }
 
@@ -241,11 +281,41 @@ $events_json = json_encode($events);
         .text-warning { color: #f59e0b !important; }
         .text-danger { color: #ef4444 !important; }
 
-        /* FullCalendar Custom Styles */
-        #calendar { max-height: 500px; }
-        .fc-event[style*="background-color: #3b82f6"] { background-color: #3b82f6 !important; color: white !important; }
-        .fc-event.buffer-event { background-color: #fdba74 !important; border-color: #f97316 !important; color: #854d0e !important; }
+/* Targetkan bekas kalendar (yang mengandungi kalendar FullCalendar atau yang serupa) */
+.calendar-card {
+    /* Tetapkan ketinggian minimum yang mencukupi untuk kalendar */
+    min-height: 550px; 
+}
 
+/* Pastikan semua elemen kalendar mengisi lebar penuh bekas */
+#calendar,
+.reservation-calendar,
+.fc-view-container { 
+    width: 100%;
+}
+
+/* Penyesuaian font/saiz untuk Kalendar */
+.reservation-calendar table {
+    font-size: 14px; /* Kecilkan sedikit agar muat dengan baik */
+    border: 1px solid var(--border-color); /* Tambah border yang lebih jelas */
+    border-radius: 8px; 
+}
+
+/* Penyesuaian header Kalendar */
+.fc-toolbar {
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Menyelaraskan kotak slot tempahan (seperti "Type-c charger") */
+.fc-event {
+    background-color: var(--secondary-color); /* Warna yang lebih baik untuk event */
+    border: 1px solid var(--primary-color);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 12px;
+}
         /* 5. MOBILE OPTIMIZATIONS */
         @media (max-width: 991.98px) {
             /* Sidebar becomes off-canvas and hidden by default */
@@ -307,10 +377,15 @@ $events_json = json_encode($events);
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>Dashboard</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php" class="active"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php">
+            <i class="fa-solid fa-dolly"></i> Manage Requests
+            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+        </a>
         <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>

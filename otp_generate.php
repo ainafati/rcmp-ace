@@ -69,15 +69,6 @@ try {
     exit;
 }
 
-
-// --- 6. Send OTP Email (Placeholder) ---
-
-/*
- * !!! IMPORTANT: Sending email is complex and requires an external service (like SendGrid, Mailgun, or a configured SMTP server).
- * PHP's built-in mail() function often doesn't work reliably for real applications.
- *
- * REPLACE THIS PLACEHOLDER CODE with actual email sending logic using a robust library (e.g., PHPMailer or an API call).
- */
 $mail_success = false;
 $subject = "Password Reset OTP Code";
 $body = "Hi " . htmlspecialchars($user['name']) . ",\n\nYour One-Time Password (OTP) is: " . $otp . "\n\nThis code expires in 5 minutes.";

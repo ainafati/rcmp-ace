@@ -92,7 +92,7 @@ if ($res_items) {
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
         .btn-primary { background-color: #3b82f6; border: none; }
         .btn-primary:hover { background-color: #2563eb; }
-        .category-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
+        .category-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
         .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; }
         .select2-container--default .select2-selection--single { border: 1px solid #dee2e6; border-radius: 8px; height: 44px; }
         .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 42px; padding-left: 12px; }
@@ -522,7 +522,7 @@ $(document).ready(function() {
         const quantity = $('#quantity').val();
         const reserve = $('#reserveDate').val();
         const ret = $('#returnDate').val();
-        const reason = $('#reason').val();
+        const reason = $('#reason').val(); // Ambil reason dari borang
 
         if (!itemName || !quantity || !reserve || !ret || !reason.trim()) {
             Swal.fire("Incomplete Form", "Please fill in all request details, including a reason.", "warning");
@@ -558,7 +558,8 @@ $(document).ready(function() {
         $('#quantity').val(1);
         reserveDatepicker.clear();
         returnDatepicker.clear();
-        $('#reason').val('');
+        // **BARIS MASALAH DIPADAMKAN/DINYAHAKTIFKAN DI SINI:**
+        // $('#reason').val(''); 
         $('#availability-status').html('');
         // NOTE: program_type tidak direset kerana ia biasanya sama untuk keseluruhan tempahan
     });
@@ -612,6 +613,13 @@ $(document).ready(function() {
         if (!$('#agreeTerms').is(':checked')) {
             Swal.fire("Terms and Conditions", "You must agree to the Terms and Conditions to proceed.", "warning");
             return; // Hentikan penghantaran
+        }
+        
+        // **Tambahan semakan: Walaupun item sudah ditambah, pastikan medan reason tidak kosong semasa submit**
+        // Ini melindungi jika pengguna hanya tambah 1 item dan tidak menggunakan addToList
+        if (!$('#reason').val().trim()) {
+            Swal.fire("Incomplete Form", "Please ensure the Purpose of Loan is filled in.", "warning");
+            return;
         }
 
         const submitBtn = $(this).find('button[type="submit"]');

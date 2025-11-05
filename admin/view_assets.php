@@ -1,32 +1,91 @@
 <?php
-// (SEMUA KOD PHP ANDA DI BAHAGIAN ATAS KEKAL SAMA)
 session_start();
 include 'config.php';
 
-// --- Authentication & Setup ---
+// --- Configuration & Setup ---
+// Pastikan senarai ini merangkumi SEMUA status yang mungkin wujud dalam DB.
+$all_possible_statuses = ['Available', 'Borrowed', 'Checked Out', 'Maintenance', 'Damaged', 'Retired'];
+
+// --- Authentication ---
 if (!isset($_SESSION['admin_id'])) {
     header("Location: login.php");
     exit();
 }
 
+// Dapatkan item_id dari URL. Jika tiada, redirect balik.
 $item_id_filter = isset($_GET['item_id']) ? (int)$_GET['item_id'] : 0;
 if ($item_id_filter === 0) {
-    header("Location: manageItem_admin.php");
+    // Kita gunakan 'manageItem_admin.php' untuk Admin, bukan manageItems_tech.php
+    header("Location: manageItem_admin.php"); 
     exit();
 }
 
-// (Pastikan semua logik PHP lain anda untuk fetch data masih ada di sini)
+// --- HANDLE POST/GET ACTIONS (Edit & Delete) ---
+
+// 1. HANDLE EDIT ASSET (POST)
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
+    $asset_id = (int)$_POST['asset_id'];
+    $brand = trim($_POST['brand']);
+    $model = trim($_POST['model']);
+    $status = trim($_POST['status']);
+    $item_id_return = (int)$_POST['item_id_return']; // Untuk redirect
+
+    // Pastikan status sah sebelum update
+    if ($asset_id > 0 && in_array($status, $all_possible_statuses)) {
+        $stmt_update = $conn->prepare("UPDATE assets SET brand = ?, model = ?, status = ? WHERE asset_id = ?");
+        $stmt_update->bind_param("sssi", $brand, $model, $status, $asset_id);
+        
+        if ($stmt_update->execute()) {
+            $_SESSION['message'] = ['type' => 'success', 'text' => 'Asset Unit successfully updated!'];
+        } else {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'Error updating asset: ' . $conn->error];
+        }
+        $stmt_update->close();
+    } else {
+        $_SESSION['message'] = ['type' => 'warning', 'text' => 'Invalid data or status provided for update.'];
+    }
+
+    header("Location: view_assets.php?item_id=" . $item_id_return);
+    exit();
+}
+
+// 2. HANDLE DELETE ASSET (GET)
+if (isset($_GET['delete_asset_id'])) {
+    $delete_asset_id = (int)$_GET['delete_asset_id'];
+    $item_id_return = (int)$_GET['item_id_return']; // Untuk redirect
+
+    if ($delete_asset_id > 0) {
+        // Amaran: Jika aset ini mempunyai rekod dalam jadual lain (cth: borrowing/reservation),
+        // anda perlu mengendalikan Foreign Key Constraints (ON DELETE CASCADE atau set NULL).
+        // Untuk memudahkan, kita andaikan ON DELETE CASCADE telah diset dalam DB.
+        
+        $stmt_delete = $conn->prepare("DELETE FROM assets WHERE asset_id = ?");
+        $stmt_delete->bind_param("i", $delete_asset_id);
+        
+        if ($stmt_delete->execute()) {
+            $_SESSION['message'] = ['type' => 'success', 'text' => 'Asset Unit deleted successfully.'];
+        } else {
+            // Mesej ralat ini mungkin menunjukkan Foreign Key Constraint yang belum dikendalikan.
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'Error deleting asset unit. Pastikan tiada rekod pinjaman aktif.'];
+        }
+        $stmt_delete->close();
+    } else {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Invalid asset ID for deletion.'];
+    }
+
+    header("Location: view_assets.php?item_id=" . $item_id_return);
+    exit();
+}
+
+
+// --- Data Fetching (Item Type & Assets) ---
+
 $status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 $where_clauses = ["i.item_id = ?"];
 $param_types = "i";
 $param_values = [$item_id_filter];
 
-if (!empty($status_filter) && $status_filter != 'All') {
-    $where_clauses[] = "a.status = ?";
-    $param_types .= "s";
-    $param_values[] = $status_filter;
-}
-
+// Ambil Nama Item Type dan Description
 $stmt_item = $conn->prepare("SELECT item_name, description FROM item WHERE item_id = ?");
 $stmt_item->bind_param("i", $item_id_filter);
 $stmt_item->execute();
@@ -36,21 +95,42 @@ if (!$stmt_item->fetch()) {
 }
 $stmt_item->close();
 
+// Tambah filter Status jika ada
+if (!empty($status_filter) && $status_filter != 'All') {
+    $where_clauses[] = "a.status = ?";
+    $param_types .= "s";
+    $param_values[] = $status_filter;
+}
+
+// QUERY SQL DIPERBAIKI
+// Menggunakan LEFT JOIN untuk mencari peminjam AKTIF bagi aset yang berstatus 'Checked Out'
 $sql_assets = "
-    SELECT a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name
+    SELECT 
+        a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name,
+        CASE 
+            WHEN a.status IN ('Checked Out') THEN u.name 
+            ELSE NULL 
+        END AS borrower_name
     FROM assets a
     JOIN item i ON a.item_id = i.item_id
+    -- LEFT JOIN ke reservation_assets (ra) dan reservation_items (ri)
+    LEFT JOIN reservation_assets ra ON a.asset_id = ra.asset_id
+    LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id AND ri.status = 'Checked Out'
+    -- LEFT JOIN ke reservations (r) dan users (u)
+    LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
+    LEFT JOIN user u ON r.user_id = u.user_id -- Asumsi jadual pengguna anda adalah 'users'
     WHERE " . implode(' AND ', $where_clauses) . "
     ORDER BY a.asset_code ASC
 ";
+
 $stmt_assets = $conn->prepare($sql_assets);
 $stmt_assets->bind_param($param_types, ...$param_values);
 $stmt_assets->execute();
 $all_assets = $stmt_assets->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_assets->close();
 
-$available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
-
+// Kita gunakan $all_possible_statuses di sini untuk Filter/Modal
+$available_statuses = $all_possible_statuses; 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,12 +139,11 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
     <title>Manage Assets — <?= htmlspecialchars($item_name_title) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* CSS LENGKAP & SERAGAM UNTUK TEMA BARU ANDA */
+        /* CSS LENGKAP & SERAGAM KEKAL SAMA */
         body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
         .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
@@ -88,6 +167,7 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
         .btn { border-radius: 8px; font-weight: 500; }
         .btn-primary { background-color: #3b82f6; border: none; }
         .btn-primary:hover { background-color: #2563eb; }
+        .borrower-icon { color: #1e293b; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -117,12 +197,13 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
             <h5><i class="fa-solid fa-list me-2 text-primary"></i> <?= htmlspecialchars($item_name_title) ?></h5>
             <p class="text-muted"><?= htmlspecialchars($description) ?></p>
             <hr>
-            <form method="GET" class="row g-3 align-items-center mb-3">
+            
+            <form method="GET" class="row g-3 align-items-center mb-4">
                 <input type="hidden" name="item_id" value="<?= $item_id_filter ?>">
                 <div class="col-md-4">
-                    <label for="status_filter" class="form-label small">Filter by Status</label>
+                    <label for="status_filter" class="form-label small text-uppercase fw-bold">Filter by Status</label>
                     <select name="status" id="status_filter" class="form-select">
-                        <option value="All">Show All</option>
+                        <option value="All">Show All (<?= count($all_assets) ?> units)</option>
                         <?php foreach($available_statuses as $s): ?>
                             <option value="<?= $s ?>" <?= $status_filter == $s ? 'selected' : '' ?>><?= htmlspecialchars($s) ?></option>
                         <?php endforeach; ?>
@@ -137,14 +218,14 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>Asset Code</th><th>Brand</th><th>Model</th><th>Status</th><th>Actions</th>
+                            <th>Asset Code</th><th>Brand</th><th>Model</th><th>Status</th><th>Borrower</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($all_assets)): ?>
-                            <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-box-open fa-2x mb-2"></i><br>No asset units found for this item type.</td></tr>
-                        <?php else: foreach($all_assets as $asset): 
-                            $status = strtolower($asset['status']);
+                            <tr><td colspan="6" class="text-center text-muted py-5"><i class="fa-solid fa-box-open fa-2x mb-2"></i><br>No asset units found for this item type or filter.</td></tr>
+                        <?php else: foreach($all_assets as $asset):
+                            $status = strtolower(str_replace(' ', '_', $asset['status']));
                             $badge_class = 'text-bg-light';
                             if ($status == 'available') $badge_class = 'text-bg-success';
                             if (in_array($status, ['borrowed', 'checked_out'])) $badge_class = 'text-bg-warning';
@@ -156,6 +237,13 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
                             <td><?= htmlspecialchars($asset['brand'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($asset['model'] ?: '-') ?></td>
                             <td><span class="badge rounded-pill <?= $badge_class ?>"><?= htmlspecialchars($asset['status']) ?></span></td>
+                            <td>
+                                <?php if (!empty($asset['borrower_name'])): ?>
+                                    <i class="fa fa-user borrower-icon"></i> <?= htmlspecialchars($asset['borrower_name']) ?>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <button class="btn btn-sm btn-outline-warning" title="Edit Unit" onclick='openEditAssetModal(<?= json_encode($asset) ?>)'><i class="fa fa-edit"></i></button>
                                 <button class="btn btn-sm btn-outline-danger" title="Delete Unit" onclick="deleteAsset(<?= $asset['asset_id'] ?>, '<?= htmlspecialchars(addslashes($asset['asset_code'])) ?>', <?= $item_id_filter ?>)"><i class="fa fa-trash"></i></button>
@@ -181,10 +269,18 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
                     <input type="hidden" name="edit_asset" value="1">
                     <input type="hidden" id="edit_asset_id" name="asset_id">
                     <input type="hidden" name="item_id_return" value="<?= $item_id_filter ?>">
-                    <div class="mb-3"><label class="form-label">Brand</label><input type="text" id="edit_brand" name="brand" class="form-control"></div>
-                    <div class="mb-3"><label class="form-label">Model</label><input type="text" id="edit_model" name="model" class="form-control"></div>
-                    <div class="mb-3"><label class="form-label">Status</label><select id="edit_status" name="status" class="form-select" required><?php foreach($available_statuses as $s): ?><option value="<?= $s ?>"><?= htmlspecialchars($s) ?></option><?php endforeach; ?></select></div>
-                    <button type="submit" class="btn btn-warning w-100 text-dark">Update Asset Unit</button>
+                    
+                    <div class="mb-3"><label class="form-label fw-bold">Brand</label><input type="text" id="edit_brand" name="brand" class="form-control"></div>
+                    <div class="mb-3"><label class="form-label fw-bold">Model</label><input type="text" id="edit_model" name="model" class="form-control"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Status</label>
+                        <select id="edit_status" name="status" class="form-select" required>
+                            <?php foreach($all_possible_statuses as $s): // Guna all_possible_statuses di modal ?>
+                                <option value="<?= $s ?>"><?= htmlspecialchars($s) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100 text-dark fw-bold mt-3">Update Asset Unit</button>
                 </form>
             </div>
         </div>
@@ -193,21 +289,55 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// (SEMUA FUNGSI JAVASCRIPT ANDA KEKAL SAMA)
-function openEditAssetModal(asset) {
-    document.getElementById('edit_asset_id').value = asset.asset_id;
-    document.getElementById('asset_code_display').textContent = asset.asset_code;
-    document.getElementById('edit_brand').value = asset.brand;
-    document.getElementById('edit_model').value = asset.model;
-    document.getElementById('edit_status').value = asset.status;
-    new bootstrap.Modal(document.getElementById('editAssetModal')).show();
-}
-
-function deleteAsset(id, code, item_id) {
-    if (confirm("Are you sure you want to delete asset unit '" + code + "'? This cannot be undone.")) {
-        window.location.href = 'view_assets.php?delete_asset_id=' + id + '&item_id_return=' + item_id;
+    // --- SWEETALERT2 MESSAGE DISPLAY (DAPATKAN DARI SESSION) ---
+    <?php
+    if (isset($_SESSION['message'])) {
+        $message = $_SESSION['message'];
+        unset($_SESSION['message']);
+        echo "Swal.fire({
+            icon: '{$message['type']}',
+            title: '{$message['text']}',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3500,
+            timerProgressBar: true
+        });";
     }
-}
+    ?>
+
+    // --- FUNGSI JAVASCRIPT ---
+
+    function openEditAssetModal(asset) {
+        document.getElementById('edit_asset_id').value = asset.asset_id;
+        document.getElementById('asset_code_display').textContent = asset.asset_code;
+        document.getElementById('edit_brand').value = asset.brand;
+        document.getElementById('edit_model').value = asset.model;
+        // Pastikan status di modal juga diset betul
+        const statusSelect = document.getElementById('edit_status');
+        for (let i = 0; i < statusSelect.options.length; i++) {
+            if (statusSelect.options[i].value === asset.status) {
+                statusSelect.selectedIndex = i;
+                break;
+            }
+        }
+        new bootstrap.Modal(document.getElementById('editAssetModal')).show();
+    }
+
+    function deleteAsset(id, code, item_id) {
+        Swal.fire({
+            title: `Delete Unit ${code}?`,
+            text: "This unit will be permanently removed from inventory. This action cannot be undone!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Yes, Delete Unit!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = 'view_assets.php?delete_asset_id=' + id + '&item_id_return=' + item_id;
+            }
+        });
+    }
 </script>
 </body>
 </html>

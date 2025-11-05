@@ -3,202 +3,251 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UniKL A.C.E. (Asset Check Effective) - IT Asset Management</title>
+    <title>R-ILMS (RCMP Management System-Inventory) - IT Asset Management</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         :root {
-            --unikl-blue: #002147;
-            --unikl-orange: #f58220;
-            --light-blue: #f0f5ff;
-            --text-dark: #333;
-            --text-light: #555;
+            /* NEW RCMP-Inspired Colors (Clean & Tech/Medical) */
+            --primary-blue: #002147;      /* Keep a dark blue base for text/structure */
+            --accent-cyan: #00A3C9;       /* Light Blue/Cyan for highlights */
+            --accent-green: #A7D737;      /* Lime Green for secondary highlights */
+            --background-light: #ffffff; 
+            --off-white: #f8f9fc;
+            --text-dark: #222;
+            --text-muted: #666;
+            --border-color: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
             margin: 0;
-            font-family: 'Poppins', 'Segoe UI', sans-serif;
-            background: #f8f9fc;
+            font-family: 'Poppins', sans-serif;
+            background: var(--background-light); 
             color: var(--text-dark);
             scroll-behavior: smooth;
         }
 
-        /* Navbar */
+        /* Container for Content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Navbar - Clean and Professional */
         .navbar {
-            background: white;
+            background: var(--background-light);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 15px 40px;
+            justify-content: center;
+            padding: 15px 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             position: sticky;
             top: 0;
             z-index: 1000;
+            border-bottom: 3px solid var(--accent-cyan); /* Using New Accent Cyan */
+        }
+        .navbar-layout { 
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px; 
         }
         .navbar-left img {
-            height: 50px; /* Logo Size INCREASED */
+            height: 38px; 
         }
         .navbar-title {
-            color: var(--unikl-blue);
-            font-size: 20px;
+            color: var(--primary-blue);
+            font-size: 18px; 
             font-weight: 700;
+            line-height: 1.2;
         }
         .navbar-right a {
             color: white;
             text-decoration: none;
-            background: var(--unikl-orange);
-            padding: 12px 22px;
-            border-radius: 8px;
+            background: var(--accent-cyan); /* Using New Accent Cyan */
+            padding: 8px 20px; 
+            border-radius: 6px;
             transition: all 0.3s ease;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(245, 130, 32, 0.3);
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 10px rgba(0, 163, 201, 0.2);
         }
         .navbar-right a:hover {
-            background: #ff9d40;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(245, 130, 32, 0.4);
+            background: var(--primary-blue);
+            box-shadow: 0 6px 15px rgba(0, 33, 71, 0.2);
         }
 
-        /* Hero Section */
+        /* Hero Section - Split Layout */
         .hero {
-            height: 500px;
+            height: 70vh;
+            min-height: 550px;
             display: flex;
             align-items: center;
+            background: var(--background-light);
+            position: relative;
+            padding-top: 50px;
+        }
+        .hero-layout {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 50px;
+            width: 100%;
+        }
+        .hero-text {
+            flex: 1;
+            padding-right: 20px;
+            animation: slideInLeft 1s ease-out forwards;
+        }
+        .hero-graphic {
+            flex: 1;
+            display: flex;
             justify-content: center;
-            text-align: center;
+            align-items: center;
             position: relative;
-            overflow: hidden;
-            color: white;
+            animation: fadeIn 1s ease-out forwards;
         }
-        .hero::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: linear-gradient(to top, rgba(0, 33, 71, 0.7), rgba(0, 0, 0, 0.3));
-            z-index: 1;
+        .hero-graphic img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         }
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 40px 60px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            animation: fadeInHero 1s ease-out forwards;
-        }
-        @keyframes fadeInHero {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+
+        /* Hero Text Styling */
         .hero h1 {
-            font-size: 42px;
-            margin: 0;
-            font-weight: 700;
+            font-size: 48px;
+            margin: 10px 0 20px 0;
+            font-weight: 800;
+            color: var(--primary-blue);
+            line-height: 1.2;
+        }
+        .hero h1 strong {
+            color: var(--accent-cyan); /* Using New Accent Cyan */
         }
         .hero p {
             font-size: 18px;
-            margin-top: 15px;
-            opacity: 0.9;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: var(--primary-blue);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+        .cta-button:hover {
+            background: var(--accent-cyan);
+            transform: translateY(-2px);
         }
 
-        /* Slider */
-        .hero .slider {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-        }
-        .hero .slider img {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            position: absolute;
-            top: 0; left: 0;
-            opacity: 0;
-            transition: opacity 1.5s ease-in-out;
-        }
-        .hero .slider img.active {
-            opacity: 1;
-        }
-        
-        /* Content Section Wrapper */
+        /* Features Section */
         .content-wrapper {
-            max-width: 1100px;
-            margin: 60px auto;
-            padding: 0 20px;
+            padding: 80px 0;
+            background: var(--off-white);
+        }
+        .section-title {
+            text-align: center;
+            color: var(--primary-blue);
+            font-size: 36px;
+            margin-bottom: 60px;
+            font-weight: 800;
         }
 
-        /* Features */
+        /* Features Grid */
         .features {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 30px;
+            gap: 40px;
         }
         .card {
-            background: white;
-            border-radius: 16px;
+            background: var(--background-light);
+            border-radius: 12px;
             padding: 30px;
-            text-align: center;
-            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.07);
+            text-align: left;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid var(--accent-green); /* Using New Accent Green */
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 10px 35px rgba(0, 33, 71, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
         }
         .card .icon {
             font-size: 40px;
-            color: var(--unikl-orange);
+            color: var(--accent-cyan); /* Using New Accent Cyan */
             margin-bottom: 15px;
         }
         .card h3 {
-            color: var(--unikl-blue);
+            color: var(--primary-blue);
             font-size: 20px;
             margin-top: 0;
+            font-weight: 700;
         }
         .card p {
             font-size: 15px;
-            line-height: 1.7;
-            color: var(--text-light);
+            line-height: 1.6;
+            color: var(--text-muted);
         }
 
         /* About Section */
         .about {
-            margin-top: 80px;
-            background: var(--light-blue);
-            padding: 50px;
-            border-radius: 20px;
+            background: var(--primary-blue); /* Keep dark primary blue for contrast */
+            color: white;
+            padding: 60px 20px;
+            border-radius: 12px;
             text-align: center;
+            margin: 80px auto;
         }
         .about h2 {
-            color: var(--unikl-blue);
-            font-size: 28px;
+            color: var(--accent-green); /* Using New Accent Green */
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 20px;
         }
         .about p {
             font-size: 16px;
             margin: 15px auto 0;
             line-height: 1.8;
-            max-width: 700px;
-            color: var(--text-light);
+            max-width: 800px;
+            opacity: 0.9;
         }
 
         /* Footer */
         footer {
-            background: var(--unikl-blue);
+            background: var(--primary-blue);
             color: white;
             text-align: center;
-            padding: 20px;
-            margin-top: 60px;
+            padding: 25px;
+            font-size: 14px;
         }
-        
-        /* Scroll Animation */
+        footer strong {
+            color: var(--accent-green); /* Using New Accent Green */
+            font-weight: 600;
+        }
+
+        /* Scroll Animation (no change) */
         .animate-on-scroll {
             opacity: 0;
             transform: translateY(30px);
@@ -208,8 +257,16 @@
             opacity: 1;
             transform: translateY(0);
         }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
 
-        /* Modal */
+        /* Modal (updated colors) */
         .modal {
             display: none;
             position: fixed;
@@ -222,175 +279,179 @@
             justify-content: center;
         }
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 16px;
+            background: var(--background-light);
+            color: var(--text-dark);
+            padding: 40px;
+            border-radius: 12px;
             max-width: 450px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-            animation: modalFadeIn 0.5s ease;
-        }
-        @keyframes modalFadeIn {
-            from { transform: scale(0.9); opacity: 0;}
-            to { transform: scale(1); opacity: 1;}
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
         .modal-content .icon {
             font-size: 3rem;
-            color: var(--unikl-orange);
+            color: var(--accent-cyan); /* Using New Accent Cyan */
         }
         .modal-content h3 {
             margin: 15px 0;
-            color: var(--unikl-blue);
+            color: var(--primary-blue);
         }
         .modal-content button {
             margin-top: 20px;
             padding: 12px 25px;
-            background: var(--unikl-orange);
+            background: var(--accent-green); /* Using New Accent Green */
             color: white;
             border: none;
             border-radius: 8px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         .modal-content button:hover {
-            background: #ff9d40;
+            background: #90c226; /* Slightly darker green for hover */
             transform: translateY(-2px);
         }
 
-        /* Responsive Design */
+
+        /* Responsive Design (no change) */
         @media (max-width: 992px) {
-            .features {
-                grid-template-columns: 1fr;
+            .hero-layout {
+                flex-direction: column;
+                text-align: center;
+                gap: 40px;
             }
-            .navbar-title {
-                font-size: 18px;
+            .hero-text {
+                padding-right: 0;
+            }
+            .hero-graphic {
+                display: none; 
+            }
+            .hero {
+                height: auto;
+                min-height: 400px;
+                padding-bottom: 50px;
+            }
+            .features {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
             }
         }
         @media (max-width: 768px) {
             .navbar { padding: 15px 20px; }
-            .hero-content { padding: 30px 20px; }
-            .hero h1 { font-size: 32px; }
-            .hero p { font-size: 16px; }
-            .content-wrapper { margin: 40px auto; }
-            .about { padding: 40px 20px; }
-            .navbar-title {
-                display: none; 
-            }
+            .hero h1 { font-size: 36px; }
+            .features { grid-template-columns: 1fr; }
+            .navbar-title { display: none; }
         }
-
     </style>
 </head>
 <body>
 
     <div class="navbar">
-        <div class="navbar-left">
-            <img src="img/Logo-UniKL-PCM.jpg" alt="UniKL Logo">
-        </div>
-        <div class="navbar-title">UniKL A.C.E. (Asset Check Effective)</div>
-        <div class="navbar-right">
-            <a href="login.php">Log In</a>
+        <div class="container navbar-layout">
+            <div class="navbar-left">
+                <img src="img/Logo-UniKL-PCM.jpg" alt="UniKL RCMP Logo">
+                <div class="navbar-title">RCMP Inventory Loan Management System</div>
+            </div>
+            <div class="navbar-right">
+                <a href="login.php">Log In</a>
+            </div>
         </div>
     </div>
 
     <div class="hero">
-        <div class="slider">
-            <img src="img/view.png" class="active" alt="Campus view">
-            <img src="img/unikl.jpg" alt="UniKL RCMP">
-        </div>
-        <div class="hero-content">
-            <h1>Welcome to UniKL A.C.E.</h1>
-            <p>The Effective IT Asset Management System. Your platform for tracking and recording asset movement at the <strong>Royal College of Medicine Perak (RCMP) Ipoh Campus</strong>.</p>
+        <div class="container">
+            <div class="hero-layout">
+                <div class="hero-text">
+                    <p style="font-size: 16px; font-weight: 500; color: var(--accent-cyan); margin-bottom: 5px; text-transform: uppercase;">R-ILMS: Royal College of Medicine Perak</p>
+                    <h1>Precision Asset Tracking for <strong>UniKL RCMP.</strong></h1>
+                    <p>The definitive <strong>IT Asset Management System</strong> designed for accuracy and accountability. Manage loans, track inventory lifecycle, and generate precise audit reports for all campus equipment.</p>
+                    <a href="#features-section" class="cta-button">Explore Core Features <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="hero-graphic">
+                    <img src="img/view.png" alt="IT Asset Management System Dashboard Mockup">
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="content-wrapper">
-        <div class="features">
-            <div class="card animate-on-scroll">
-                <div class="icon"><i class="fas fa-boxes-stacked"></i></div>
-                <h3>Asset Management</h3>
-                <p>Register, track, and manage all UniKL IT equipment using serial numbers and asset tags.</p>
+        <div class="container">
+            <h2 class="section-title animate-on-scroll" id="features-section">System Highlights</h2>
+            <div class="features">
+                <div class="card animate-on-scroll">
+                    <div class="icon"><i class="fas fa-barcode"></i></div>
+                    <h3>Inventory Tracking (Barcode/Tag)</h3>
+                    <p>Register, categorize, and permanently track all equipment using serial numbers and unique <strong>UniKL asset tags</strong> for robust accountability.</p>
+                </div>
+                <div class="card animate-on-scroll" style="transition-delay: 0.1s;">
+                    <div class="icon"><i class="fas fa-exchange-alt"></i></div>
+                    <h3>Controlled Loan Lifecycle</h3>
+                    <p>The core <strong>Check-In/Check-Out</strong> function ensures every asset movement is logged, providing full visibility over who holds which equipment and for how long.</p>
+                </div>
+                <div class="card animate-on-scroll" style="transition-delay: 0.2s;">
+                    <div class="icon"><i class="fas fa-cogs"></i></div>
+                    <h3>Maintenance & Audit Logs</h3>
+                    <p>Maintain a complete history of equipment condition, repair status, and generate detailed utilization reports necessary for annual IT audits.</p>
+                </div>
             </div>
-            <div class="card animate-on-scroll" style="transition-delay: 0.1s;">
-                <div class="icon"><i class="fas fa-calendar-check"></i></div>
-                <h3>Check-In/Check-Out</h3>
-                <p>The core function for recording asset loans by users and ensuring timely returns are logged.</p>
-            </div>
-            <div class="card animate-on-scroll" style="transition-delay: 0.2s;">
-                <div class="icon"><i class="fas fa-chart-pie"></i></div>
-                <h3>Reports & Audits</h3>
-                <p>Generate detailed reports on asset utilization, loan status, and the complete record history of each equipment.</p>
-            </div>
-        </div>
 
-        <div class="about animate-on-scroll">
-            <h2>About UniKL A.C.E.</h2>
-            <p>This system is exclusively designed for the <strong>UniKL IT Department</strong> to implement an efficient <strong>Check-In & Check-Out</strong> process for digital assets such as laptops, projectors, and lab equipment. It helps administrators and technicians monitor usage, check conditions, and ensure transparent asset management.</p>
+            <div class="about animate-on-scroll">
+                <h2>Designed for IT Department, Serving the Campus.</h2>
+                <p>R-ILMS is an essential tool for the <strong>UniKL IT Department</strong> at the Royal College of Medicine Perak. Its purpose is to streamline asset issuance (laptops, projectors, testing gear) to faculty and students, minimizing loss and ensuring operational readiness across all medical and administrative facilities.</p>
+            </div>
         </div>
     </div>
 
     <footer>
-        &copy; <?php echo date("Y"); ?> Universiti Kuala Lumpur <strong>Royal College of Medicine Perak (RCMP)</strong> IT Department. All rights reserved.
+        <div class="container">
+            <p>&copy; <?php echo date("Y"); ?> Universiti Kuala Lumpur <strong>Royal College of Medicine Perak (RCMP)</strong> IT Department. All rights reserved.</p>
+        </div>
     </footer>
 
     <div class="modal" id="disclaimerModal">
         <div class="modal-content">
             <div class="icon"><i class="fas fa-bullhorn"></i></div>
-            <h3>Important Notice</h3>
-            <p><strong>All borrowed items must be collected personally from the UniKL IT Department office.</strong></p>
+            <h3>Important Notice for Borrowers</h3>
+            <p><strong>All borrowed items must be collected and returned personally at the UniKL IT Department office.</strong></p>
             <button onclick="closeModal()">I Understand</button>
         </div>
     </div>
 
 <script>
-    // Slider Logic
-    let currentImage = 0;
-    const images = document.querySelectorAll(".hero .slider img");
-    const totalImages = images.length;
-    
-    function showNextImage() {
-        images[currentImage].classList.remove("active");
-        currentImage = (currentImage + 1) % totalImages;
-        images[currentImage].classList.add("active");
-    }
-    setInterval(showNextImage, 5000);
-
-    // =======================================================
     // MODAL LOGIC (Using SESSIONSTORAGE)
-    // =======================================================
     const modal = document.getElementById("disclaimerModal");
     
-    function closeModal() {
+    window.closeModal = function() {
         modal.style.display = "none";
-        // 1. Store a flag in sessionStorage
-        sessionStorage.setItem('noticeShown', 'true'); 
+        sessionStorage.setItem('noticeShown', 'true');    
     }
     
     window.onload = () => {
-        // 2. Check if the user HAS NOT seen the notice in this session
         if (!sessionStorage.getItem('noticeShown')) {
             setTimeout(() => {
                 modal.style.display = "flex";
-            }, 1000); // Show popup after 1 second
+            }, 1000);
         }
+
+        setupScrollAnimation();
     };
-    // =======================================================
 
     // Scroll Animation Logic
-    const scrollElements = document.querySelectorAll(".animate-on-scroll");
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target); // Animate only once
-            }
-        });
-    }, { threshold: 0.1 });
+    function setupScrollAnimation() {
+        const scrollElements = document.querySelectorAll(".animate-on-scroll");
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("is-visible");
+                    observer.unobserve(entry.target); 
+                }
+            });
+        }, { threshold: 0.1 });
 
-    scrollElements.forEach(el => {
-        observer.observe(el);
-    });
+        scrollElements.forEach(el => {
+            observer.observe(el);
+        });
+    }
 </script>
 
 </body>

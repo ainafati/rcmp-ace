@@ -22,19 +22,43 @@ if ($stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?")
     $stmt_tech->close();
 }
 
+function get_reservation_item_count($conn, $status) {
+    // Hanya kira item yang berstatus 'Pending'
+    $sql = "SELECT COUNT(id) AS count 
+            FROM reservation_items 
+            WHERE status = ?";
+    
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("Prepare failed: (" . $conn->errno . ") " . $conn->error);
+        return 0;
+    }
+    
+    $stmt->bind_param("s", $status);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    return $result ? (int) $result['count'] : 0;
+}
+
+// Dapatkan kiraan yang diperlukan untuk dashboard
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
+
 // Dapatkan senarai kategori untuk dropdown penapis
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
-
-// --- Dapatkan Data Berdasarkan Penapis ---
+// Dapatkan Data Berdasarkan Penapis ---
 // Default dates: first and last day of the current month
 $start_date = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-01');
 $end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-t');
 $category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0; 
 
+// Ambil bulan/tahun daripada $start_date (yang mungkin daripada POST atau lalai)
 $current_month = date('m', strtotime($start_date));
 $current_year = date('Y', strtotime($start_date));
+
 
 // --- LOGIK PAGINATION ---
 $limit = 10; // 10 rekod per halaman
@@ -153,6 +177,23 @@ $pagination_params = http_build_query([
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
         
+		/* 5. SIDEBAR BADGE STYLE (Penambahan) */
+.sidebar a .badge {
+    margin-left: auto; /* Tolak badge ke kanan */
+    font-size: 0.75rem;
+    padding: 0.4em 0.6em;
+    font-weight: 700;
+    border-radius: 10px;
+    background-color: #ef4444; /* Merah untuk menarik perhatian */
+    color: white;
+}
+
+/* Pastikan badge tidak hilang apabila item menu di-hover atau aktif */
+.sidebar a.active .badge, .sidebar a:hover .badge {
+    background-color: #ffffff;
+    color: #ef4444; /* Warna terbalik agar kontras */
+}
+
         /* 3. MAIN LAYOUT & TOPBAR */
         .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
         .topbar { 
@@ -206,13 +247,18 @@ $pagination_params = http_build_query([
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>Dashboard</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php">
+            <i class="fa-solid fa-dolly"></i> Manage Requests
+            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+        </a>
         <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php" class="active"><i class="fa-solid fa-chart-line"></i> Report</a>
-	</div>
+    </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
@@ -394,7 +440,7 @@ $pagination_params = http_build_query([
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // Initialize date pickers
+    // Inisialisasi date pickers
     flatpickr("#start_date", { dateFormat: "Y-m-d" });
     flatpickr("#end_date", { dateFormat: "Y-m-d" });
 
@@ -405,7 +451,7 @@ $pagination_params = http_build_query([
     const endDateInput = document.getElementById('end_date');
     const categoryFilter = document.getElementById('category_filter');
 
-    // --- Logik Sidebar Mobile ---
+    // --- Logik Sidebar Mobile (Kekalkan) ---
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -418,7 +464,7 @@ $pagination_params = http_build_query([
         } else {
             setTimeout(() => {
                 backdrop.style.display = 'none';
-            }, 300); 
+            }, 300);
         }
     }
 
@@ -432,9 +478,8 @@ $pagination_params = http_build_query([
     // --- End Logik Sidebar Mobile ---
 
 
-    // --- Logik Filter Bulan/Tahun ---
-    function updateAndSubmit(event) {
-        // Hentikan submit automatik untuk membolehkan pengguna klik butang 'Apply Filters'
+    // --- Logik Filter Bulan/Tahun & Kategori (DIPERBAIKI) ---
+    function updateDateInputs() {
         if (!yearFilter || !monthFilter || !startDateInput || !endDateInput) return; 
 
         const year = yearFilter.value;
@@ -446,28 +491,31 @@ $pagination_params = http_build_query([
         const startDate = `${year}-${('0' + month).slice(-2)}-01`;
         const endDate = `${year}-${('0' + month).slice(-2)}-${('0' + lastDay).slice(-2)}`;
 
-        // Hanya kemas kini input tarikh, jangan submit form secara automatik
+        // Kemas kini input tarikh
         startDateInput.value = startDate;
         endDateInput.value = endDate;
+    }
 
-        // Jika perubahan datang dari category filter, submit form
-        // Ini membolehkan pengguna menukar bulan/tahun DAN KATEGORI, kemudian klik 'Apply Filters'
-        if (event && event.target === categoryFilter) {
-             reportForm.submit();
-        }
+    function handleFilterChange(event) {
+        // 1. Pastikan input tarikh dikemas kini dahulu
+        updateDateInputs();
+
+        // 2. Jika perubahan datang dari Month, Year, atau Category, submit form
+        if (event.target === monthFilter || event.target === yearFilter || event.target === categoryFilter) {
+            // **Hantar borang secara automatik**
+            reportForm.submit();
+        } 
+        
+        // JANGAN submit jika datang dari butang 'Apply Filters' atau date pickers lain
     }
     
-    // Submit form hanya apabila Category Filter diubah
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', updateAndSubmit); 
-    }
+    // Listeners untuk perubahan
+    if (monthFilter) monthFilter.addEventListener('change', handleFilterChange);
+    if (yearFilter) yearFilter.addEventListener('change', handleFilterChange);
+    if (categoryFilter) categoryFilter.addEventListener('change', handleFilterChange);
     
-    // Update tarikh bila Bulan/Tahun diubah
-    if (monthFilter) monthFilter.addEventListener('change', updateAndSubmit);
-    if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
-    
-    // Pastikan tarikh range telah diset dengan betul pada permulaan
-    updateAndSubmit(); 
+    // Pastikan input tarikh dikemas kini pada pemuatan halaman
+    updateDateInputs(); 
 </script>
 </body>
 </html>
