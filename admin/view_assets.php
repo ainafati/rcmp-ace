@@ -180,6 +180,7 @@ $available_statuses = $all_possible_statuses;
         </div>
         <a href="manageItem_admin.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+		<a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>

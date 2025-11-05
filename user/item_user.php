@@ -54,6 +54,9 @@ if ($res_items) {
         $items_for_dropdown[] = $row;
     }
 }
+
+// Jangan lupa close connection pada akhir script
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,30 +71,99 @@ if ($res_items) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* DEFINING TEAL COLOR AS PRIMARY & MODERN STYLING */
+        :root {
+            --primary-color: #06b6d4; /* Cyan 600 */
+            --primary-hover: #0891b2; /* Cyan 700 */
+            --bg-light-gray: #f8fafc; /* Latar belakang utama yang sangat lembut */
+            --card-bg: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+        }
+
         /* CSS DEFAULT DESKTOP */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease-in-out; }
+        body { 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            background-color: var(--bg-light-gray); 
+            color: var(--text-dark); 
+            min-height: 100vh; 
+        }
+        .sidebar { 
+            width: 250px; 
+            position: fixed; 
+            top: 0; 
+            bottom: 0; 
+            left: 0; 
+            background: var(--card-bg);
+            padding: 20px; 
+            border-right: 1px solid #e2e8f0; 
+            z-index: 1000; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            transition: transform 0.3s ease-in-out; 
+        }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
+        .logo-icon { 
+            width: 40px; 
+            height: 40px; 
+            background-color: var(--primary-color); /* TEAL */
+            color: white; 
+            border-radius: 8px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 20px; 
+        }
+        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
+        .logo-text span { font-size: 12px; color: var(--text-muted); }
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        .sidebar a.active, .sidebar a:hover { 
+            background: var(--primary-color); /* TEAL */
+            color: #fff; 
+        }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
         .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; z-index: 999; position: sticky; top: 0; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
+        .topbar { 
+            background: var(--card-bg); 
+            padding: 15px 30px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #e2e8f0; 
+            z-index: 999; 
+            position: sticky; 
+            top: 0; 
+        }
+        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
         .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
+        .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
         .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: #1e293b; margin-bottom: 5px; }
+        .card { 
+            border-radius: 16px; 
+            padding: 25px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); 
+            background: var(--card-bg); 
+            margin-bottom: 25px; 
+            border: 1px solid #e2e8f0; 
+        }
+        .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
+        
+        .text-primary { color: var(--primary-color) !important; } /* TEAL */
+        .btn-primary { 
+            background-color: var(--primary-color); /* TEAL */
+            border-color: var(--primary-color); /* TEAL */
+        }
+        .btn-primary:hover { 
+            background-color: var(--primary-hover); /* Darker TEAL */
+            border-color: var(--primary-hover); /* Darker TEAL */
+        }
+
         .form-label { font-weight: 500; color: #334155; }
         .form-control, .form-select { border-radius: 8px; }
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-        .btn-primary { background-color: #3b82f6; border: none; }
-        .btn-primary:hover { background-color: #2563eb; }
+        
         .category-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
         .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; }
         .select2-container--default .select2-selection--single { border: 1px solid #dee2e6; border-radius: 8px; height: 44px; }
@@ -199,7 +271,7 @@ if ($res_items) {
         <div class="user-profile">
             <span class="user-name"><?= htmlspecialchars($user['name']) ?></span>
             <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>
         </div>
     </div>
@@ -286,7 +358,7 @@ if ($res_items) {
                             <input class="form-check-input" type="checkbox" value="" id="agreeTerms">
                             <label class="form-check-label" for="agreeTerms">
                                 I have read and agree to the 
-                                <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>.
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary">Terms and Conditions</a>.
                             </label>
                         </div>
 
@@ -350,7 +422,6 @@ if ($res_items) {
         </div>
     </div>
 </div>
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

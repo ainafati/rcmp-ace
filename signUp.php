@@ -136,12 +136,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* -------------------------------------------------------------------------- */
-        /* GLOBAL & STRUCTURE - Disesuaikan untuk tema UniKL (Navy/Blue) */
+        /* GLOBAL & STRUCTURE - Fokus pada reka bentuk pusat (Single Panel) */
         /* -------------------------------------------------------------------------- */
         :root {
             --primary-color: #00285a; /* Dark Navy Blue (UniKL) */
             --secondary-color: #005a9c; /* Lighter Blue */
-            --light-bg: #f5f8ff; /* Very light blue/gray background */
+            --light-bg: #f0f4f8; /* Very light blue/gray background */
             --border-color: #cbd5e1;
             --success-color: #22c55e;
             --error-color: #ef4444;
@@ -153,49 +153,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-family: 'Inter', sans-serif; 
             height: 100%; 
             background-color: var(--light-bg); 
-        }
-        .container { 
-            display: flex; 
-            height: 100%; 
-            width: 100%; 
+            display: flex;
+            align-items: center; /* Pusat menegak */
+            justify-content: center; /* Pusat mendatar */
+            min-height: 100vh; /* Pastikan ia meliputi seluruh viewport */
         }
         
-        /* INFO PANEL (LEFT) */
-        .info-panel { 
-            flex: 1; 
-            background: var(--primary-color); 
-            color: white; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 40px; 
-            text-align: center; 
-            box-shadow: inset -5px 0 10px rgba(0, 0, 0, 0.2); 
-        }
-        .info-panel h1 { font-size: 30px; font-weight: 800; margin: 0; letter-spacing: 0.5px; }
-        .info-panel p { font-size: 16px; opacity: 0.9; max-width: 350px; line-height: 1.6; margin-top: 15px;}
-
-        /* FORM PANEL (RIGHT) */
-        .form-panel { 
-            flex: 1; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background: #fff; 
-            padding: 40px; 
-            overflow-y: auto; 
-        }
-        .form-container { 
+        /* CONTAINER UTAMA (MODEN, SATU PANEL) - MENGGANTIKAN .container DAN .form-panel */
+        .auth-container { 
             width: 100%; 
-            max-width: 450px; 
+            max-width: 480px; /* Lebar maksimum untuk borang */
+            padding: 40px;
+            margin: 20px auto;
+            background: #fff; 
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 40, 90, 0.15); /* Soft, professional shadow */
         }
-        h2 { 
-            font-size: 28px; 
-            font-weight: 700; 
+
+        /* HEADER */
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .auth-header h2 { 
+            font-size: 32px; 
+            font-weight: 800; 
             color: var(--primary-color); 
-            margin-bottom: 25px; 
-            text-align: center; 
+            margin-bottom: 5px; 
+            letter-spacing: 0.5px;
+        }
+        .auth-header p {
+            font-size: 15px;
+            color: #64748b;
         }
         
         /* FORM ELEMENTS */
@@ -214,11 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border-radius: 8px; 
             box-sizing: border-box; 
             font-size: 16px;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-group input:focus {
             border-color: var(--secondary-color);
-            box-shadow: 0 0 0 2px rgba(0, 90, 156, 0.2);
+            box-shadow: 0 0 0 3px rgba(0, 90, 156, 0.15);
             outline: none;
         }
         
@@ -244,31 +233,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         
         /* FOOTER & ALERTS */
-        .form-footer { margin-top: 25px; font-size: 15px; text-align: center; }
-        .form-footer a { color: var(--secondary-color); text-decoration: none; font-weight: 600; }
-        .form-footer a:hover { text-decoration: underline; }
+        .auth-footer { margin-top: 25px; font-size: 15px; text-align: center; }
+        .auth-footer a { color: var(--secondary-color); text-decoration: none; font-weight: 600; }
+        .auth-footer a:hover { text-decoration: underline; }
         .alert-danger { 
-            background-color: #f8d7da; 
-            color: #842029; 
+            background-color: #fef2f2; /* Light Red */
+            color: var(--error-color); 
             padding: 12px; 
-            border: 1px solid #f5c2c7; 
+            border: 1px solid var(--error-color); 
             border-radius: 8px; 
             margin-bottom: 20px;
             font-size: 15px;
             font-weight: 500;
         }
         
-        /* PASSWORD REQUIREMENTS LIST */
-        #password-requirements { 
+.form-row {
+    display: flex; /* Aktifkan Flexbox */
+    gap: 20px; /* Jarak antara kolum */
+    margin-bottom: 0; /* Alihkan margin-bottom ke .input-group di dalam .form-row */
+}
+
+.form-row .input-group {
+    flex: 1; /* Pastikan setiap input-group mengambil ruang yang sama */
+    margin-bottom: 20px; /* Kembalikan margin-bottom di sini */
+}
+
+/* Ubah susunan Password Requirements (agar ia menjadi satu kolum di bawah) */
+#password-requirements { 
             list-style-type: none; 
             padding: 0; 
             font-size: 13px; 
             color: #64748b; 
             margin-top: -10px; 
             margin-bottom: 25px; 
-        }
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* TETAPKAN KEPADA DUA KOLUM UNTUK DESKTOP */
+    gap: 5px 15px; /* Tambah jarak mendatar */
+}
         #password-requirements li { 
-            margin-bottom: 5px; 
+            margin-bottom: 0; 
             transition: color 0.3s;
         }
         #password-requirements li.valid { 
@@ -276,8 +279,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-weight: 500;
         }
         #password-requirements li i { 
-            width: 20px; 
-            margin-right: 5px;
+            width: 18px; 
+            margin-right: 3px;
             color: var(--error-color); 
         }
         #password-requirements li.valid i { 
@@ -294,108 +297,99 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         /* -------------------------------------------------------------------------- */
         /* RESPONSIVE DESIGN (MOBILE) */
         /* -------------------------------------------------------------------------- */
-        @media (max-width: 850px) {
-            .container {
-                flex-direction: column; 
-                height: auto; 
-                min-height: 100vh; 
+        @media (max-width: 600px) {
+            body {
+                align-items: flex-start; /* Alihkan ke atas pada mobile */
+                padding: 20px;
             }
-
-            /* Panel Maklumat (atas) */
-            .info-panel {
-                flex: none; 
-                padding: 30px 20px;
-                height: 150px; 
-                justify-content: center;
+            .auth-container {
+                box-shadow: none; /* Buang shadow pada mobile */
+                border-radius: 0;
+                padding: 0;
+                margin: 0 auto;
+                background: var(--light-bg); /* Jadikan background borang sama dengan body pada mobile */
             }
-            .info-panel h1 { 
-                font-size: 24px; 
+            .auth-header h2 {
+                font-size: 28px;
             }
-            .info-panel p { 
-                font-size: 14px;
-            }
-
-            /* Panel Borang (bawah) */
-            .form-panel {
-                flex: none; 
-                padding: 30px 20px; 
-                min-height: calc(100vh - 150px); 
-            }
-            
-            .form-container {
-                max-width: 100%; 
-            }
-            h2 {
-                font-size: 24px;
+            #password-requirements {
+                grid-template-columns: 1fr; /* 1 kolum pada mobile */
             }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="info-panel">
-        <h1>Create Your R-ILMS Account</h1>
-        <p>Join the RCMP Inventory Loan Management System to easily borrow and manage technical assets.</p>
+<div class="auth-container">
+    <div class="auth-header">
+        <h2><i class="fa-solid fa-user-plus me-2"></i> Create Account</h2>
+        <p>RCMP Inventory Reservation Check System</p>
     </div>
 
-    <div class="form-panel">
-        <div class="form-container">
-            <h2>Sign Up</h2>
-            <?php if (!empty($_SESSION['error'])): ?>
-                <div class="alert alert-danger">
-                    <?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
-                </div>
-            <?php endif; ?>
-
-            <form method="POST" action="signUp.php" id="signupForm">
-                <div class="input-group">
-                    <label for="name">Full Name</label>
-                    <input type="text" name="name" id="name" required 
-                           value="<?= htmlspecialchars(isset($_POST['name']) ? $_POST['name'] : '') ?>">
-                </div>
-                
-                <div class="input-group">
-                    <label for="ic_num">IC Number (12 Digits)</label>
-                    <input type="text" name="ic_num" id="ic_num" required 
-                            pattern="[0-9]{12}" 
-                            title="IC Number must be 12 digits (e.g., 900101015001)"
-                            value="<?= htmlspecialchars(isset($_POST['ic_num']) ? $_POST['ic_num'] : '') ?>"> 
-                </div>
-
-                <div class="input-group">
-                    <label for="email">Email</label>
-                    <input type="email" name="email" id="email" required placeholder="username@unikl.edu.my"
-                            value="<?= htmlspecialchars(isset($_POST['email']) ? $_POST['email'] : '') ?>">
-                </div>
-                <div class="input-group">
-                    <label for="phoneNum">Phone Number</label>
-                    <input type="text" name="phoneNum" id="phoneNum" required placeholder="01X-XXXXXXX"
-                            value="<?= htmlspecialchars(isset($_POST['phoneNum']) ? $_POST['phoneNum'] : '') ?>">
-                </div>
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" name="password" id="password" required>
-                </div>
-                <ul id="password-requirements">
-                    <li id="length"><i class="fa-solid fa-times"></i> At least 8 characters</li>
-                    <li id="lowercase"><i class="fa-solid fa-times"></i> A lowercase letter</li>
-                    <li id="uppercase"><i class="fa-solid fa-times"></i> An uppercase letter</li>
-                    <li id="number"><i class="fa-solid fa-times"></i> A number</li>
-                    <li id="special"><i class="fa-solid fa-times"></i> A special character</li>
-                </ul>
-                <div class="input-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input type="password" name="confirm_password" id="confirm_password" required>
-                    <div id="password-match-error" class="password-match-error">Passwords do not match.</div>
-                </div>
-                <button type="submit" class="submit-btn" id="submitBtn" disabled>Create Account</button>
-            </form>
-
-            <div class="form-footer">
-                <p>Already have an account? <a href="login.php">Login here</a></p>
-            </div>
+    <?php if (!empty($_SESSION['error'])): ?>
+        <div class="alert alert-danger">
+            <?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
         </div>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['success']) && basename($_SERVER['PHP_SELF']) == 'signUp.php'): ?>
+        <div class="alert alert-success">
+            <?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?>
+        </div>
+    <?php endif; ?>
+
+
+<form method="POST" action="signUp.php" id="signupForm">
+    <div class="form-row">
+        <div class="input-group">
+            <label for="name">Full Name</label>
+            <input type="text" name="name" id="name" required 
+                   value="<?= htmlspecialchars(isset($_POST['name']) ? $_POST['name'] : '') ?>">
+        </div>
+        
+        <div class="input-group">
+            <label for="ic_num">IC Number (12 Digits)</label>
+            <input type="text" name="ic_num" id="ic_num" required 
+                    pattern="[0-9]{12}" 
+                    title="IC Number must be 12 digits (e.g., 900101015001)"
+                    value="<?= htmlspecialchars(isset($_POST['ic_num']) ? $_POST['ic_num'] : '') ?>"> 
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="input-group">
+            <label for="email">UniKL Email</label>
+            <input type="email" name="email" id="email" required placeholder="username@unikl.edu.my"
+                    value="<?= htmlspecialchars(isset($_POST['email']) ? $_POST['email'] : '') ?>">
+        </div>
+        <div class="input-group">
+            <label for="phoneNum">Phone Number</label>
+            <input type="text" name="phoneNum" id="phoneNum" required placeholder="01X-XXXXXXX"
+                    value="<?= htmlspecialchars(isset($_POST['phoneNum']) ? $_POST['phoneNum'] : '') ?>">
+        </div>
+    </div>
+    <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" name="password" id="password" required>
+    </div>
+    
+    <ul id="password-requirements">
+        <li id="length"><i class="fa-solid fa-times"></i> 8+ characters</li>
+        <li id="lowercase"><i class="fa-solid fa-times"></i> Lowercase letter</li>
+        <li id="uppercase"><i class="fa-solid fa-times"></i> Uppercase letter</li>
+        <li id="number"><i class="fa-solid fa-times"></i> A number</li>
+        <li id="special"><i class="fa-solid fa-times"></i> Special character</li>
+    </ul>
+
+    <div class="input-group">
+        <label for="confirm_password">Confirm Password</label>
+        <input type="password" name="confirm_password" id="confirm_password" required>
+        <div id="password-match-error" class="password-match-error">Passwords do not match.</div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="submitBtn" disabled>Create Account</button>
+</form>
+
+    <div class="auth-footer">
+        <p>Already have an account? <a href="login.php">Login here</a></p>
     </div>
 </div>
 
@@ -435,7 +429,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     function validateConfirmPassword() {
-        const passwordsMatch = passwordInput.value === confirmPasswordInput.value && passwordInput.value !== '';
+        const isPasswordSet = passwordInput.value.length > 0;
+        const passwordsMatch = isPasswordSet && (passwordInput.value === confirmPasswordInput.value);
         
         if (confirmPasswordInput.value === '') {
             matchError.style.display = 'none';
@@ -453,6 +448,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         // Semak pengesahan HTML5 (required fields, pattern, email type)
         const form = document.getElementById('signupForm');
+        // Gunakan reportValidity() untuk memaksa semakan pengesahan HTML5
+        // Nota: checkValidity() sahaja cukup untuk semak keadaan borang tanpa memaparkan mesej ralat HTML5
         const isFormFilled = form.checkValidity();
 
         if (isPasswordStrong && doPasswordsMatch && isFormFilled) {

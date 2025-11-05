@@ -71,7 +71,7 @@
                 Forgot Password
             </h2>
             <p class="text-gray-500 text-center text-sm font-medium mt-1">
-                UniKL A.C.E. RCMP Ipoh Asset Portal
+                RCMP NexCheck Portal
             </p>
         </div>
 
@@ -82,7 +82,7 @@
         <form id="forgotForm">
             <div class="mb-5">
                 <label for="email" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Email Address</label>
-                <input type="email" name="email" id="email" placeholder="contoh@email.com" required
+                <input type="email" name="email" id="email" placeholder="contoh@unikl.edu.my" required
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-unikl-orange transition duration-150 ease-in-out shadow-sm">
             </div>
 

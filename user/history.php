@@ -130,105 +130,119 @@ $conn->close();
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
 
     <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
+        /* DEFINING TEAL COLOR AS PRIMARY & MODERN STYLING */
+        :root {
+            --primary-color: #06b6d4; /* Cyan 600 */
+            --primary-hover: #0891b2; /* Cyan 700 */
+            --bg-light-gray: #f8fafc; 
+            --card-bg: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body { 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            background-color: var(--bg-light-gray); 
+            color: var(--text-dark); 
+            min-height: 100vh; 
+        }
         
         /* --- Sidebar Styles (Desktop) --- */
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
-        .main-content { margin-left: 250px; }
+        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: var(--card-bg); padding: 20px; border-right: 1px solid #e2e8f0; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease-in-out; }
+        .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
+        .logo-icon { width: 40px; height: 40px; background-color: var(--primary-color); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
+        .logo-text span { font-size: 12px; color: var(--text-muted); }
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        .sidebar a.active, .sidebar a:hover { background: var(--primary-color); color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
 
         /* --- Topbar & Content Styles --- */
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; z-index: 999; position: sticky; top: 0; }
+        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
         .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
+        .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
         .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: #1e293b; }
-        /* Removed card-summary styles */
-        .text-primary i { color: #3b82f6; } .text-success i { color: #22c55e; } .text-warning i { color: #f59e0b; } .text-danger i { color: #ef4444; } .text-secondary i { color: #64748b; }
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; white-space: nowrap;}
+        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .card h5 { font-weight: 600; color: var(--text-dark); }
+        
+        /* Primary/Teal Color Application */
+        .text-primary { color: var(--primary-color) !important; }
+        .text-primary i { color: var(--primary-color); }
+        .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-primary:hover { background-color: var(--primary-hover); border-color: var(--primary-hover); }
+        .btn-outline-primary { color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-outline-primary:hover { color: #fff; background-color: var(--primary-color); }
+        
+        /* Status Colors (Keep Success/Warning/Danger standard) */
+        .text-success i { color: #22c55e; } 
+        .text-warning i { color: #f59e0b; } 
+        .text-danger i { color: #ef4444; } 
+        .text-secondary i { color: #64748b; }
+
+        /* Table and Pagination */
+        .table thead th { background: var(--bg-light-gray); color: var(--text-muted); border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; white-space: nowrap;}
         .table tbody td { border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 0.9rem;}
         .table tbody tr:last-child td { border-bottom: none; }
-        .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-        #calendarView .fc-event { font-weight: 500; cursor: pointer; border: none; }
-        #calendarView .fc-daygrid-day.fc-day-today { background-color: #eff6ff; }
+        
+        /* --- NEW: Quick Filters (Chips) --- */
+        .quick-filter-chips .btn { 
+            font-size: 14px; 
+            padding: 5px 12px; 
+            font-weight: 500; 
+            border-radius: 20px;
+        }
+        .quick-filter-chips .btn.active { 
+             background-color: var(--primary-color); 
+             color: #fff; 
+             border-color: var(--primary-color);
+        }
+        
+        /* --- NEW: Enhanced Badge Styling --- */
+        .badge.rounded-pill { 
+            padding: .4em .8em; 
+            font-weight: 600; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px;
+        }
+        .badge.rounded-pill i { 
+            font-size: 0.8em; 
+            line-height: 1; 
+        }
+
+        /* FullCalendar - Change standard blue to Teal */
+        #calendarView .fc-event { 
+            font-weight: 500; cursor: pointer; border: none;
+            background-color: var(--primary-color); /* Teal for events */
+            border-color: var(--primary-color);
+        }
+        #calendarView .fc-daygrid-day.fc-day-today { 
+            background-color: #eff6ff; 
+        }
+        
+        .pagination .page-item .page-link { border-radius: 8px; margin: 0 3px; border: 1px solid #e2e8f0; color: var(--primary-color); }
+        .pagination .page-item.active .page-link { background-color: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+        .pagination .page-item.disabled .page-link { color: #94a3b8; background-color: #e9ecef; border-color: #dee2e6; }
+        
+        /* Upcoming Bookings */
         .upcoming-list { display: flex; flex-direction: column; gap: 15px; }
         .upcoming-item { display: flex; align-items: center; gap: 15px; }
         .upcoming-item .icon-box { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; flex-shrink: 0; }
-        .pagination-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; font-size: 14px; color: #64748b; }
-        .pagination-controls .pagination { margin-bottom: 0; }
-        .pagination .page-item .page-link { border-radius: 8px; margin: 0 3px; border: 1px solid #e2e8f0; color: #3b82f6; }
-        .pagination .page-item.active .page-link { background-color: #3b82f6; border-color: #3b82f6; color: #fff; }
-        .pagination .page-item.disabled .page-link { color: #94a3b8; background-color: #e9ecef; border-color: #dee2e6; }
         
-        /* --- Mobile Optimizations (Max Width 991.98px) --- */
+        /* --- Mobile Optimizations --- */
         @media (max-width: 991.98px) {
-            /* Sidebar becomes off-canvas and hidden by default */
-            .sidebar {
-                width: 300px;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease-in-out;
-                z-index: 1050; 
-                position: fixed; 
-            }
-            .offcanvas-open .sidebar {
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0; /* Full width for content */
-            }
-            .topbar {
-                padding: 15px 15px;
-            }
-            /* Add button to toggle sidebar on mobile */
-            .topbar .d-lg-none {
-                display: block !important;
-            }
-            /* History table scrollable */
-            .table-responsive {
-                overflow-x: auto;
-            }
-            /* Center pagination and stack elements */
-            .pagination-controls {
-                flex-direction: column;
-                gap: 10px;
-            }
-            .pagination-controls > div {
-                text-align: center;
-            }
-            /* Stack filter/search inputs */
-            .d-flex.flex-wrap.justify-content-between.align-items-center {
-                flex-direction: column;
-                align-items: stretch !important;
-                gap: 15px;
-            }
-            .d-flex.align-items-center.gap-2.mb-3 {
-                flex-direction: column;
-                align-items: stretch !important;
-            }
-            .d-flex.align-items-center.gap-2.mb-3 > * {
-                width: 100% !important;
-            }
-            /* Adjust padding on small screens */
-            .container-fluid {
-                padding: 15px;
-            }
+            .sidebar { transform: translateX(-100%); z-index: 1050; position: fixed; }
+            .offcanvas-open .sidebar { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .d-flex.align-items-center.gap-2.mb-3 { flex-direction: column; align-items: stretch !important; gap: 10px; }
+            .d-flex.align-items-center.gap-2.mb-3 > * { width: 100% !important; }
+            .quick-filter-chips { justify-content: space-between !important; overflow-x: auto; padding-bottom: 10px;}
+            .quick-filter-chips .btn { white-space: nowrap; }
+            .container-fluid { padding: 15px; }
         }
-        
-        /* Hide logo/branding on small mobile screens to save space in offcanvas */
-        @media (max-width: 575.98px) {
-             .logo-text strong { font-size: 14px; }
-             .logo-text span { display: none; }
-        }
-
     </style>
 </head>
 <body>
@@ -258,7 +272,7 @@ $conn->close();
         <div class="user-profile">
             <span class="user-name"><?= htmlspecialchars(isset($user['name']) ? $user['name'] : 'User') ?></span>
             <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>
         </div>
     </div>
@@ -275,9 +289,16 @@ $conn->close();
                     </div>
 
                     <div id="tableView">
+                        <div class="d-flex flex-wrap gap-2 mb-3 quick-filter-chips">
+                            <button type="button" class="btn btn-outline-primary btn-sm quick-filter-btn" data-filter-status="">All History</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm quick-filter-btn" data-filter-status="pending"><i class="fa-solid fa-hourglass-half me-1"></i> Pending</button>
+                            <button type="button" class="btn btn-outline-success btn-sm quick-filter-btn" data-filter-status="approved,checked out"><i class="fa-solid fa-box-open me-1"></i> Active Loans</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm quick-filter-btn" data-filter-status="returned"><i class="fa-solid fa-check-double me-1"></i> Returned</button>
+                        </div>
+                        
                         <div class="d-flex align-items-center gap-2 mb-3">
-                           <select id="statusFilter" class="form-select form-select-sm">
-                                <option value="">All Statuses</option>
+                           <select id="statusFilter" class="form-select form-select-sm" style="width: auto; min-width: 150px;">
+                                <option value="">All Statuses (Dropdown)</option>
                                 <option value="approved">Approved</option>
                                 <option value="checked out">Checked Out</option>
                                 <option value="pending">Pending</option>
@@ -286,6 +307,7 @@ $conn->close();
                            </select>
                            <input id="searchInput" type="text" class="form-control form-control-sm" placeholder="Search item or reason...">
                         </div>
+                        
                         <div class="table-responsive">
                             <table id="historyTable" class="table align-middle">
                                 <thead>
@@ -301,20 +323,36 @@ $conn->close();
                                 <tbody>
                                     <?php if (!empty($history)): ?>
                                         <?php foreach ($history as $loan):
-                                            // Correct placement for badge logic
                                             $status = strtolower($loan['status']);
-                                            $badgeClass = 'text-bg-light'; // Default
-                                            if ($status == 'approved') $badgeClass = 'text-bg-success';
-                                            elseif ($status == 'checked out') $badgeClass = 'text-bg-primary'; // Blue color
-                                            elseif ($status == 'pending') $badgeClass = 'text-bg-warning';
-                                            elseif ($status == 'rejected') $badgeClass = 'text-bg-danger';
-                                            elseif ($status == 'returned') $badgeClass = 'text-bg-secondary';
+                                            $badgeClass = 'text-bg-light'; 
+                                            $statusIcon = 'fa-solid fa-circle-info';
+
+                                            if ($status == 'approved') {
+                                                $badgeClass = 'text-bg-success';
+                                                $statusIcon = 'fa-solid fa-circle-check';
+                                            } elseif ($status == 'checked out') {
+                                                $badgeClass = 'text-bg-primary'; 
+                                                $statusIcon = 'fa-solid fa-hand-holding-box';
+                                            } elseif ($status == 'pending') {
+                                                $badgeClass = 'text-bg-warning';
+                                                $statusIcon = 'fa-solid fa-hourglass-half';
+                                            } elseif ($status == 'rejected') {
+                                                $badgeClass = 'text-bg-danger';
+                                                $statusIcon = 'fa-solid fa-circle-xmark';
+                                            } elseif ($status == 'returned') {
+                                                $badgeClass = 'text-bg-secondary';
+                                                $statusIcon = 'fa-solid fa-handshake';
+                                            }
                                         ?>
                                         <tr>
                                             <td><strong><?= htmlspecialchars($loan['item_name']) ?></strong></td>
                                             <td><?= date("d M Y", strtotime($loan['reserve_date'])) ?></td>
                                             <td><?= date("d M Y", strtotime($loan['return_date'])) ?></td>
-                                            <td><span class="badge rounded-pill <?= $badgeClass ?>"><?= ucfirst(htmlspecialchars($loan['status'])) ?></span></td>
+                                            <td>
+                                                <span class="badge rounded-pill <?= $badgeClass ?> loan-status-badge" data-status="<?= $status ?>">
+                                                    <i class="<?= $statusIcon ?>"></i> <?= ucfirst(htmlspecialchars($loan['status'])) ?>
+                                                </span>
+                                            </td>
                                             <td><?= htmlspecialchars($loan['quantity']) ?></td>
                                             <td><?= htmlspecialchars($loan['reason']) ?></td>
                                         </tr>
@@ -349,11 +387,9 @@ $conn->close();
                                 <?php endif; ?>
 
                                 <?php
-                                 // Logic for pagination links (show limited page numbers)
-                                 $maxPagesToShow = 5; // Adjust as needed
+                                 $maxPagesToShow = 5; 
                                  $startPage = max(1, $currentPage - floor($maxPagesToShow / 2));
                                  $endPage = min($totalPages, $startPage + $maxPagesToShow - 1);
-                                 // Adjust startPage if endPage is at the limit
                                  if ($endPage == $totalPages) {
                                      $startPage = max(1, $endPage - $maxPagesToShow + 1);
                                  }
@@ -428,7 +464,6 @@ $conn->close();
         </div>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {

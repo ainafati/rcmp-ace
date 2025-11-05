@@ -32,15 +32,15 @@ unset($_SESSION['error'], $_SESSION['success']);
     
 <style>
     /* -------------------------------------------------------------------------- */
-    /* GLOBAL & STRUCTURE (Using NEW Color Scheme) */
+    /* GLOBAL & STRUCTURE (Centered Design) */
     /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147;      /* Dark Blue (Text, Main Background) */
-        --accent-cyan: #00A3C9;       /* Light Blue/Cyan (Main Accent) */
-        --accent-green: #A7D737;      /* Lime Green (Secondary Accent) */
-        --light-bg: #f5f8ff;    /* Light background */
+        --primary-color: #002147;      /* Dark Blue (Main Button, Text) */
+        --accent-cyan: #00A3C9;        /* Light Blue/Cyan (Main Accent) */
+        --accent-green: #A7D737;       /* Lime Green (Input Focus) */
+        --light-bg: #f5f8ff;           /* Light background */
         --border-color: #e2e8f0;
-        --shadow-light: 0 4px 15px rgba(0, 0, 0, 0.08); /* Adjusted shadow */
+        --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15); /* Stronger shadow for card */
     }
 
     body, html { 
@@ -49,74 +49,49 @@ unset($_SESSION['error'], $_SESSION['success']);
         font-family: 'Inter', sans-serif; 
         height: 100%; 
         background-color: var(--light-bg); 
-        overflow-x: hidden; 
+        display: flex; /* Menggunakan flex untuk pusatkan kandungan */
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
     }
-    .container { 
-        display: flex; 
-        height: 100vh;
-        min-height: 700px;
-    }
-    
-    /* -------------------------------------------------------------------------- */
-    /* INFO PANEL (LEFT) - The main blue panel */
-    /* -------------------------------------------------------------------------- */
-    .info-panel { 
-        flex: 1; 
-        background: var(--primary-color); /* Dark Blue Background */
-        color: white; 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-        padding: 40px; 
-        text-align: center; 
-        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3); /* Stronger shadow */
-        position: relative;
-        z-index: 10;
-    }
-    .info-panel img { 
-        width: 200px; 
-        margin-bottom: 30px; 
-    }
-    .info-panel h1 { 
-        font-size: 38px; 
-        font-weight: 800; 
-        margin: 0; 
-        letter-spacing: 1px;
-    }
-    .info-panel p { 
-        font-size: 16px; 
-        opacity: 0.9; 
-        max-width: 400px; 
-        line-height: 1.6; 
-        margin-top: 15px; 
-    }
-    /* Logo Link Color Adjustment */
-    .form-footer a[href="index.php"] {
-        color: var(--accent-cyan) !important; 
-    }
-
-    /* -------------------------------------------------------------------------- */
-    /* FORM PANEL (RIGHT) */
-    /* -------------------------------------------------------------------------- */
-    .form-panel { 
-        flex: 1; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
+    .form-wrapper { 
+        max-width: 450px; /* Lebar maksimum kad log masuk */
+        width: 90%; 
         background: #fff; 
         padding: 40px; 
+        border-radius: 12px; 
+        box-shadow: var(--shadow-strong);
+        transition: transform 0.3s ease-in-out;
     }
-    .form-container { 
-        width: 100%; 
-        max-width: 420px; 
-        transition: height 0.3s ease;
+    
+    /* Header Branding */
+    .header-branding {
+        text-align: center;
+        margin-bottom: 30px;
     }
+    .header-branding img {
+        width: 120px; 
+        margin-bottom: 10px;
+    }
+    .header-branding h1 {
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--primary-color);
+        margin: 0;
+        letter-spacing: 0.5px;
+    }
+    .header-branding p {
+        font-size: 14px;
+        color: #64748b;
+        margin-top: 5px;
+    }
+
+    /* Form Title */
     h2 { 
-        font-size: 30px; 
+        font-size: 24px; 
         font-weight: 700; 
         color: var(--primary-color); 
-        margin-bottom: 30px; 
+        margin-bottom: 25px; 
         text-align: center; 
     }
     
@@ -138,16 +113,16 @@ unset($_SESSION['error'], $_SESSION['success']);
     .role-content { 
         border: 2px solid var(--border-color); 
         border-radius: 10px; 
-        padding: 20px 10px; 
+        padding: 15px 10px; 
         text-align: center; 
         cursor: pointer; 
         transition: all 0.3s ease-in-out;
         background-color: #ffffff;
-        box-shadow: var(--shadow-light); 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Shadow lebih ringan */
     }
     .role-content i { 
-        font-size: 30px; 
-        margin-bottom: 10px; 
+        font-size: 24px; 
+        margin-bottom: 8px; 
         color: var(--accent-cyan); /* Icon Color: Cyan */
     }
     .role-content span { 
@@ -157,17 +132,17 @@ unset($_SESSION['error'], $_SESSION['success']);
         color: #1e293b; 
     }
     .role-card:hover .role-content { 
-        border-color: var(--accent-cyan); /* Hover Border: Cyan */
-        transform: translateY(-3px);
+        border-color: var(--accent-cyan); 
+        transform: translateY(-2px);
     }
     .role-card input:checked + .role-content { 
-        border-color: var(--primary-color); /* Checked Border: Dark Blue */
+        border-color: var(--primary-color); 
         background-color: #f0f4f9; 
-        transform: translateY(-2px); 
+        transform: translateY(-1px); 
     }
     
     /* -------------------------------------------------------------------------- */
-    /* LOGIN FORM ELEMENTS */
+    /* LOGIN FORM ELEMENTS (Kekalkan Gaya Sedia Ada) */
     /* -------------------------------------------------------------------------- */
     #login-details-step { 
         opacity: 0; 
@@ -179,210 +154,117 @@ unset($_SESSION['error'], $_SESSION['success']);
     #login-details-step.visible { 
         opacity: 1; 
         height: auto;
-        margin-top: 30px;
+        margin-top: 25px; /* Kurangkan margin atas */
     }
-    .input-group { 
-        margin-bottom: 20px; 
-        text-align: left; 
-        position: relative; 
-    }
-    .input-group label { 
-        font-weight: 600; 
-        font-size: 14px; 
-        display: block; 
-        margin-bottom: 6px; 
-        color: #1e293b; 
-    }
+    .input-group { margin-bottom: 18px; text-align: left; position: relative; }
+    .input-group label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: #1e293b; }
     .input-group input { 
-        width: 100%; 
-        padding: 14px 12px; 
-        border: 1px solid var(--border-color); 
-        border-radius: 8px; 
-        box-sizing: border-box; 
-        font-size: 16px;
+        width: 100%; padding: 12px; border: 1px solid var(--border-color); 
+        border-radius: 8px; box-sizing: border-box; font-size: 16px;
         transition: border-color 0.3s, box-shadow 0.3s;
     }
     .input-group input:focus {
-        border-color: var(--accent-green); /* Input Focus: Lime Green */
+        border-color: var(--accent-green);
         box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
         outline: none;
     }
-    .toggle-password { 
-        position: absolute; 
-        right: 15px; 
-        top: 45px; 
-        cursor: pointer; 
-        color: #94a3b8; 
-        transition: color 0.2s;
-        font-size: 16px;
-    }
-    .toggle-password:hover {
-        color: var(--accent-cyan); /* Toggle Hover: Cyan */
-    }
+    .toggle-password { position: absolute; right: 12px; top: 41px; cursor: pointer; color: #94a3b8; font-size: 16px; }
+    .toggle-password:hover { color: var(--accent-cyan); }
     .login-btn { 
-        background: var(--primary-color); /* Button: Dark Blue */
-        color: white; 
-        border: none; 
-        width: 100%; 
-        padding: 15px; 
-        border-radius: 8px; 
-        font-weight: 700; 
-        cursor: pointer; 
-        font-size: 17px;
+        background: var(--primary-color); 
+        color: white; border: none; width: 100%; padding: 13px; 
+        border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px;
         transition: background-color 0.3s, transform 0.1s;
+        margin-top: 5px;
     }
-    .login-btn:hover {
-        background-color: var(--accent-cyan); /* Button Hover: Cyan */
-        transform: translateY(-1px);
-    }
-    .login-btn:active {
-        transform: translateY(0);
-        background-color: #0087a3; /* Darker Cyan on press */
-    }
+    .login-btn:hover { background-color: var(--accent-cyan); transform: translateY(-1px); }
+    .login-btn:active { transform: translateY(0); background-color: #0087a3; }
     
     /* Footer & Alerts */
-    .form-footer { margin-top: 25px; font-size: 14px; text-align: center; }
-    .form-footer a { 
-        color: var(--accent-cyan); /* Footer Links: Cyan */
-        text-decoration: none; 
-        font-weight: 600; 
-    }
-    .form-footer a:hover { 
-        text-decoration: underline; 
-        color: var(--primary-color); /* Footer Hover: Dark Blue */
-    }
-    .alert-message { 
-        border-radius: 8px; 
-        padding: 12px; 
-        margin-bottom: 20px; 
-        text-align: center; 
-        font-size: 15px; 
-        font-weight: 600; 
-        transition: opacity 0.5s ease;
-        opacity: 1;
-    }
-    .error-message { color: #842029; background-color: #f8d7da; border: 1px solid #f5c2c7; }
-    .success-message { color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; }
-    .instruction #role-title {
-        color: var(--accent-cyan) !important; /* Ensure role title is Cyan */
-    }
+    .form-footer { margin-top: 20px; font-size: 14px; text-align: center; }
+    .form-footer a { color: var(--accent-cyan); text-decoration: none; font-weight: 600; }
+    .form-footer a:hover { text-decoration: underline; color: var(--primary-color); }
+    .alert-message { border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 14px; }
+    .instruction #role-title { color: var(--accent-cyan) !important; }
 
     /* -------------------------------------------------------------------------- */
     /* RESPONSIVE DESIGN (MOBILE) */
     /* -------------------------------------------------------------------------- */
-    @media (max-width: 850px) {
-        .container {
-            flex-direction: column; 
-            height: auto; 
-            min-height: 100vh; 
-        }
-
-        /* Info Panel (top) */
-        .info-panel {
-            flex: none; 
+    @media (max-width: 550px) {
+        .form-wrapper {
+            width: 100%;
+            max-width: none;
             padding: 30px 20px;
-            height: 180px; 
-            justify-content: center;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2); 
+            box-shadow: none; /* Buang shadow pada mobile penuh */
+            border-radius: 0;
+            min-height: 100vh;
         }
-        .info-panel img { 
-            width: 140px; 
-            margin-bottom: 5px;
-        }
-        .info-panel h1 { 
-            font-size: 28px; 
-        }
-        .info-panel p { 
-            display: none; 
-        }
-
-        /* Form Panel (bottom) */
-        .form-panel {
-            flex: none; 
-            padding: 30px 20px; 
-            min-height: calc(100vh - 180px); 
-        }
-        
         .roles {
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            grid-template-columns: 1fr; /* 1 kolum untuk skrin kecil */
+            gap: 10px;
         }
-        .role-content {
-            padding: 15px 10px; 
-        }
-        
-        /* Step 2 spacing adjustment */
-        #login-details-step.visible {
-            margin-top: 20px;
-        }
-        
-    }
-    /* For very small phones */
-    @media (max-width: 450px) {
-        .roles {
-            grid-template-columns: 1fr;
+        .header-branding {
+             margin-top: 15px;
         }
     }
 </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="info-panel">
-        <img src="assets/unikl-logo.png" alt="UniKL Logo">
-        <h1>UniKL R-ILMS</h1>
-        <p>Asset Check Effective. IT Department Asset Management Portal. Please select your role to proceed.</p>
+<div class="form-wrapper">
+    <div class="header-branding">
+         <img src="assets/unikl-logo.png" alt="UniKL Logo">
+        <h1>RCMP NexCheck</h1>
+        <p>IT Department Inventory Management Portal.</p>
     </div>
 
-    <div class="form-panel">
-        <div class="form-container">
-            <h2>UniKL R-ILMS Login</h2>
-            
-            <div id="role-selection-step">
-                <p class="instruction">Who are you logging in as?</p>
-                <div class="roles">
-                    <label class="role-card"><input type="radio" name="role" value="admin" data-title="Admin"><div class="role-content"><i class="fa-solid fa-user-shield"></i><span>Admin</span></div></label>
-                    <label class="role-card"><input type="radio" name="role" value="tech" data-title="Technician"><div class="role-content"><i class="fa-solid fa-screwdriver-wrench"></i><span>Technician</span></div></label>
-                    <label class="role-card"><input type="radio" name="role" value="user" data-title="User"><div class="role-content"><i class="fa-solid fa-user"></i><span>User/Staff</span></div></label>
-                </div>
+    <div class="form-container">
+        <h2>System Login</h2>
+        
+        <div id="role-selection-step">
+            <p class="instruction">Please select your role to proceed:</p>
+            <div class="roles">
+                <label class="role-card"><input type="radio" name="role" value="admin" data-title="Admin"><div class="role-content"><i class="fa-solid fa-user-shield"></i><span>Admin</span></div></label>
+                <label class="role-card"><input type="radio" name="role" value="tech" data-title="Technician"><div class="role-content"><i class="fa-solid fa-screwdriver-wrench"></i><span>Technician</span></div></label>
+                <label class="role-card"><input type="radio" name="role" value="user" data-title="User"><div class="role-content"><i class="fa-solid fa-user"></i><span>User/Staff</span></div></label>
             </div>
+        </div>
 
-            <div id="login-details-step">
-                <p class="instruction" style="font-weight: 700;">Log In as <span id="role-title" style="color: var(--accent-cyan);"></span></p>
-                
-                <?php if (!empty($errorMessage)): ?>
-                    <div class="alert-message error-message"><?= htmlspecialchars($errorMessage); ?></div>
-                <?php endif; ?>
-                
-                <?php if (!empty($successMessage)): ?>
-                    <div class="alert-message success-message"><?= htmlspecialchars($successMessage); ?></div>
-                <?php endif; ?>
-
-                <form method="POST" action="login_process.php">
-                    <input type="hidden" name="role" id="hidden-role-input">
-                    
-                    <div class="input-group">
-                        <label for="email">Email</label>
-                        <input type="email" name="email" id="email" value="<?= htmlspecialchars($login_attempt_email) ?>" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="password">Password</label>
-                        <input type="password" name="password" id="password" required>
-                        <i class="fa-solid toggle-password" id="togglePassword"></i> </div>
-                    
-                    <button type="submit" class="login-btn">Log In</button>
-                </form>
-
-                <div class="form-footer">
-                    <p>Forgot your password? <a href="forgot_password.php">Reset it here</a></p>
-                    <p id="signUpLink" style="display: none;">Don't have an account? <a href="signUp.php">Sign Up</a></p>
-                </div>
-            </div>
+        <div id="login-details-step">
+            <p class="instruction" style="font-weight: 700;">Log In as <span id="role-title"></span></p>
             
-             <div class="form-footer" id="main-footer" style="margin-top: 15px;">
-                 <p><a href="index.php"><i class="fa-solid fa-home me-1"></i> Back to Homepage</a></p>
-             </div>
+            <?php if (!empty($errorMessage)): ?>
+                <div class="alert-message error-message"><?= htmlspecialchars($errorMessage); ?></div>
+            <?php endif; ?>
+            
+            <?php if (!empty($successMessage)): ?>
+                <div class="alert-message success-message"><?= htmlspecialchars($successMessage); ?></div>
+            <?php endif; ?>
+
+            <form method="POST" action="login_process.php">
+                <input type="hidden" name="role" id="hidden-role-input">
+                
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" name="email" id="email" value="<?= htmlspecialchars($login_attempt_email) ?>" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" name="password" id="password" required>
+                </div>
+                
+                <button type="submit" class="login-btn">Log In</button>
+            </form>
+
+            <div class="form-footer">
+                <p>Forgot your password? <a href="forgot_password.php">Reset it here</a></p>
+                <p id="signUpLink" style="display: none;">Don't have an account? <a href="signUp.php">Sign Up</a></p>
+            </div>
+        </div>
+        
+        <div class="form-footer" style="margin-top: 30px;">
+            <p><a href="index.php"><i class="fa-solid fa-home me-1"></i> Back to Homepage</a></p>
         </div>
     </div>
 </div>
@@ -395,8 +277,6 @@ unset($_SESSION['error'], $_SESSION['success']);
         const hiddenRoleInput = document.getElementById('hidden-role-input');
         const roleTitle = document.getElementById('role-title');
         const signUpLink = document.getElementById('signUpLink');
-        const mainFooter = document.getElementById('main-footer');
-        
         const togglePassword = document.querySelector("#togglePassword");
         const passwordField = document.querySelector("#password");
         
@@ -421,8 +301,14 @@ unset($_SESSION['error'], $_SESSION['success']);
             signUpLink.style.display = (role === 'user') ? 'block' : 'none';
             
             // Show the Login Details Form (with smooth transition)
+            // Sembunyikan Role Selection
+            document.getElementById('role-selection-step').style.display = 'none'; 
+            
+            // Tunjukkan Login Details
             loginDetailsStep.classList.add('visible');
-            mainFooter.style.display = 'none'; // Hide main footer to avoid clutter
+            
+            // Scroll ke borang (untuk skrin kecil)
+            loginDetailsStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         roleRadios.forEach(radio => {
@@ -432,12 +318,13 @@ unset($_SESSION['error'], $_SESSION['success']);
         });
         
         // --- 3. Password Toggle ---
+        // Sediakan ikon awal yang betul (fa-eye) jika type='password'
+        togglePassword.classList.add("fa-eye-slash"); 
+        
         togglePassword.addEventListener("click", function () {
-            // 1. Tukar jenis input
             const isPassword = passwordField.type === "password";
             passwordField.type = isPassword ? "text" : "password";
             
-            // 2. Tukar ikon
             this.classList.toggle("fa-eye-slash");
             this.classList.toggle("fa-eye");
         });
@@ -451,7 +338,10 @@ unset($_SESSION['error'], $_SESSION['success']);
                 radio.checked = true;
                 
                 // Programmatically trigger the next step
-                showLoginDetails(attemptedRole, radio.dataset.title);
+                // Kita guna setTimeout untuk memastikan CSS transition berfungsi
+                setTimeout(() => {
+                    showLoginDetails(attemptedRole, radio.dataset.title);
+                }, 100); 
             }
         }
     });

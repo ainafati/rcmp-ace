@@ -350,7 +350,7 @@
         <div class="container navbar-layout">
             <div class="navbar-left">
                 <img src="img/Logo-UniKL-PCM.jpg" alt="UniKL RCMP Logo">
-                <div class="navbar-title">RCMP Inventory Loan Management System</div>
+                <div class="navbar-title">RCMP Inventory Reservation Check System</div>
             </div>
             <div class="navbar-right">
                 <a href="login.php">Log In</a>
@@ -362,8 +362,8 @@
         <div class="container">
             <div class="hero-layout">
                 <div class="hero-text">
-                    <p style="font-size: 16px; font-weight: 500; color: var(--accent-cyan); margin-bottom: 5px; text-transform: uppercase;">R-ILMS: Royal College of Medicine Perak</p>
-                    <h1>Precision Asset Tracking for <strong>UniKL RCMP.</strong></h1>
+                    <p style="font-size: 16px; font-weight: 500; color: var(--accent-cyan); margin-bottom: 5px; text-transform: uppercase;">NexCheck: Royal College of Medicine Perak</p>
+                    <h1>Precision Inventory Tracking for <strong>UniKL RCMP.</strong></h1>
                     <p>The definitive <strong>IT Asset Management System</strong> designed for accuracy and accountability. Manage loans, track inventory lifecycle, and generate precise audit reports for all campus equipment.</p>
                     <a href="#features-section" class="cta-button">Explore Core Features <i class="fas fa-arrow-right"></i></a>
                 </div>
@@ -397,7 +397,7 @@
 
             <div class="about animate-on-scroll">
                 <h2>Designed for IT Department, Serving the Campus.</h2>
-                <p>R-ILMS is an essential tool for the <strong>UniKL IT Department</strong> at the Royal College of Medicine Perak. Its purpose is to streamline asset issuance (laptops, projectors, testing gear) to faculty and students, minimizing loss and ensuring operational readiness across all medical and administrative facilities.</p>
+                <p>NexCheck is an essential tool for the <strong>UniKL IT Department</strong> at the Royal College of Medicine Perak. Its purpose is to streamline asset issuance (laptops, projectors, testing gear) to faculty and students, minimizing loss and ensuring operational readiness across all medical and administrative facilities.</p>
             </div>
         </div>
     </div>
