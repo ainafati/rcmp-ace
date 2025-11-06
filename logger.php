@@ -16,8 +16,8 @@ function log_activity($conn, $user_type, $user_id, $action, $details) {
     
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        $stmt->bind_param("sssss", $user_type, $user_id, $action, $details, $ip_address);
-        $stmt->execute();
+// BARU: 'sssss' -> string, string (s), string, string, string
+$stmt->bind_param("sssss", $user_type, $user_id, $action, $details, $ip_address);        $stmt->execute();
         $stmt->close();
     } else {
         error_log("Failed to prepare log statement: " . $conn->error);
