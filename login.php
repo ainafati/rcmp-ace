@@ -1,6 +1,6 @@
 <?php
 session_start();
-include __DIR__ . '/config.php';
+include 'config.php'; 
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) { header("Location: user/dashboard_user.php"); exit(); }

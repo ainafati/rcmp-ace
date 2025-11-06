@@ -1,10 +1,13 @@
 <?php
 // File: login_process.php
 session_start();
-include __DIR__ . '/config.php';
+include 'config.php';
 
+// Include logger file. You may need to fix the path
+// If 'includes' folder is inside 'admin', this may be wrong
+// Assuming 'includes' is at the root: /includes/logger.php
 if (file_exists('logger.php')) {
-include __DIR__ . '/logger.php';
+    include 'logger.php';
 } else {
     // Fallback if the path is different. If logger.php does not exist, create a dummy function
     if (!function_exists('log_activity')) {
