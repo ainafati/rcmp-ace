@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexCheck (RCMP Inventory Reservation Check System) - IT Asset Management</title>
+    <title>R-ILMS (RCMP Management System-Inventory) - IT Asset Management</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         :root {
             /* NEW RCMP-Inspired Colors (Clean & Tech/Medical) */
-            --primary-blue: #002147;      /* Keep a dark blue base for text/structure */
-            --accent-cyan: #00A3C9;       /* Light Blue/Cyan for highlights */
-            --accent-green: #A7D737;      /* Lime Green for secondary highlights */
-            --background-light: #ffffff; 
+            --primary-blue: #002147;      /* Keep a dark blue base for text/structure */
+            --accent-cyan: #00A3C9;       /* Light Blue/Cyan for highlights */
+            --accent-green: #A7D737;      /* Lime Green for secondary highlights */
+            --background-light: #ffffff; 
             --off-white: #f8f9fc;
             --text-dark: #222;
             --text-muted: #666;
@@ -31,7 +31,7 @@
         body {
             margin: 0;
             font-family: 'Poppins', sans-serif;
-            background: var(--background-light); 
+            background: var(--background-light); 
             color: var(--text-dark);
             scroll-behavior: smooth;
         }
@@ -54,9 +54,9 @@
             position: sticky;
             top: 0;
             z-index: 1000;
-            border-bottom: 3px solid var(--accent-cyan); 
+            border-bottom: 3px solid var(--accent-cyan); /* Using New Accent Cyan */
         }
-        .navbar-layout { 
+        .navbar-layout { 
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -65,43 +65,40 @@
         .navbar-left {
             display: flex;
             align-items: center;
-            gap: 10px; 
+            gap: 10px; 
         }
         .navbar-left img {
-            height: 38px; 
+            height: 38px; 
         }
         .navbar-title {
             color: var(--primary-blue);
-            font-size: 18px; 
+            font-size: 18px; 
             font-weight: 700;
             line-height: 1.2;
         }
-        /* Navbar Right Button - DIKEMASKINI: Rekabentuk Outline (Garisan) */
         .navbar-right a {
-            color: var(--primary-blue); 
+            color: white;
             text-decoration: none;
-            background: transparent; /* TIADA latar belakang */
-            border: 2px solid var(--accent-cyan); /* Border Cyan terang */
-            padding: 8px 20px; 
+            background: var(--accent-cyan); /* Using New Accent Cyan */
+            padding: 8px 20px; 
             border-radius: 6px;
             transition: all 0.3s ease;
             font-weight: 600;
             letter-spacing: 0.5px;
+            box-shadow: 0 4px 10px rgba(0, 163, 201, 0.2);
         }
         .navbar-right a:hover {
-            background: var(--primary-blue); /* Hover: Latar belakang Biru Tua */
-            color: white; /* Teks Putih */
-            border-color: var(--primary-blue);
-            box-shadow: 0 4px 15px rgba(0, 33, 71, 0.2);
+            background: var(--primary-blue);
+            box-shadow: 0 6px 15px rgba(0, 33, 71, 0.2);
         }
 
-        /* HERO SECTION - KEMASKINI WARNA LATAR BELAKANG */
+        /* Hero Section - Split Layout */
         .hero {
             height: 70vh;
             min-height: 550px;
             display: flex;
             align-items: center;
-            background: #00477E; 
+            background: var(--background-light);
             position: relative;
             padding-top: 50px;
         }
@@ -129,7 +126,7 @@
             max-width: 100%;
             height: auto;
             border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         }
 
         /* Hero Text Styling */
@@ -137,38 +134,31 @@
             font-size: 48px;
             margin: 10px 0 20px 0;
             font-weight: 800;
-            color: white; 
+            color: var(--primary-blue);
             line-height: 1.2;
         }
         .hero h1 strong {
-            color: var(--accent-cyan); 
+            color: var(--accent-cyan); /* Using New Accent Cyan */
         }
         .hero p {
             font-size: 18px;
             line-height: 1.6;
-            color: #c4d0e1; 
+            color: var(--text-muted);
             margin-bottom: 30px;
             max-width: 500px;
         }
-        /* Style untuk pautan "NexCheck: ..." */
-        .hero .hero-text p:first-child { 
-            color: var(--accent-green) !important; 
-        }
-        
-        /* CTA Button - KEMASKINI WARNA TEKS UNTUK HIJAU */
         .cta-button {
             display: inline-block;
-            background: var(--accent-green); 
-            color: white; /* TEKS PUTIH UNTUK KONTRAK YANG LEBIH BAIK */
+            background: var(--primary-blue);
+            color: white;
             padding: 12px 30px;
             text-decoration: none;
             border-radius: 6px;
-            font-weight: 700;
+            font-weight: 600;
             transition: background 0.3s ease, transform 0.3s ease;
         }
         .cta-button:hover {
-            background: var(--accent-cyan); 
-            color: white; 
+            background: var(--accent-cyan);
             transform: translateY(-2px);
         }
 
@@ -197,7 +187,7 @@
             padding: 30px;
             text-align: left;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-            border-left: 5px solid var(--accent-green); 
+            border-left: 5px solid var(--accent-green); /* Using New Accent Green */
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .card:hover {
@@ -206,7 +196,7 @@
         }
         .card .icon {
             font-size: 40px;
-            color: var(--accent-cyan); 
+            color: var(--accent-cyan); /* Using New Accent Cyan */
             margin-bottom: 15px;
         }
         .card h3 {
@@ -223,7 +213,7 @@
 
         /* About Section */
         .about {
-            background: var(--primary-blue); 
+            background: var(--primary-blue); /* Keep dark primary blue for contrast */
             color: white;
             padding: 60px 20px;
             border-radius: 12px;
@@ -231,7 +221,7 @@
             margin: 80px auto;
         }
         .about h2 {
-            color: var(--accent-green); 
+            color: var(--accent-green); /* Using New Accent Green */
             font-size: 32px;
             font-weight: 700;
             margin-bottom: 20px;
@@ -253,7 +243,7 @@
             font-size: 14px;
         }
         footer strong {
-            color: var(--accent-green); 
+            color: var(--accent-green); /* Using New Accent Green */
             font-weight: 600;
         }
 
@@ -276,7 +266,7 @@
             to { opacity: 1; }
         }
 
-        /* Modal (no change) */
+        /* Modal (updated colors) */
         .modal {
             display: none;
             position: fixed;
@@ -300,7 +290,7 @@
         }
         .modal-content .icon {
             font-size: 3rem;
-            color: var(--accent-cyan); 
+            color: var(--accent-cyan); /* Using New Accent Cyan */
         }
         .modal-content h3 {
             margin: 15px 0;
@@ -309,7 +299,7 @@
         .modal-content button {
             margin-top: 20px;
             padding: 12px 25px;
-            background: var(--accent-green); 
+            background: var(--accent-green); /* Using New Accent Green */
             color: white;
             border: none;
             border-radius: 8px;
@@ -318,12 +308,12 @@
             transition: all 0.3s ease;
         }
         .modal-content button:hover {
-            background: #90c226; 
+            background: #90c226; /* Slightly darker green for hover */
             transform: translateY(-2px);
         }
 
 
-        /* Responsive Design */
+        /* Responsive Design (no change) */
         @media (max-width: 992px) {
             .hero-layout {
                 flex-direction: column;
@@ -334,7 +324,7 @@
                 padding-right: 0;
             }
             .hero-graphic {
-                display: none; 
+                display: none; 
             }
             .hero {
                 height: auto;
@@ -428,7 +418,7 @@
     </div>
 
 <script>
-    
+    // MODAL LOGIC (Using SESSIONSTORAGE)
     const modal = document.getElementById("disclaimerModal");
     
     window.closeModal = function() {
@@ -446,7 +436,7 @@
         setupScrollAnimation();
     };
 
-    
+    // Scroll Animation Logic
     function setupScrollAnimation() {
         const scrollElements = document.querySelectorAll(".animate-on-scroll");
         const observer = new IntersectionObserver((entries) => {

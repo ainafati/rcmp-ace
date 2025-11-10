@@ -1,9 +1,9 @@
 <?php
 session_start();
+// Pastikan path ke config.php adalah betul
+include '../config.php'; // Path disesuaikan
 
-include '../config.php'; 
-
-
+// Pastikan pengguna log masuk
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -11,14 +11,14 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = (int) $_SESSION['user_id'];
 
-
+// Ambil maklumat pengguna terkini dari pangkalan data
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
-
+// Jika $conn ditutup di sini, pastikan ia dibuka semula jika fail lain memerlukannya.
 
 if (!$user) {
     session_destroy();
@@ -32,12 +32,12 @@ if (!$user) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile — UniKL</title>
-    <link href="https:
-    <link rel="stylesheet" href="https:
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <link rel="preconnect" href="https:
-    <link rel="preconnect" href="https:
-    <link href="https:
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         /* 1. FONT & BODY BACKGROUND */
@@ -274,35 +274,35 @@ if (!$user) {
     </div>
 </div>
 
-<script src="https:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    
-    
-    
+    // ==========================================================
+    // --- PENGISYTIHARAN PEMBOLEHUBAH GLOBAL UTAMA ---
+    // ==========================================================
     const passwordInput = document.getElementById('new_password');
     const confirmInput = document.getElementById('confirm_password');
     const matchStatus = document.getElementById('match-status');
     const form = document.getElementById('profileUpdateForm');
 
 
-    
+    // --- Logik Sidebar (Dikekalkan) ---
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     const body = document.body;
 
-    
+    // --- Logik Show/Hide Password ---
     const togglePassword = document.getElementById('togglePassword');
     
     if (togglePassword && passwordInput) {
         togglePassword.addEventListener('click', function () {
-            
+            // Tukar jenis input: password <-> text
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             
-            
+            // Tukar ikon: mata tertutup <-> mata terbuka
             this.classList.toggle('fa-eye');
             this.classList.toggle('fa-eye-slash');
         });
@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
             viewMode.style.display = 'none';
             editMode.style.display = 'block';
             
-            
+            // Panggil checkRequirements semasa Edit Mode dibuka untuk set status awal (semua ❌)
             checkPasswordRequirements(document.getElementById('new_password').value);
         });
 
@@ -348,15 +348,15 @@ document.addEventListener('DOMContentLoaded', function() {
             viewMode.style.display = 'block';
             document.getElementById('profileUpdateForm').reset();
             
-            
+            // Reset status match dan status syarat kata laluan
             matchStatus.textContent = '';
             checkPasswordRequirements(''); 
         });
     }
     
-    
-    
-    
+    // ==========================================================
+    // --- LOGIK PENGESAHAN KATA LALUAN (CHECKLIST) ---
+    // ==========================================================
     
     const requirements = {
         length: document.getElementById('req-length'),
@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     function checkPasswordRequirements(password) {
-        
+        // Regexes (Sama seperti yang digunakan dalam PHP)
         const checks = {
             length: password.length >= 8,
             uppercase: /[A-Z]/.test(password),
@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const isValid = checks[key];
             const element = requirements[key];
             
-            
+            // Kemas kini paparan (❌ <-> ✅)
             if (isValid) {
                 element.style.color = 'green';
                 element.innerHTML = element.innerHTML.replace('❌', '✅'); 
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    
+    // --- Event Listeners Kata Laluan ---
     
     passwordInput.addEventListener('keyup', function() {
         checkPasswordRequirements(this.value); 
@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     confirmInput.addEventListener('keyup', checkPasswordMatch);
 
-    
+    // Halang penghantaran borang jika kata laluan diisi tetapi tidak sah
     form.addEventListener('submit', function(e) {
         if (passwordInput.value.length > 0) {
             const isValid = checkPasswordRequirements(passwordInput.value);

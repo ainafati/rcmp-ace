@@ -1,11 +1,11 @@
 <?php
-
+// checkout_action.php (DIBETULKAN UNTUK NAMA JADUAL ASAS & MULTI-ASSET)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 session_start();
-
+// Pastikan laluan ini betul (Jika config.php berada di folder yang sama)
 include 'config.php'; 
 include 'config_email.php'; 
 require 'send_email.php';
@@ -43,11 +43,11 @@ switch ($action) {
             http_response_code(400); echo json_encode(['message' => 'Missing required information.']); exit();
         }
 
-        
+        // --- 1. DAPATKAN MAKLUMAT E-MEL DAHULU (SEBELUM TRANSAKSI) ---
         $info = null;
 
         try {
-            
+            // NAMA JADUAL TANPA AWALAN (reservation_items, reservations, user, item)
             $stmt_info = $conn->prepare("
                 SELECT 
                     u.email AS user_email, 
@@ -71,7 +71,7 @@ switch ($action) {
             
             if (!$info) throw new Exception("Reservation Item ID not found or join failed.");
 
-            
+            // KOD BARU: Dapatkan SEMUA asset_code
             $asset_placeholders = implode(',', array_fill(0, count($selectedAssets), '?'));
             
             $stmt_codes = $conn->prepare("SELECT asset_code FROM assets WHERE asset_id IN ($asset_placeholders)"); 
@@ -87,9 +87,9 @@ switch ($action) {
 
             if (empty($asset_results)) throw new Exception("No Asset Codes found for selected IDs.");
             
-            
+            // GABUNGKAN SEMUA KOD MENJADI SATU RENTETAN
             $all_asset_codes = implode(', ', array_column($asset_results, 'asset_code'));
-            $info['asset_code'] = $all_asset_codes; 
+            $info['asset_code'] = $all_asset_codes; // DISIMPAN UNTUK E-MEL
 
         } catch (Exception $e) {
             http_response_code(500);
@@ -98,16 +98,16 @@ switch ($action) {
         }
 
 
-        
+        // --- 2. MULAKAN TRANSAKSI (UNTUK KEMAS KINI DB) ---
         $conn->begin_transaction();
         try {
-            
+            // 1. Kemas kini status tempahan (reservation_items)
             $stmt = $conn->prepare("UPDATE reservation_items SET status = 'Approved', approved_by = ? WHERE id = ?");
             $stmt->bind_param("ii", $tech_id, $reservation_item_id);
             $stmt->execute();
             $stmt->close();
 
-            
+            // 2. Pautkan aset yang dipilih (reservation_assets)
             $stmt_link = $conn->prepare("INSERT INTO reservation_assets (reservation_item_id, asset_id) VALUES (?, ?)");
             foreach ($selectedAssets as $asset_id) {
                 $asset_id = (int)$asset_id;
@@ -116,7 +116,7 @@ switch ($action) {
             }
             $stmt_link->close();
 
-            
+            // 3. Kemas kini status aset kepada 'Reserved' (assets)
             $asset_placeholders = implode(',', array_fill(0, count($selectedAssets), '?'));
             $stmt_update = $conn->prepare("UPDATE assets SET status = 'Reserved' WHERE asset_id IN ($asset_placeholders)");
             $types = str_repeat('i', count($selectedAssets));
@@ -126,10 +126,10 @@ switch ($action) {
             
             $conn->commit();
 
-            
+            // --- 3. PANGGIL FUNGSI E-MEL ---
             $email_sent = false;
             if ($info && defined('SMTP_USER') && defined('SMTP_PASS')) {
-                
+                // Sekarang menghantar 8 parameter yang diperlukan
                 $email_sent = sendNotificationEmail(
                     $info['user_email'],
                     $info['user_name'],
@@ -166,13 +166,13 @@ switch ($action) {
         $reservation_item_id = (int)$_POST['reservation_item_id'];
         $conn->begin_transaction();
         try {
-            
+            // 1. Kemas kini status tempahan (reservation_items)
             $stmt = $conn->prepare("UPDATE reservation_items SET status = 'Checked Out' WHERE id = ?");
             $stmt->bind_param("i", $reservation_item_id);
             $stmt->execute();
             $stmt->close();
 
-            
+            // 2. Kemas kini status aset (assets)
             $stmt_assets = $conn->prepare("UPDATE assets SET status = 'Checked Out' WHERE asset_id IN (SELECT asset_id FROM reservation_assets WHERE reservation_item_id = ?)");
             $stmt_assets->bind_param("i", $reservation_item_id);
             $stmt_assets->execute();

@@ -2,19 +2,19 @@
 session_start();
 include 'config.php'; 
 
-
+// Redirect if already logged in
 if (isset($_SESSION['user_id'])) { header("Location: user/dashboard_user.php"); exit(); }
 if (isset($_SESSION['tech_id'])) { header("Location: technician/dashboard_tech.php"); exit(); }
 if (isset($_SESSION['admin_id'])) { header("Location: admin/manageItem_admin.php"); exit(); }
 
-
+// Check for a failed login attempt OR a successful signup
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
-
+// Clear session variables after reading
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 
-
+// Retrieve and clear flash messages
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
 unset($_SESSION['error'], $_SESSION['success']);
@@ -27,8 +27,8 @@ unset($_SESSION['error'], $_SESSION['success']);
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <link rel="stylesheet" href="https:
-    <link href="https:
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
 <style>
     /* -------------------------------------------------------------------------- */
@@ -280,7 +280,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         const togglePassword = document.querySelector("#togglePassword");
         const passwordField = document.querySelector("#password");
         
-        
+        // --- 1. Alert Message Timeout ---
         if (alertMessages) {
             alertMessages.forEach(function(message) {
                 setTimeout(() => {
@@ -292,22 +292,22 @@ unset($_SESSION['error'], $_SESSION['success']);
             });
         }
         
-        
+        // --- 2. Role Selection Logic ---
         function showLoginDetails(role, title) {
             roleTitle.textContent = title;
             hiddenRoleInput.value = role;
             
-            
+            // Show/Hide Sign Up Link
             signUpLink.style.display = (role === 'user') ? 'block' : 'none';
             
-            
-            
+            // Show the Login Details Form (with smooth transition)
+            // Sembunyikan Role Selection
             document.getElementById('role-selection-step').style.display = 'none'; 
             
-            
+            // Tunjukkan Login Details
             loginDetailsStep.classList.add('visible');
             
-            
+            // Scroll ke borang (untuk skrin kecil)
             loginDetailsStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
@@ -317,8 +317,8 @@ unset($_SESSION['error'], $_SESSION['success']);
             });
         });
         
-        
-        
+        // --- 3. Password Toggle ---
+        // Sediakan ikon awal yang betul (fa-eye) jika type='password'
         togglePassword.classList.add("fa-eye-slash"); 
         
         togglePassword.addEventListener("click", function () {
@@ -329,16 +329,16 @@ unset($_SESSION['error'], $_SESSION['success']);
             this.classList.toggle("fa-eye");
         });
         
-        
+        // --- 4. Failed Attempt / Pre-fill Logic ---
         const attemptedRole = '<?= $login_attempt_role ?>';
         if (attemptedRole) {
             const radio = document.querySelector(`input[name="role"][value="${attemptedRole}"]`);
             if (radio) {
-                
+                // Check the radio button
                 radio.checked = true;
                 
-                
-                
+                // Programmatically trigger the next step
+                // Kita guna setTimeout untuk memastikan CSS transition berfungsi
                 setTimeout(() => {
                     showLoginDetails(attemptedRole, radio.dataset.title);
                 }, 100); 

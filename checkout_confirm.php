@@ -12,13 +12,13 @@ require 'PHPMailer-master/src/SMTP.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reserve_id = (int)$_POST['reserve_id'];
 
-    
+    // 1. Update status
     $stmt = $conn->prepare("UPDATE reservations SET status = 'checked_out' WHERE reserve_id = ?");
     $stmt->bind_param("i", $reserve_id);
     $stmt->execute();
     $stmt->close();
 
-    
+    // 2. Fetch reservation info (user email, items, dates)
     $sql = "
         SELECT u.email, u.name AS username, r.reserve_date, r.return_date, i.item_name, ri.quantity
         FROM reservations r
@@ -47,14 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $stmt->close();
 
-    
+    // 3. Send Email
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'ainafthhj@gmail.com';  
-        $mail->Password   = 'udzl nvxz sqfd ddwl';  
+        $mail->Password   = 'udzl nvxz sqfd ddwl';  // app password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 

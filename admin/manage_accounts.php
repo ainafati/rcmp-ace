@@ -2,12 +2,12 @@
 session_start();
 include 'config.php';
 
-
+// Check database connection
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-
+// Ensure admin is logged in
 if (!isset($_SESSION['admin_id'])) {
     header("Location: login.php");
     exit();
@@ -23,7 +23,7 @@ if ($admin_data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-
+// Fetch accounts including suspension remarks
 $sql = "
     (SELECT tech_id AS id, name, email, ic_num, status, suspension_remarks, phoneNum, 'Technician' AS role, created_at FROM technician)
     UNION ALL
@@ -36,7 +36,7 @@ if (!$result) {
     die("Error executing query: ". $conn->error);
 }
 
-
+// Fetch all results into the accounts array
 $accounts = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -44,10 +44,10 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="UTF-8">
     <title>Manage User Accounts</title>
-    <link href="https:
-    <link rel="stylesheet" href="https:
-    <link rel="stylesheet" href="https:
-    <link href="https:
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
         .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
@@ -369,20 +369,20 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         </form>
     </div>
 </div>
-<script src="https:
-<script src="https:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-
+// --- MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL ---
 const sidebar = document.querySelector('.sidebar');
 const overlay = document.getElementById('overlay');
 const menuToggle = document.getElementById('menuToggle');
 
-
+// Fungsi untuk menukar keadaan sidebar
 function toggleSidebar() {
     sidebar.classList.toggle('active');
     
-    
+    // Kawal paparan overlay
     if (sidebar.classList.contains('active')) {
         overlay.style.display = 'block';
     } else {
@@ -390,22 +390,22 @@ function toggleSidebar() {
     }
 }
 
-
+// Apabila butang menu diklik
 menuToggle.addEventListener('click', toggleSidebar);
 
-
+// Tutup sidebar apabila mengklik overlay (hanya berfungsi di mobile)
 if (overlay) { 
     overlay.addEventListener('click', toggleSidebar); 
 }
 
-
+// Tutup sidebar apabila mengubah saiz kepada desktop
 window.addEventListener('resize', function() {
     if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
         sidebar.classList.remove('active');
         overlay.style.display = 'none';
     }
 });
-
+// ------------------------------------------------
 
 function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     document.getElementById('editId').value = id;
@@ -415,23 +415,23 @@ function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     document.getElementById('editPhone').value = phone;
     document.getElementById('editStatus').value = status.trim();
     document.getElementById('editRole').value = role.trim();
-    document.getElementById('editRemarks').value = remarks; 
+    document.getElementById('editRemarks').value = remarks; // Set remarks
 
-    
+    // Show/Hide Remarks container based on initial status
     const remarksContainer = document.getElementById('editRemarksContainer');
     const remarksTextarea = document.getElementById('editRemarks');
     if (status.trim().toLowerCase() === 'suspended') {
         remarksContainer.style.display = 'block';
-        remarksTextarea.required = true; 
+        remarksTextarea.required = true; // Make required if suspended
     } else {
         remarksContainer.style.display = 'none';
-        remarksTextarea.required = false; 
+        remarksTextarea.required = false; // Make not required if active
     }
 
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
 }
 
-
+// Function to filter the table based on search and dropdowns
 function filterTable() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const role = document.getElementById('roleFilter').value.toLowerCase();
@@ -440,10 +440,10 @@ function filterTable() {
     rows.forEach(row => {
         const name = row.cells[0].textContent.toLowerCase();
         const emailPhone = row.cells[1].textContent.toLowerCase();
-        
+        // Ensure status text is correctly extracted (might be inside a span)
         const statusSpan = row.cells[2].querySelector('.badge');
         const userStatus = statusSpan ? statusSpan.textContent.toLowerCase().trim() : '';
-        
+        // Ensure role text is correctly extracted
         const roleSpan = row.cells[3].querySelector('.badge');
         const userRole = roleSpan ? roleSpan.textContent.toLowerCase().trim() : '';
 
@@ -455,26 +455,26 @@ function filterTable() {
     });
 }
 
-
+// Client-side validation for Add Account form (UniKL email)
 document.getElementById('addAccountForm').addEventListener('submit', function(e) {
     const emailInput = this.querySelector('input[name="email"]');
     const email = emailInput.value.trim();
 
     if (!email.endsWith('@unikl.edu.my')) {
-        e.preventDefault(); 
+        e.preventDefault(); // Stop form submission
         Swal.fire({
             icon: 'error',
             title: 'Invalid Email',
             text: 'Please enter a valid UniKL email address (e.g., name@unikl.edu.my)',
             didClose: () => {
-                emailInput.focus(); 
+                emailInput.focus(); // Re-focus the email input after closing
             }
         });
     }
-    
+    // IC validation is handled by the 'pattern' attribute
 });
 
-
+// Show/Hide Suspension Remarks in Edit Modal based on Status dropdown
 document.getElementById('editStatus').addEventListener('change', function() {
     const selectedStatus = this.value.toLowerCase();
     const remarksContainer = document.getElementById('editRemarksContainer');
@@ -482,28 +482,28 @@ document.getElementById('editStatus').addEventListener('change', function() {
 
     if (selectedStatus === 'suspended') {
         remarksContainer.style.display = 'block';
-        remarksTextarea.required = true; 
+        remarksTextarea.required = true; // Make required
     } else {
         remarksContainer.style.display = 'none';
-        remarksTextarea.required = false; 
-        remarksTextarea.value = ''; 
+        remarksTextarea.required = false; // Make not required
+        remarksTextarea.value = ''; // Clear remarks when switching to Active
     }
 });
 
-
+// Client-side validation for Edit Account form (Remarks required if suspended)
 document.getElementById('editAccountForm').addEventListener('submit', function(e) {
     const status = document.getElementById('editStatus').value.toLowerCase();
     const remarksTextarea = document.getElementById('editRemarks');
     const remarks = remarksTextarea.value.trim();
 
     if (status === 'suspended' && remarks === '') {
-        e.preventDefault(); 
+        e.preventDefault(); // Stop submission
         Swal.fire({
             icon: 'warning',
             title: 'Remarks Required',
             text: 'Please provide a reason for suspending this account.'
         }).then(() => {
-             remarksTextarea.focus(); 
+             remarksTextarea.focus(); // Focus the textarea
         });
     }
 });

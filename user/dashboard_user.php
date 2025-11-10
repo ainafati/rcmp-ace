@@ -1,13 +1,13 @@
 <?php
 session_start();
-include 'config.php'; 
+include 'config.php'; // Pastikan path ke config betul
 
-
+// Check database connection
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-
+// pastikan user login
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -15,8 +15,8 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = (int) $_SESSION['user_id'];
 
-
-
+// ambil maklumat user
+// Asumsi: Jadual pengguna adalah 'users' atau 'user'. Kita kekalkan 'user' seperti dalam kod asal.
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -30,9 +30,9 @@ if (!$user) {
     exit();
 }
 
+// --- LOGIK DATABASE UNTUK DASHBOARD ---
 
-
-
+// 1. Kad Ringkasan (Summary Cards)
 $total = 0; $approved = 0; $pending = 0; $rejected = 0;
 $summary_sql = "SELECT
                     COUNT(ri.id) AS total,
@@ -55,7 +55,7 @@ if ($summary_row = $summary_result->fetch_assoc()) {
 $stmt_summary->close();
 
 
-
+// 2. Jadual Tempahan Terkini (Recent Reservations)
 $recent_sql = "SELECT
                     i.item_name,
                     ri.reserve_date,
@@ -79,9 +79,9 @@ $stmt_recent->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>User Dashboard — UniKL</title>
-    <link href="https:
-    <link rel="stylesheet" href="https:
-    <link href="https:
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         /* DEFINING TEAL COLOR AS PRIMARY & MODERN STYLING */
@@ -304,9 +304,9 @@ $stmt_recent->close();
                             <tr><td colspan="4" class="text-center text-muted py-4">No recent reservations found.</td></tr>
                         <?php else: $i=1; foreach($recent as $r): ?>
                             <?php
-                                
+                                // Tentukan warna badge berdasarkan status
                                 $status = strtolower($r['status']);
-                                $badge_class = 'secondary'; 
+                                $badge_class = 'secondary'; // Lalai
                                 if ($status == 'approved') $badge_class = 'success';
                                 elseif ($status == 'pending') $badge_class = 'warning';
                                 elseif ($status == 'rejected') $badge_class = 'danger';
@@ -325,10 +325,10 @@ $stmt_recent->close();
     </div>
 </div>
 
-<script src="https:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-
+// --- MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL ---
 const sidebar = document.querySelector('.sidebar');
 const overlay = document.getElementById('overlay');
 const menuToggle = document.getElementById('menuToggle');
@@ -336,7 +336,7 @@ const menuToggle = document.getElementById('menuToggle');
 function toggleSidebar() {
     sidebar.classList.toggle('active');
     
-    
+    // Kawal paparan overlay
     if (sidebar.classList.contains('active')) {
         overlay.style.display = 'block';
     } else {
@@ -352,7 +352,7 @@ if (overlay) {
     overlay.addEventListener('click', toggleSidebar); 
 }
 
-
+// Tutup sidebar apabila mengubah saiz kepada desktop
 window.addEventListener('resize', function() {
     if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
         sidebar.classList.remove('active');

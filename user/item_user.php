@@ -1,13 +1,13 @@
 <?php
 session_start();
-include '../config.php'; 
+include '../config.php'; // Correct path to config
 
-// Periksa sambungan database
+// Check database connection
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// Periksa status log masuk
+// Ensure user is logged in
 if (!isset($_SESSION['user_id'])){
     header("Location: login.php");
     exit();
@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])){
 
 $user_id = (int) $_SESSION['user_id'];
 
-// Ambil maklumat pengguna
+// Fetch user info
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -29,7 +29,7 @@ if (!$user) {
     exit();
 }
 
-// Ambil semua kategori untuk filter dan senarai
+// Fetch categories
 $categories = [];
 $res_cat = $conn->query("SELECT * FROM categories ORDER BY category_name");
 if ($res_cat) {
@@ -38,7 +38,7 @@ if ($res_cat) {
     }
 }
 
-// Ambil semua item untuk dropdown menu
+// Fetch items for the dropdown
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
@@ -55,7 +55,7 @@ if ($res_items) {
     }
 }
 
-
+// Jangan lupa close connection pada akhir script
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -64,12 +64,12 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Item Availability — UniKL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..999&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* DEFINING TEAL COLOR AS PRIMARY & MODERN STYLING */
         :root {
@@ -242,7 +242,6 @@ $conn->close();
                 grid-template-columns: 1fr;
                 gap: 10px !important;
             }
-            /* Bootstrap order classes are used in HTML to change column order on mobile */
         }
     </style>
 </head>
@@ -279,23 +278,7 @@ $conn->close();
 
     <div class="container-fluid">
         <div class="row">
-            
-            <div class="col-lg-5 order-1 order-lg-2">
-                <div class="card">
-                    <h5><i class="fa-solid fa-layer-group me-2 text-primary"></i> Item Categories</h5>
-                    <p class="text-muted small">A visual guide of our main categories.</p>
-                    <div class="list-group list-group-flush">
-                        <?php foreach ($categories as $category): ?>
-                            <div class="list-group-item d-flex align-items-center p-2">
-                                <img src="../<?= htmlspecialchars($category['image_url'] ?: 'assets/img/default-thumb.jpg') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
-                                <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-7 order-2 order-lg-1">
+            <div class="col-lg-7">
                 <div class="card">
                     <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> Request Form</h5>
                     <p class="text-muted small">Fill in the details to check item availability in real-time.</p>
@@ -313,7 +296,7 @@ $conn->close();
                                 <?php foreach ($categories as $category): ?>
                                     <a href="#" class="btn btn-sm btn-outline-secondary ms-2 category-pill-filter" 
                                        data-category="<?= htmlspecialchars($category['category_name']) ?>">
-                                         <?= htmlspecialchars($category['category_name']) ?>
+                                        <?= htmlspecialchars($category['category_name']) ?>
                                     </a>
                                 <?php endforeach; ?>
                             </div>
@@ -325,7 +308,7 @@ $conn->close();
                                 <?php
                                 $current_category = null;
                                 foreach ($items_for_dropdown as $item) {
-                                    
+                                    // PENTING: Gunakan trim() untuk buang whitespace jika ada
                                     $item_category_name = trim($item['category_name']); 
                                     if ($item_category_name !== $current_category) {
                                         if ($current_category !== null) echo '</optgroup>';
@@ -393,6 +376,21 @@ $conn->close();
                 </div>
             </div>
             
+            <div class="col-lg-5">
+                <div class="card">
+                    <h5><i class="fa-solid fa-layer-group me-2 text-primary"></i> Item Categories</h5>
+                    <p class="text-muted small">A visual guide of our main categories.</p>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($categories as $category): ?>
+                            <div class="list-group-item d-flex align-items-center p-2">
+                                <img src="../<?= htmlspecialchars($category['image_url'] ?: 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
+                                <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -424,14 +422,14 @@ $conn->close();
         </div>
     </div>
 </div>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    
+    // Initialize Select2 dropdown
     $('#item_select').select2({
         placeholder: "-- Search and select an item --",
         allowClear: true
@@ -444,18 +442,18 @@ $(document).ready(function() {
         const categoryName = $(this).data('category').toString().trim();
         const $select = $('#item_select');
 
-        
+        // 2. Kemas kini rupa butang 'pill'
         $('.category-pill-filter').removeClass('btn-primary').addClass('btn-outline-secondary');
         $(this).removeClass('btn-outline-secondary').addClass('btn-primary');
 
-        
+        // 3. Kosongkan select box (tinggalkan opsyen placeholder)
         $select.empty().append('<option value="">-- Search and select an item --</option>');
 
         if (categoryName === "") {
-            
+            // 4. Jika 'All Items', masukkan semua optgroup yang telah disimpan
             $select.append(allOptgroups.clone());
         } else {
-            
+            // 5. Jika kategori khusus, cari dan masukkan optgroup yang sepadan sahaja
             allOptgroups.each(function() {
                 const optgroupLabel = $(this).attr('label').trim();
                 if (optgroupLabel === categoryName) {
@@ -464,18 +462,18 @@ $(document).ready(function() {
             });
         }
 
-        
-        
+        // 6. Reset pilihan Select2 dan buka ia
+        // Select2 akan membaca opsyen baru secara automatik
         $select.val(null).trigger('change');
         $select.select2('open');
     });
     
-    
+    // --- MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL ---
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('overlay');
     const menuToggle = document.getElementById('menuToggle');
 
-    
+    // Fungsi untuk menukar keadaan sidebar
     if (menuToggle) {
         menuToggle.addEventListener('click', function() {
             sidebar.classList.toggle('active');
@@ -487,7 +485,7 @@ $(document).ready(function() {
         });
     }
 
-    
+    // Tutup sidebar apabila mengklik overlay
     if (overlay) { 
         overlay.addEventListener('click', function() {
             sidebar.classList.remove('active');
@@ -495,14 +493,14 @@ $(document).ready(function() {
         }); 
     }
     
-    
+    // Tutup sidebar apabila mengubah saiz kepada desktop
     window.addEventListener('resize', function() {
         if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
             sidebar.classList.remove('active');
             overlay.style.display = 'none';
         }
     });
-    
+    // --- END MOBILE SIDEBAR TOGGLE ---
     
     let debounceTimer;
 
@@ -546,7 +544,7 @@ $(document).ready(function() {
                             statusDiv.html(suggestionHTML);
                             addBtn.prop('disabled', true); 
 
-                        } else { 
+                        } else { // This is for 'error' status
                             statusDiv.html(`<div class="alert alert-danger py-2">❌ <strong>Not Available:</strong> ${response.message}</div>`);
                             addBtn.prop('disabled', true);
                         }
@@ -595,27 +593,27 @@ $(document).ready(function() {
         const quantity = $('#quantity').val();
         const reserve = $('#reserveDate').val();
         const ret = $('#returnDate').val();
-        const reason = $('#reason').val(); 
+        const reason = $('#reason').val(); // Ambil reason dari borang
 
         if (!itemName || !quantity || !reserve || !ret || !reason.trim()) {
             Swal.fire("Incomplete Form", "Please fill in all request details, including a reason.", "warning");
             return;
         }
         
-        
+        // Semak ketersediaan lagi sebelum menambah ke senarai (untuk keselamatan)
         if ($('#availability-status').find('.alert-success').length === 0) {
             Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
             return;
         }
         
-        
+        // Cipta objek yang mengandungi semua data item
         const newItem = { 
             item_name: itemName, 
             quantity: quantity, 
             reserve_date: reserve, 
             return_date: ret, 
             reason: reason,
-            program_type: $('#program_type').val() 
+            program_type: $('#program_type').val() // Ambil program type dari borang utama
         };
         
         reservationItems.push(newItem);
@@ -626,15 +624,15 @@ $(document).ready(function() {
         });
         Toast.fire({ icon: 'success', title: 'Added to list!' });
 
-        
+        // Reset the form fields for the next item
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         reserveDatepicker.clear();
         returnDatepicker.clear();
-        
-        
+        // **BARIS MASALAH DIPADAMKAN/DINYAHAKTIFKAN DI SINI:**
+        // $('#reason').val(''); 
         $('#availability-status').html('');
-        
+        // NOTE: program_type tidak direset kerana ia biasanya sama untuk keseluruhan tempahan
     });
 
     function renderItemsList() {
@@ -657,11 +655,11 @@ $(document).ready(function() {
             listDiv.html(`<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p>Your request list is empty.</p></div>`);
         }
         
-        
-        
+        // Tambahkan input tersembunyi untuk menghantar Program Type (jika ada item)
+        // Kita hantar data item list sahaja, program_type akan diambil dari borang utama
         $('#allItems').val(JSON.stringify(reservationItems));
         
-        
+        // Memastikan butang submit hanya berfungsi jika ada item
         $('#reserveForm').find('button[type="submit"]').prop('disabled', reservationItems.length === 0);
     }
 
@@ -670,7 +668,7 @@ $(document).ready(function() {
         renderItemsList();
     }
     
-    
+    // Inisiasi awal butang submit
     $('#reserveForm').find('button[type="submit"]').prop('disabled', true);
 
 
@@ -682,14 +680,14 @@ $(document).ready(function() {
             return;
         }
 
-        
+        // PENGESAHAN TERMA & SYARAT
         if (!$('#agreeTerms').is(':checked')) {
             Swal.fire("Terms and Conditions", "You must agree to the Terms and Conditions to proceed.", "warning");
-            return; 
+            return; // Hentikan penghantaran
         }
         
-        
-        
+        // **Tambahan semakan: Walaupun item sudah ditambah, pastikan medan reason tidak kosong semasa submit**
+        // Ini melindungi jika pengguna hanya tambah 1 item dan tidak menggunakan addToList
         if (!$('#reason').val().trim()) {
             Swal.fire("Incomplete Form", "Please ensure the Purpose of Loan is filled in.", "warning");
             return;
@@ -698,7 +696,7 @@ $(document).ready(function() {
         const submitBtn = $(this).find('button[type="submit"]');
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
         
-        
+        // Serialize the form data (termasuk user_id, program_type, dan allItems)
         $.ajax({
             type: 'POST',
             url: 'submit_reservation.php',
@@ -729,7 +727,7 @@ $(document).ready(function() {
         });
     });
     
-    
+    // Panggilan awal untuk memastikan list butang submit adalah betul
     renderItemsList();
 });
 </script>

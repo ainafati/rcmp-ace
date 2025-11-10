@@ -1,21 +1,21 @@
 <?php
 session_start();
-include '../config.php'; 
+include '../config.php'; // Correct path to config
 
-
-if (!isset($_SESSION['tech_id'])) { 
+// --- Authentication ---
+if (!isset($_SESSION['tech_id'])) { // Changed from admin_id to tech_id to match your other files
     header("Location: ../login.php");
     exit();
 }
 
 $item_id_filter = isset($_GET['item_id']) ? (int)$_GET['item_id'] : 0;
-if (isset($_POST['item_id_return'])) { 
+if (isset($_POST['item_id_return'])) { // To handle return from POST form
     $item_id_filter = (int)$_POST['item_id_return'];
 }
 
+// <<< --- START: KOD BARU UNTUK EDIT & DELETE --- >>>
 
-
-
+// --- LOGIC TO HANDLE EDIT ASSET ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $asset_id = (int)$_POST['asset_id'];
     $brand = trim($_POST['brand']);
@@ -27,33 +27,33 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $stmt->execute();
     $stmt->close();
     
-    
+    // Redirect back to the same page to show changes
     header("Location: assets_technician.php?item_id=" . $item_id_filter);
     exit();
 }
 
-
+// --- LOGIC TO HANDLE DELETE ASSET ---
 if (isset($_GET['delete_asset_id'])) {
     $asset_id_to_delete = (int)$_GET['delete_asset_id'];
     $item_id_return = isset($_GET['item_id_return']) ? (int)$_GET['item_id_return'] : 0;
     
-    
+    // You might want to add checks here to ensure the asset isn't borrowed before deleting
     $stmt = $conn->prepare("DELETE FROM assets WHERE asset_id = ?");
     $stmt->bind_param("i", $asset_id_to_delete);
     $stmt->execute();
     $stmt->close();
     
-    
+    // Redirect back to the asset list for that item
     header("Location: assets_technician.php?item_id=" . $item_id_return);
     exit();
 }
 
+// <<< --- END: KOD BARU UNTUK EDIT & DELETE --- >>>
 
 
-
-
+// --- Fetching and Display Logic (Code below is mostly the same) ---
 if ($item_id_filter === 0) {
-    header("Location: manageItems_tech.php"); 
+    header("Location: manageItems_tech.php"); // Corrected filename with 's'
     exit();
 }
 
@@ -73,7 +73,7 @@ $stmt_item->bind_param("i", $item_id_filter);
 $stmt_item->execute();
 $stmt_item->bind_result($item_name_title, $description);
 if (!$stmt_item->fetch()) {
-    header("Location: manageItems_tech.php"); exit(); 
+    header("Location: manageItems_tech.php"); exit(); // Corrected filename with 's'
 }
 $stmt_item->close();
 
@@ -110,9 +110,9 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Assets — <?= htmlspecialchars($item_name_title) ?></title>
-    <link href="https:
-    <link rel="stylesheet" href="https:
-    <link href="https:
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         /* CSS LENGKAP & SERAGAM UNTUK TEMA BARU ANDA */
@@ -291,7 +291,7 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
     </div>
 </div>
 
-<script src="https:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function openEditAssetModal(asset) {
     document.getElementById('edit_asset_id').value = asset.asset_id;

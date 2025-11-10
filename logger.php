@@ -1,5 +1,5 @@
 <?php
-
+// File: /includes/logger.php
 function log_activity($conn, $user_type, $user_id, $action, $details) {
     
     $ip_address = 'UNKNOWN';
@@ -16,7 +16,7 @@ function log_activity($conn, $user_type, $user_id, $action, $details) {
     
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-
+// BARU: 'sssss' -> string, string (s), string, string, string
 $stmt->bind_param("sssss", $user_type, $user_id, $action, $details, $ip_address);        $stmt->execute();
         $stmt->close();
     } else {

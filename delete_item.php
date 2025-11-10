@@ -7,6 +7,6 @@ if (isset($_GET['id'])) {
     $stmt->execute();
     $stmt->close();
 }
-header("Location: manageItem_admin.php"); 
+header("Location: manageItem_admin.php"); // change to your actual page name
 exit();
 ?>
