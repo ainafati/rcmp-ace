@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>R-ILMS (RCMP Management System-Inventory) - IT Asset Management</title>
+    <title>NexCheck (RCMP Inventory Reservation Check System) - IT Asset Management</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https:
+    <link rel="preconnect" href="https:
+    <link href="https:
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https:
 
     <style>
         :root {
@@ -418,7 +418,7 @@
     </div>
 
 <script>
-    // MODAL LOGIC (Using SESSIONSTORAGE)
+    
     const modal = document.getElementById("disclaimerModal");
     
     window.closeModal = function() {
@@ -436,7 +436,7 @@
         setupScrollAnimation();
     };
 
-    // Scroll Animation Logic
+    
     function setupScrollAnimation() {
         const scrollElements = document.querySelectorAll(".animate-on-scroll");
         const observer = new IntersectionObserver((entries) => {

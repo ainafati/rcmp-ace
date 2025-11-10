@@ -19,7 +19,7 @@ if ($requested_quantity <= 0) {
     exit();
 }
 
-// Get total functional stock
+
 $item_id = 0;
 $total_functional_stock = 0;
 $stmt_item = $conn->prepare("SELECT i.item_id, COUNT(a.asset_id) as total_stock FROM item i LEFT JOIN assets a ON i.item_id = a.item_id WHERE i.item_name = ? AND (a.status IS NULL OR a.status NOT IN ('Broken', 'Missing')) GROUP BY i.item_id");
@@ -37,7 +37,7 @@ if ($item_id === 0) {
     exit();
 }
 
-// Count booked items during the period
+
 $booked_during_period = 0;
 $sql_booked = "SELECT COALESCE(SUM(ri.quantity), 0) as booked_qty FROM reservation_items ri WHERE ri.item_id = ? AND ri.status = 'Approved' AND ri.reserve_date <= ? AND ri.return_date >= ?";
 $stmt_booked = $conn->prepare($sql_booked);
@@ -51,20 +51,20 @@ $stmt_booked->close();
 
 $effective_available_stock = $total_functional_stock - $booked_during_period;
 
-// ✅ NEW LOGIC: Return different statuses based on availability
+
 if ($requested_quantity <= $effective_available_stock) {
-    // Fully available
+    
     echo json_encode(['status' => 'success', 'message' => 'Item is available.']);
 } elseif ($effective_available_stock > 0) {
-    // Partially available
+    
     $message = "Only " . $effective_available_stock . " unit(s) of '" . htmlspecialchars($item_name) . "' are available for these dates.";
     echo json_encode([
-        'status' => 'partial', // The new status
+        'status' => 'partial', 
         'message' => $message,
-        'available_count' => $effective_available_stock // Send back how many are available
+        'available_count' => $effective_available_stock 
     ]);
 } else {
-    // Completely unavailable
+    
     $message = "No units of '" . htmlspecialchars($item_name) . "' are available for these dates.";
     echo json_encode(['status' => 'error', 'message' => $message]);
 }

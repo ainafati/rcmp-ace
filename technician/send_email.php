@@ -3,36 +3,36 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\SMTP;
 
-// Pastikan laluan fail PHPMailer anda betul
+
 require '../PHPMailer-master/src/Exception.php';
 require '../PHPMailer-master/src/PHPMailer.php';
 require '../PHPMailer-master/src/SMTP.php';
 
 function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $reserve_date, $return_date, $smtp_user, $smtp_pass) {
-    // PENGISYTIHARAN OBJEK PHPMailer
+    
     $mail = new PHPMailer(true);
 
     try {
-        // --- KONFIGURASI SMTP YANG HILANG (WAJIB ADA) ---
-        $mail->isSMTP();                                       // Hantar menggunakan SMTP
         
-        // GANTI NILAI INI DENGAN SERVER EMAIL ANDA YANG SEBENAR
-        $mail->Host       = 'smtp.gmail.com';                // Contoh: smtp.gmail.com atau mail.unikl.edu.my
-        $mail->SMTPAuth   = true;                              // Dayakan pengesahan SMTP
-        $mail->Username   = $smtp_user;                        // Gunakan SMTP_USER dari config_email.php
-        $mail->Password   = $smtp_pass;                        // Gunakan SMTP_PASS dari config_email.php (Pastikan ia App Password!)
+        $mail->isSMTP();                                       
         
-        // GANTI NILAI INI DENGAN PORT ANDA YANG SEBENAR
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;       // Gunakan SMTPS (untuk Port 465)
-        $mail->Port       = 465;                               // Atau 587 jika anda menggunakan TLS
         
-        // Pastikan konfigurasi ini sama dengan apa yang anda tetapkan dalam config_email.php
+        $mail->Host       = 'smtp.gmail.com';                
+        $mail->SMTPAuth   = true;                              
+        $mail->Username   = $smtp_user;                        
+        $mail->Password   = $smtp_pass;                        
         
-        // --- BUTIRAN PENGHANTAR DAN PENERIMA ---
+        
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;       
+        $mail->Port       = 465;                               
+        
+        
+        
+        
         $mail->setFrom($smtp_user, 'UniKL Inventory System');
         $mail->addAddress($to_email, $user_name);
 
-        // --- KANDUNGAN E-MEL ---
+        
         $mail->isHTML(true); 
         $mail->Subject = 'Confirmation of Assigned Assets ' . $item_name;
         
@@ -81,7 +81,7 @@ function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $
         $mail->send();
         return true; 
     } catch (Exception $e) {
-        // Log ralat sebenar ke log server/PHP
+        
         error_log("PHPMailer Error: {$mail->ErrorInfo}"); 
         return false; 
     }

@@ -1,10 +1,10 @@
 <?php
 session_start();
-include '../config.php'; // Pastikan laluan ke config.php betul
+include '../config.php'; 
 
 // 1. Pastikan admin sudah log masuk
 if (!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+    header("Location: ../login.php"); 
     exit();
 }
 
@@ -22,7 +22,7 @@ $stmt->close();
 if (!$admin) {
     // Jika admin tidak wujud, paksa log keluar
     session_destroy();
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 ?>
@@ -30,14 +30,20 @@ if (!$admin) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <title>My Profile — Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* CSS Lengkap & Seragam Untuk Tema Anda */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden; }
+        
+        /* DESKTOP STYLES */
+        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
+        .sidebar-overlay.active { display: block; }
+
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
         .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
@@ -46,7 +52,9 @@ if (!$admin) {
         .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
+        
+        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
+        
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .container-fluid { padding: 30px; }
@@ -57,11 +65,97 @@ if (!$admin) {
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
         .btn-primary { background-color: #3b82f6; border: none; }
         .btn-primary:hover { background-color: #2563eb; }
+        
+        /* Tambah ini untuk mobile tables */
+        .table-responsive-sm {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        /* --- MOBILE VIEW (MAX-WIDTH 992px) --- */
+        #sidebar-toggle-btn {
+            display: none; 
+            background: none;
+            border: none;
+            color: #334155;
+            font-size: 20px;
+            padding: 0;
+            margin-right: 15px;
+        }
+
+        @media (max-width: 992px) {
+            /* General Layout & Sidebar */
+            #sidebar-toggle-btn { display: block; }
+            .sidebar { 
+                transform: translateX(-100%); 
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); 
+                z-index: 1050; 
+            }
+            .sidebar.open { 
+                transform: translateX(0); 
+            }
+            .main-content { 
+                margin-left: 0; 
+                width: 100%; 
+            }
+
+            /* Topbar - Diperkemas */
+            .topbar { 
+                padding: 10px 15px; 
+                justify-content: space-between; /* Tukar balik ke space-between */
+            } 
+            .topbar h3 { 
+                font-size: 18px; 
+                flex-grow: 1; /* Biar tajuk ambil ruang di tengah */
+                text-align: center;
+                margin-left: -35px; /* Adjust untuk center, menampung ikon toggle */
+            }
+            .topbar .d-flex {
+                /* Untuk ikon profil di kanan */
+                margin-left: auto;
+            }
+            
+            /* Content Area */
+            .container-fluid { 
+                padding: 15px; 
+            }
+            .card {
+                padding: 20px;
+            }
+
+            /* Profile Card Stacks Vertically */
+            .col-lg-4, .col-lg-8 {
+                width: 100%; 
+            }
+            .profile-header-card {
+                margin-bottom: 15px;
+            }
+
+            /* Buttons */
+            #viewMode .d-flex {
+                flex-direction: column;
+                align-items: flex-start !important;
+            }
+            #viewMode .d-flex button {
+                width: 100%;
+                margin-top: 15px;
+            }
+            #editMode .btn {
+                width: 100%;
+                margin-top: 10px;
+            }
+            #editMode .btn-secondary {
+                /* Tukar margin-top asal dari 10px ke 0 untuk butang 'Cancel' */
+                margin-top: 0; 
+            }
+        }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
@@ -76,7 +170,13 @@ if (!$admin) {
 
 <div class="main-content">
     <div class="topbar">
+        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
         <h3>My Profile</h3>
+        <div class="d-flex align-items-center">
+            <a href="profile_admin.php" title="My Profile" style="color: inherit; text-decoration: none;">
+                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+            </a>
+        </div>
     </div>
 
     <div class="container-fluid">
@@ -149,7 +249,38 @@ if (!$admin) {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // --- JS UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('admin-sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle-btn');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        if (toggleBtn) {
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            }
+
+            toggleBtn.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', toggleSidebar);
+            
+            const sidebarLinks = sidebar.querySelectorAll('a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 992) {
+                        setTimeout(() => { 
+                            sidebar.classList.remove('open');
+                            overlay.classList.remove('active');
+                        }, 100);
+                    }
+                });
+            });
+        }
+    });
+
+    // --- JS UNTUK TOGGLE VIEW/EDIT MODE ---
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');

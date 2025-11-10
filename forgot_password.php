@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password - UniKL A.C.E. RCMP</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https:
+    <link rel="stylesheet" href="https:
     
     <style>
         /* Tetapkan palet warna UniKL sebagai custom CSS variables */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        @import url('https:
         
         :root {
             --unikl-navy: #002147; /* Primary Dark Navy Blue */
@@ -115,7 +115,7 @@
 
         function displayMessage(isSuccess, message) {
             resultText.textContent = message;
-            messageContainer.className = 'mt-6 p-4 rounded-lg text-left border'; // Reset classes
+            messageContainer.className = 'mt-6 p-4 rounded-lg text-left border'; 
             
             if (isSuccess) {
                 messageContainer.classList.add('alert-success', 'border-green-500');
@@ -124,7 +124,7 @@
             }
             messageContainer.classList.remove('hidden');
 
-            // Sembunyikan selepas 8 saat
+            
             setTimeout(() => {
                 messageContainer.classList.add('hidden');
             }, 8000); 
@@ -133,10 +133,10 @@
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
 
-            // Setup button for loading status
+            
             submitButton.disabled = true;
             submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http:
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -159,7 +159,7 @@
                 if (res.ok && data.success) {
                     displayMessage(true, data.message);
                     
-                    // Redirect to OTP verification form after 2 seconds
+                    
                     setTimeout(() => {
                         window.location.href = `verify_otp_form.php?email=${encodeURIComponent(email)}`;
                     }, 2000);
@@ -173,7 +173,7 @@
                 console.error("Fetch Error:", error);
                 displayMessage(false, `Error: Server connection failed. Please check the network.`);
             } finally {
-                // Reset button to normal only if redirection hasn't happened
+                
                 if (submitButton.disabled && messageContainer.classList.contains('alert-error')) {
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;

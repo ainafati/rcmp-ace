@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Set New Password - UniKL A.C.E. RCMP</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https:
+    <link rel="stylesheet" href="https:
     
     <style>
         /* Define UniKL color palette as custom CSS variables */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        @import url('https:
         
         :root {
             --unikl-navy: #002147; /* Primary Dark Navy Blue */
@@ -134,7 +134,7 @@
         const newPasswordInput = document.getElementById('new_password');
         const confirmPasswordInput = document.getElementById('confirm_password');
 
-        // New elements for password toggle
+        
         const toggleNewPasswordButton = document.getElementById('toggleNewPassword');
         const toggleConfirmPasswordButton = document.getElementById('toggleConfirmPassword');
         const newPasswordIcon = document.getElementById('newPasswordIcon');
@@ -233,7 +233,7 @@
             const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
             inputField.setAttribute('type', type);
             
-            // Toggle the icon
+            
             if (type === 'text') {
                 iconElement.classList.remove('fa-eye-slash');
                 iconElement.classList.add('fa-eye');
@@ -243,7 +243,7 @@
             }
         }
 
-        // Initialize on page load
+        
         document.addEventListener('DOMContentLoaded', () => {
             const params = getUrlParams();
             if (params.email) {
@@ -258,7 +258,7 @@
             }
         });
 
-        // Event listeners for password toggles
+        
         toggleNewPasswordButton.addEventListener('click', (e) => {
             e.preventDefault();
             togglePasswordVisibility(newPasswordInput, newPasswordIcon);
@@ -269,17 +269,17 @@
             togglePasswordVisibility(confirmPasswordInput, confirmPasswordIcon);
         });
 
-        // Event listener for Resend Button
+        
         resendOtpButton.addEventListener('click', resendOtp);
 
-        // Form Submission (Reset Password)
+        
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
 
             const newPassword = newPasswordInput.value;
             const confirmPassword = confirmPasswordInput.value;
             
-            // Client-side validation
+            
             if (newPassword !== confirmPassword) {
                 displayMessage(false, "New password and confirmation do not match.");
                 return;
@@ -293,10 +293,10 @@
                 return;
             }
 
-            // Disable buttons during processing
+            
             resetButton.disabled = true;
             resendOtpButton.disabled = true;
-            resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...`;
+            resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http:
             messageContainer.classList.add('hidden');
 
             const formData = new FormData(form);
@@ -328,7 +328,7 @@
                 displayMessage(false, `System Error: Failed to connect to server. (${error.message})`);
             }
 
-            // Restore buttons after completion (unless successful and redirecting)
+            
             resetButton.disabled = false; 
             resetButton.textContent = originalResetButtonText;
             if (cooldownSeconds <= 0) {

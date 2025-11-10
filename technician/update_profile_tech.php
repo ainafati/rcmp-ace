@@ -2,7 +2,7 @@
 session_start();
 include '../config.php';
 
-// 1. Pastikan teknikal sudah log masuk
+
 if (!isset($_SESSION['tech_id'])) {
     $_SESSION['error'] = "Sila log masuk semula.";
     header("Location: ../login.php");
@@ -10,26 +10,26 @@ if (!isset($_SESSION['tech_id'])) {
 }
 $tech_id = (int) $_SESSION['tech_id'];
 
-// 2. Ambil data dari borang
+
 $name = isset($_POST['name']) ? trim($_POST['name']) : '';
 $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 $phoneNum = isset($_POST['phoneNum']) ? trim($_POST['phoneNum']) : '';
 $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : '';
 $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
 
-// 3. Pengesahan asas
+
 if (empty($name) || empty($email) || empty($phoneNum)) {
     $_SESSION['error'] = "Name, email, and phone number cannot be empty.";
     header("Location: profile_tech.php");
     exit();
 }
 
-// 4. Bina query UPDATE untuk jadual 'technician'
+
 $sql = "UPDATE technician SET name = ?, email = ?, phoneNum = ? WHERE tech_id = ?";
-$types = "sssi"; // string, string, string, integer
+$types = "sssi"; 
 $params = [$name, $email, $phoneNum, $tech_id];
 
-// 5. Logik untuk kemas kini kata laluan (jika diisi)
+
 if (!empty($new_password)) {
     if ($new_password !== $confirm_password) {
         $_SESSION['error'] = "New passwords do not match.";
@@ -50,7 +50,7 @@ if (!empty($new_password)) {
     $params = [$name, $email, $phoneNum, $hashed_password, $tech_id];
 }
 
-// 6. Sediakan dan laksanakan query
+
 $stmt = $conn->prepare($sql);
 
 if ($stmt === false) {
@@ -59,7 +59,7 @@ if ($stmt === false) {
     exit();
 }
 
-// Guna cara yang serasi dengan PHP lama untuk bind_param
+
 $bind_params = [];
 $bind_params[] = $types;
 foreach ($params as $key => $value) {

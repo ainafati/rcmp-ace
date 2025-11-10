@@ -2,7 +2,7 @@
 $servername = "localhost";
 $username = "nexcheck_dbuser";
 $password = "nexcheck_dbuser";
-$database = "inventory"; // nama database kamu
+$database = "inventory"; 
 
 $conn = new mysqli($servername, $username, $password, $database);
 

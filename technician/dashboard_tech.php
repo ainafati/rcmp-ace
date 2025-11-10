@@ -1,9 +1,9 @@
 <?php
 session_start();
-// Pastikan path ke config.php adalah betul (diasumsikan berada di folder atas)
+
 include '../config.php';
 function get_reservation_item_count($conn, $status) {
-    // Hanya kira item yang berstatus 'Pending'
+    
     $sql = "SELECT COUNT(id) AS count 
             FROM reservation_items 
             WHERE status = ?";
@@ -22,10 +22,10 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
-// Dapatkan kiraan yang diperlukan untuk dashboard
+
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
 
-// Ensure technician is logged in
+
 if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
@@ -33,7 +33,7 @@ if (!isset($_SESSION['tech_id'])) {
 
 $tech_id = (int) $_SESSION['tech_id'];
 
-// Get technician info
+
 $stmt = $conn->prepare("SELECT name, email FROM technician WHERE tech_id = ?");
 $stmt->bind_param("i", $tech_id);
 $stmt->execute();
@@ -47,7 +47,7 @@ if (!$tech) {
     exit();
 }
 
-// 1. Summary Cards Data
+
 $totalAssetsResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 $totalAssetsRow = $totalAssetsResult->fetch_assoc();
 $totalAssetsCount = isset($totalAssetsRow['total']) ? (int)$totalAssetsRow['total'] : 0;
@@ -64,9 +64,9 @@ $overdueResult = $conn->query("SELECT COUNT(DISTINCT ri.id) AS total FROM reserv
 $overdueRow = $overdueResult->fetch_assoc();
 $overdueCount = isset($overdueRow['total']) ? (int)$overdueRow['total'] : 0;
 
-// --- Fetch Detailed Lists for Modals ---
 
-// Function to fetch asset details with item and category names
+
+
 function fetch_asset_details($conn, $status_condition_sql) {
     $sql = "
         SELECT
@@ -88,15 +88,15 @@ function fetch_asset_details($conn, $status_condition_sql) {
     }
 }
 
-// Fetch Total Assets (Active ones)
+
 $total_assets_details = fetch_asset_details($conn, "a.status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 $total_assets_details_json = json_encode($total_assets_details);
 
-// Fetch Available Assets
+
 $available_assets_details = fetch_asset_details($conn, "a.status = 'Available'");
 $available_assets_details_json = json_encode($available_assets_details);
 
-// Fetch Checked Out Assets (Add User Name)
+
 $checked_out_sql = "
     SELECT
         a.asset_id, a.asset_code, a.status,
@@ -124,7 +124,7 @@ if ($checked_out_result) {
 $checked_out_details_json = json_encode($checked_out_details);
 
 
-// Fetch Overdue Details
+
 $overdue_details_sql = "
     SELECT
         ri.id AS reservation_item_id, u.name AS user_name, u.phoneNum AS user_phone, i.item_name,
@@ -147,7 +147,7 @@ if($overdue_details_result) {
 }
 $overdue_details_json = json_encode($overdue_details);
 
-// 3. Loan Distribution Chart Data
+
 $chart_sql = "SELECT c.category_name, COUNT(ri.id) as loan_count FROM reservation_items ri JOIN item i ON ri.item_id = i.item_id JOIN categories c ON i.category_id = c.category_id WHERE ri.status = 'Checked Out' GROUP BY c.category_id ORDER BY loan_count DESC";
 $chart_result = $conn->query($chart_sql);
 $chart_data = $chart_result ? $chart_result->fetch_all(MYSQLI_ASSOC) : [];
@@ -158,10 +158,10 @@ foreach ($chart_data as $row) {
     $chartValues[] = (int)$row['loan_count'];
 }
 
-// 4. Calendar Data
-$events = []; // Mulakan array kosong
 
-// --- Query 1: Ambil SEMUA Tempahan Aktif (Approved & Checked Out) ---
+$events = []; 
+
+
 $historySql = "SELECT ri.quantity, ri.reserve_date, ri.return_date, ri.status,
                        u.name AS username, i.item_name
                FROM reservation_items ri
@@ -174,27 +174,27 @@ $historyResult = $conn->query($historySql);
 
 if ($historyResult) {
     while ($h = $historyResult->fetch_assoc()) {
-        // --- Event 1: Blok Tempahan Biasa (Biru) ---
+        
         $events[] = [
             'title' => "{$h['item_name']} ({$h['quantity']}) - {$h['username']}",
             'start' => date('Y-m-d', strtotime($h['reserve_date'])),
-            'end' => date('Y-m-d', strtotime($h['return_date'] . ' +1 day')), // End date is exclusive
-            'color' => '#3b82f6', // Warna biru untuk tempahan
+            'end' => date('Y-m-d', strtotime($h['return_date'] . ' +1 day')), 
+            'color' => '#3b82f6', 
             'description' => 'Reservation'
         ];
 
-        // --- Event 2: Tambah Buffer HANYA jika status = 'Checked Out' ---
+        
         if ($h['status'] === 'Checked Out' && !empty($h['return_date'])) {
-            // Tarikh buffer adalah SATU HARI SELEPAS tarikh JANGKA pemulangan
+            
             $bufferStartDate = date('Y-m-d', strtotime($h['return_date'] . ' +1 day'));
-            // Tetapkan event ini hanya untuk satu hari sahaja
-            $bufferEndDate = date('Y-m-d', strtotime($h['return_date'] . ' +2 days')); // End date is exclusive
+            
+            $bufferEndDate = date('Y-m-d', strtotime($h['return_date'] . ' +2 days')); 
 
             $events[] = [
                 'title' => "Buffer: {$h['item_name']}",
                 'start' => $bufferStartDate,
                 'end'  => $bufferEndDate,
-                'color' => '#fdba74', // Warna Oren Buffer
+                'color' => '#fdba74', 
                 'textColor' => '#854d0e',
                 'description' => 'Buffer Period - Pending Check-in'
             ];
@@ -204,10 +204,10 @@ if ($historyResult) {
     error_log("Error fetching reservation history for calendar: " . $conn->error);
 }
 
-// Tutup koneksi
+
 $conn->close();
 
-// --- Hantar ke JavaScript ---
+
 $events_json = json_encode($events);
 ?>
 <!DOCTYPE html>
@@ -216,14 +216,14 @@ $events_json = json_encode($events);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https:
+    <link rel="stylesheet" href="https:
+    <link href="https:
+    <link rel="stylesheet" href="https:
+    <script src="https:
+    <link rel="preconnect" href="https:
+    <link rel="preconnect" href="https:
+    <link href="https:
     <style>
         /* 1. FONT & BODY BACKGROUND */
         body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
@@ -532,49 +532,49 @@ $events_json = json_encode($events);
 </div>
 
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https:
+<script src="https:
+<script src="https:
+<script src="https:
+<script src="https:
 
 
 <script>
-// --- Chart JS (Pie Chart) ---
+
 const ctx = document.getElementById('loanChart');
 if (ctx) {
     new Chart(ctx, {
         type: 'doughnut', data: { labels: <?= json_encode($chartLabels) ?>, datasets: [{ data: <?= json_encode($chartValues) ?>, backgroundColor: ['#3b82f6','#22c55e','#f59e0b','#ef4444', '#64748b', '#6d28d9'], borderWidth: 0 }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } } }, cutout: '70%' } });
 }
 
-// --- Pass Asset Details to JavaScript ---
+
 const totalAssetsDetails = <?= $total_assets_details_json ?>;
 const availableAssetsDetails = <?= $available_assets_details_json ?>;
 const checkedOutAssetsDetails = <?= $checked_out_details_json ?>;
 const overdueDetails = <?= $overdue_details_json ?>;
-const eventsData = <?php echo $events_json; ?>; // Calendar Data
+const eventsData = <?php echo $events_json; ?>; 
 
 
 document.addEventListener('DOMContentLoaded', function() {
     
-    // --- Mobile Sidebar Toggle Logic ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     const body = document.body;
 
-    // Function to handle opening/closing sidebar
+    
     function toggleSidebar() {
-        // Check actual visibility state using the CSS transform property
+        
         const isOpen = sidebar.style.transform === 'translateX(0px)';
         
         if (isOpen) {
-            // Close sidebar
+            
             sidebar.style.transform = 'translateX(-100%)';
             backdrop.style.display = 'none';
             body.classList.remove('offcanvas-open');
         } else {
-            // Open sidebar
+            
             sidebar.style.transform = 'translateX(0px)';
             backdrop.style.display = 'block';
             body.classList.add('offcanvas-open');
@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
         backdrop.addEventListener('click', toggleSidebar);
     }
 
-    // --- Calendar Initialization ---
+    
     const calendarEl = document.getElementById('calendar');
     if (calendarEl) {
         const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             events: eventsData,
             height: 'auto',
-            firstDay: 1, // Start week on Monday
+            firstDay: 1, 
             eventDidMount: function(info) {
              if (info.event.extendedProps.description === 'Buffer Period - Pending Check-in') {
                 info.el.classList.add('buffer-event');
@@ -611,9 +611,9 @@ document.addEventListener('DOMContentLoaded', function() {
         calendar.render();
     } else { console.error("Calendar element #calendar not found."); }
 
-    // --- Modal Trigger Logic ---
+    
 
-    // Helper function to create asset table HTML
+    
     function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
         if (!assetList || assetList.length === 0) {
             return '<div class="text-center p-4 text-muted">No assets found in this category.</div>';
@@ -657,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return { html: tableHTML, id: tableId }; 
     }
 
-    // Function to set up modal trigger
+    
     function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
         const card = document.getElementById(cardId);
         const modalElement = document.getElementById(modalElementId);
@@ -666,13 +666,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (card && modalElement && listContainer) {
             const modalInstance = new bootstrap.Modal(modalElement);
 
-             // Destroy existing DataTable instance when modal is hidden
+             
              modalElement.addEventListener('hidden.bs.modal', function () {
                  const existingTable = listContainer.querySelector('.asset-detail-table');
                  if (existingTable && $.fn.DataTable.isDataTable(existingTable)) {
                      $(existingTable).DataTable().destroy();
                  }
-                 listContainer.innerHTML = '<div class="text-center p-3 text-muted">Loading...</div>'; // Reset content
+                 listContainer.innerHTML = '<div class="text-center p-3 text-muted">Loading...</div>'; 
              });
 
 
@@ -682,7 +682,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 modalInstance.show();
 
-                 // Initialize DataTable *after* HTML is inserted and modal is shown
+                 
                  setTimeout(() => {
                      const newTable = $(`#${tableData.id}`);
                      if (newTable.length) {
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                  "zeroRecords": "No matching assets found",
                                  "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
                              },
-                             "destroy": true // Allow reinitialization if needed
+                             "destroy": true 
                          });
                      }
                  }, 200); 
@@ -709,12 +709,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Setup Triggers for Each Card ---
+    
     setupModalTrigger('totalAssetsCard', 'totalAssetsModal', 'totalAssetsList', totalAssetsDetails);
     setupModalTrigger('availableAssetsCard', 'availableAssetsModal', 'availableAssetsList', availableAssetsDetails);
-    setupModalTrigger('checkedOutAssetsCard', 'checkedOutAssetsModal', 'checkedOutAssetsList', checkedOutAssetsDetails, true); // Include User for Checked Out
+    setupModalTrigger('checkedOutAssetsCard', 'checkedOutAssetsModal', 'checkedOutAssetsList', checkedOutAssetsDetails, true); 
 
-    // --- Overdue Modal (Existing logic, but add DataTable) ---
+    
     const overdueCard = document.getElementById('overdueCard');
     const overdueModalElement = document.getElementById('overdueModal');
     const overdueListContainer = document.getElementById('overdueList');
@@ -722,17 +722,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (overdueCard && overdueModalElement && overdueListContainer) {
         const overdueModal = new bootstrap.Modal(overdueModalElement);
 
-         // Destroy DataTable on hide
+         
          overdueModalElement.addEventListener('hidden.bs.modal', function () {
              const existingTable = overdueListContainer.querySelector('.asset-detail-table');
              if (existingTable && $.fn.DataTable.isDataTable(existingTable)) {
                  $(existingTable).DataTable().destroy();
              }
-             overdueListContainer.innerHTML = '<div class="text-center p-3 text-muted">Loading...</div>'; // Reset
+             overdueListContainer.innerHTML = '<div class="text-center p-3 text-muted">Loading...</div>'; 
          });
 
         overdueCard.addEventListener('click', function() {
-            overdueListContainer.innerHTML = ''; // Clear previous
+            overdueListContainer.innerHTML = ''; 
 
             if (overdueDetails.length === 0) {
                 overdueListContainer.innerHTML = '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2 text-success"></i><br>No items are currently overdue.</div>';
@@ -767,13 +767,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                  overdueModal.show();
                  
-                  // Initialize DataTable *after* HTML is inserted and modal is shown
+                  
                   setTimeout(() => {
                       const newTable = $(`#${tableId}`);
                       if (newTable.length) {
                           newTable.DataTable({
                               "pageLength": 10,
-                              "order": [[4, "desc"]], // Sort by Days Overdue (column 4) descending
+                              "order": [[4, "desc"]], 
                               "language": {
                                   "search": "Search:",
                                   "lengthMenu": "Show _MENU_ overdue items",

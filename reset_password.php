@@ -4,37 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tetapkan Kata Laluan Baharu</title>
-    <!-- Muatkan Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https:
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https:
         body { font-family: 'Inter', sans-serif; background-color: #f4f7f9; }
         .spinner { border-top-color: #ffffff; }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-    <!-- Card Utama -->
+    
     <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-2xl">
         <h2 class="text-3xl font-extrabold text-indigo-700 mb-4 text-center">Kata Laluan Baharu</h2>
         <p id="instructionText" class="text-gray-500 mb-8 text-center text-sm">Sila masukkan kod pengesahan, kemudian tetapkan kata laluan baharu.</p>
 
         <form id="resetForm">
-            <!-- Input Tersembunyi untuk Email (WAJIB ADA dari URL) -->
+            
             <input type="hidden" name="email" id="hiddenEmail">
             
-            <!-- Medan OTP BARU -->
+            
             <div class="mb-5">
-                <!-- PENTING: Peringatan untuk pengguna tentang OTP yang betul, yang akan datang dari DB / e-mel sebenar -->
+                
                 <label for="otp" class="block text-sm font-medium text-gray-700 mb-2 text-left">Kod Pengesahan (OTP)</label>
-                <!-- Nama medan di sini ialah 'token' -->
+                
                 <input type="text" name="token" id="otp" placeholder="Masukkan kod yang diterima" required maxlength="6"
                        class="w-full text-center text-xl font-bold tracking-widest px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out shadow-sm">
             </div>
 
-            <!-- MASA LUPUT OTP & Butang HANTAR SEMULA OTP BAHARU -->
+            
             <div class="flex justify-between items-center mb-6">
-                <!-- Tambah info masa luput -->
+                
                 <p id="otpTimerText" class="text-xs text-gray-500">Kod luput dalam <span id="cooldownDisplay">60s</span></p>
 
                  <button type="button" id="resendOtpButton" class="text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:text-gray-400 disabled:cursor-not-allowed transition duration-150">
@@ -42,15 +42,15 @@
                  </button>
             </div>
 
-            <!-- Medan Kata Laluan Baharu -->
+            
             <div class="mb-5">
                 <label for="new_password" class="block text-sm font-medium text-gray-700 mb-2 text-left">Kata Laluan Baharu</label>
-                <!-- Tambah nama 'new_password' untuk dihantar ke PHP -->
+                
                 <input type="password" name="new_password" id="new_password" required minlength="6"
                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out shadow-sm">
             </div>
 
-            <!-- Medan Sahkan Kata Laluan -->
+            
             <div class="mb-5">
                 <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-2 text-left">Sahkan Kata Laluan</label>
                 <input type="password" name="confirm_password" id="confirm_password" required minlength="6"
@@ -63,14 +63,14 @@
             </button>
         </form>
 
-        <!-- Container Mesej -->
+        
         <div id="messageContainer" class="mt-6 p-4 rounded-lg hidden text-left" role="alert">
             <p id="resultText" class="text-sm font-medium"></p>
         </div>
     </div>
 
     <script>
-        // Gunakan nama fail PHP anda untuk pemprosesan, atau ganti dengan fail sebenar anda.
+        
         const RESET_API_ENDPOINT = 'verify_otp_form.php'; 
 
         const form = document.getElementById("resetForm");
@@ -93,7 +93,7 @@
         }
 
         function startResendCooldown() {
-            // Kita gunakan 60 saat sebagai cooldown hantar semula
+            
             cooldownSeconds = 60; 
             resendOtpButton.disabled = true;
             otpTimerText.classList.remove('hidden'); 
@@ -116,7 +116,7 @@
             }, 1000);
         }
 
-        // Fungsi Simulasi untuk Hantar Semula OTP (boleh diabaikan buat masa ini)
+        
         async function resendOtp() {
             const email = hiddenEmailInput.value;
             if (!email) {
@@ -124,16 +124,16 @@
                 return;
             }
 
-            // Mulakan Pemasa Cooldown
+            
             startResendCooldown();
             
             displayMessage(true, "Meminta kod pengesahan baharu...");
             otpInput.value = ''; 
 
-            // --- SIMULASI PANGGILAN API UNTUK HANTAR SEMULA ---
+            
             await new Promise(resolve => setTimeout(resolve, 2000)); 
 
-            // Di sini, dalam sistem sebenar, anda akan memanggil API 'resend-otp'
+            
             displayMessage(true, `Kod pengesahan baharu telah dihantar ke ${email}.`);
         }
 
@@ -170,9 +170,9 @@
             const newPassword = document.getElementById('new_password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
             const email = hiddenEmailInput.value;
-            const token = otpInput.value; // Ambil nilai token/OTP
+            const token = otpInput.value; 
 
-            // Semakan kata laluan sisi klien
+            
             if (newPassword !== confirmPassword) {
                 displayMessage(false, "Kata laluan baharu dan pengesahan tidak sepadan.");
                 return;
@@ -186,17 +186,17 @@
                 return;
             }
 
-            // Lumpuhkan butang semasa memproses
+            
             resetButton.disabled = true;
             resendOtpButton.disabled = true;
-            resetButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Mengemas kini...';
+            resetButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http:
             messageContainer.classList.add('hidden');
             
-            // Siapkan data untuk dihantar ke PHP
+            
             const formData = new FormData();
             formData.append('email', email);
-            formData.append('token', token); // Hantar sebagai 'token'
-            formData.append('new_password', newPassword); // Hantar kata laluan baru
+            formData.append('token', token); 
+            formData.append('new_password', newPassword); 
 
             try {
                 const response = await fetch(RESET_API_ENDPOINT, {
@@ -209,7 +209,7 @@
                 if (data.success) {
                     displayMessage(data.success, "Kata laluan berjaya ditetapkan! Mengarahkan ke Log Masuk...");
                     
-                    // PENGARAHAN AKHIR: Alihkan ke halaman log masuk
+                    
                     setTimeout(() => {
                         window.location.href = `login.html`; 
                     }, 3000);
@@ -223,10 +223,10 @@
                 displayMessage(false, "Ralat rangkaian atau pelayan. Sila cuba lagi.");
             }
 
-            // Sentiasa pulihkan butang
+            
             resetButton.disabled = false; 
             resetButton.textContent = 'Tetapkan Kata Laluan';
-            // Pulihkan butang hantar semula hanya jika pemasa sudah tamat
+            
             if (cooldownSeconds <= 0) {
                  resendOtpButton.disabled = false;
             }

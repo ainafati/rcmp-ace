@@ -1,16 +1,16 @@
 <?php
 session_start();
-include '../config.php'; // Correct path to config
-include_once '../logger.php'; // <-- Sertakan fail logger
+include '../config.php'; 
+include_once '../logger.php'; 
 
-// --- Pengesahan Admin ---
+
 if (!isset($_SESSION['admin_id'])) {
     header("Location: login.php");
     exit();
 }
 $admin_id = (int)$_SESSION['admin_id'];
 
-// --- Dapatkan Info Admin (untuk paparan & log) ---
+
 $admin = ['name' => 'Admin'];
 $stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?");
 $stmt_admin->bind_param("i", $admin_id);
@@ -21,22 +21,22 @@ if ($admin_data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-// Sediakan pembolehubah untuk log (lebih mudah dibaca)
+
 $admin_id_session = (int)$_SESSION['admin_id'];
 $admin_name_session = $admin['name'];
 
-// --- Fungsi Bantuan ---
+
 function safe_unlink($filepath) {
     if ($filepath && file_exists($filepath) && is_file($filepath)) {
-        @unlink($filepath); // Guna @ untuk elak warning jika fail sedang digunakan
+        @unlink($filepath); 
     }
 }
 
-// ===================================
-// --- PENGURUSAN KATEGORI ---
-// ===================================
 
-// --- TAMBAH KATEGORI ---
+
+
+
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
     $db_path = "";
@@ -47,7 +47,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
         $db_path = 'uploads/' . $image_name;
         $server_path = '../' . $db_path; 
         if (!move_uploaded_file($image['tmp_name'], $server_path)) {
-            $db_path = ""; // Gagal muat naik, set laluan sebagai kosong
+            $db_path = ""; 
         }
     }
     
@@ -57,10 +57,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     if ($stmt->execute()) {
         $new_cat_id = $stmt->insert_id;
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
         log_activity($conn, 'admin', $admin_id_session, 'ADD_CATEGORY', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
     } else {
@@ -71,13 +71,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     exit();
 }
 
-// --- KEMAS KINI KATEGORI ---
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $category_id = (int)$_POST['edit_category_id'];
     $category_name = trim($_POST['edit_category_name']);
     
     if (isset($_FILES['edit_category_image']) && $_FILES['edit_category_image']['error'] === 0) {
-        // 1. Padam imej lama
+        
         $stmt_old = $conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
         $stmt_old->bind_param("i", $category_id);
         $stmt_old->execute();
@@ -87,19 +87,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
         }
         $stmt_old->close();
         
-        // 2. Muat naik imej baru
+        
         $image = $_FILES['edit_category_image'];
         $image_name = uniqid('cat_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
         $db_path = 'uploads/' . $image_name;
         $server_path = '../' . $db_path;
         
         if (move_uploaded_file($image['tmp_name'], $server_path)) {
-            // 3. Kemas kini DB dengan nama & imej baru
+            
             $stmt = $conn->prepare("UPDATE categories SET category_name = ?, image_url = ? WHERE category_id = ?");
             $stmt->bind_param("ssi", $category_name, $db_path, $category_id);
         }
     } else {
-        // 3. Kemas kini DB dengan nama sahaja
+        
         $stmt = $conn->prepare("UPDATE categories SET category_name = ? WHERE category_id = ?");
         $stmt->bind_param("si", $category_name, $category_id);
     }
@@ -107,10 +107,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     if (isset($stmt)) {
         if ($stmt->execute()) {
             
-            // --- MULA REKOD LOG ---
+            
             $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
             log_activity($conn, 'admin', $admin_id_session, 'EDIT_CATEGORY', $log_details);
-            // --- TAMAT REKOD LOG ---
+            
             
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
         }
@@ -122,11 +122,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     exit();
 }
 
-// --- PADAM KATEGORI ---
+
 if (isset($_GET['delete_category_id'])) {
     $delete_id = (int)$_GET['delete_category_id'];
     
-    // 1. Dapatkan info untuk log & padam imej
+    
     $stmt_info = $conn->prepare("SELECT category_name, image_url FROM categories WHERE category_id = ?");
     $stmt_info->bind_param("i", $delete_id);
     $stmt_info->execute();
@@ -134,25 +134,25 @@ if (isset($_GET['delete_category_id'])) {
     $stmt_info->fetch();
     $stmt_info->close();
     
-    // 2. Padam imej
+    
     if (!empty($image_url_to_delete)) {
         safe_unlink('../' . $image_url_to_delete);
     }
     
-    // 3. Padam dari DB
+    
     $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
     $stmt->bind_param("i", $delete_id);
     
     if ($stmt->execute()) {
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
         log_activity($conn, 'admin', $admin_id_session, 'DELETE_CATEGORY', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
     } else {
-        // Gagal (kemungkinan kerana 'foreign key constraint')
+        
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category. It is likely in use.'];
     }
     $stmt->close();
@@ -161,11 +161,11 @@ if (isset($_GET['delete_category_id'])) {
 }
 
 
-// ===================================
-// --- PENGURUSAN ITEM & ASET ---
-// ===================================
 
-// --- TAMBAH ITEM BARU & UNIT ASET ---
+
+
+
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     $item_name = trim($_POST['item_name']);
     $category_id = (int)$_POST['category_id'];
@@ -176,7 +176,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
 
     $conn->begin_transaction();
     try {
-        // 1. Cipta 'item' (jenis item)
+        
         $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description) VALUES (?, ?, ?)");
         $stmt_item->bind_param("sis", $item_name, $category_id, $description);
         $stmt_item->execute();
@@ -184,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         $stmt_item->close();
 
         if ($new_item_id > 0 && $quantity > 0) {
-            // 2. Dapatkan prefix kategori
+            
             $stmt_cat = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
             $stmt_cat->bind_param("i", $category_id);
             $stmt_cat->execute();
@@ -195,7 +195,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
             $prefix = strtoupper(substr($category_name, 0, 3));
             $like_prefix = $prefix . '-%';
 
-            // 3. Dapatkan nombor siri aset terakhir
+            
             $stmt_last = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code LIKE ? ORDER BY CAST(SUBSTRING(asset_code, 5) AS UNSIGNED) DESC LIMIT 1");
             $stmt_last->bind_param("s", $like_prefix);
             $stmt_last->execute();
@@ -205,7 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
             
             $last_num = $last_code ? (int)substr($last_code, -4) : 0;
             
-            // 4. Loop untuk cipta unit 'aset'
+            
             for ($i = 0; $i < $quantity; $i++) {
                 $next_num = $last_num + 1 + $i;
                 $new_asset_code = $prefix . '-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
@@ -217,38 +217,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
             }
         }
         
-        $conn->commit(); // Sahkan transaksi
+        $conn->commit(); 
 
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
         log_activity($conn, 'admin', $admin_id_session, 'ADD_ITEM_WITH_UNITS', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Successfully created ' . htmlspecialchars($item_name) . ' with ' . $quantity . ' units.'];
 
     } catch (Exception $e) {
-        $conn->rollback(); // Batalkan jika gagal
+        $conn->rollback(); 
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
     }
     header("Location: manageItem_admin.php"); 
     exit();
 }
 
-// --- KEMAS KINI ITEM & TAMBAH UNIT ASET ---
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     $item_id = (int)$_POST['edit_item_id'];
     $item_name = trim($_POST['edit_item_name']);
     $category_id = (int)$_POST['edit_category_id'];
     $description = trim($_POST['edit_description']);
     
-    // Kuantiti untuk unit BARU
+    
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
     $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
 
     $conn->begin_transaction();
     try {
-        // 1. Kemas kini 'item' (jenis item)
+        
         $stmt_update = $conn->prepare("UPDATE item SET item_name = ?, category_id = ?, description = ? WHERE item_id = ?");
         $stmt_update->bind_param("sisi", $item_name, $category_id, $description, $item_id);
         $stmt_update->execute();
@@ -256,9 +256,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
         $message_part_2 = "";
 
-        // 2. Jika ada kuantiti, tambah unit 'aset' baru
+        
         if ($quantity > 0) {
-            // (Logik sama seperti 'tambah item')
+            
             $stmt_cat = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
             $stmt_cat->bind_param("i", $category_id);
             $stmt_cat->execute();
@@ -290,12 +290,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
             $message_part_2 = " and added " . $quantity . " new units";
         }
 
-        $conn->commit(); // Sahkan transaksi
+        $conn->commit(); 
 
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
         log_activity($conn, 'admin', $admin_id_session, 'EDIT_ITEM_WITH_UNITS', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item updated successfully' . $message_part_2 . '!'];
 
@@ -308,11 +308,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     exit();
 }
 
-// --- PADAM ITEM & SEMUA ASET BERKAITAN ---
+
 if (isset($_GET['delete_item_id'])) {
     $delete_id = (int)$_GET['delete_item_id'];
     
-    // 1. Dapatkan nama item untuk log
+    
     $stmt_name = $conn->prepare("SELECT item_name FROM item WHERE item_id = ?");
     $stmt_name->bind_param("i", $delete_id);
     $stmt_name->execute();
@@ -322,7 +322,7 @@ if (isset($_GET['delete_item_id'])) {
 
     $conn->begin_transaction();
     try {
-        // 2. Dapatkan senarai aset untuk dipadam dari jadual 'reservation_assets'
+        
         $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
         $asset_ids = [];
         while ($row = $assets_to_delete_res->fetch_assoc()) { 
@@ -330,32 +330,32 @@ if (isset($_GET['delete_item_id'])) {
         }
         
         if (!empty($asset_ids)) {
-            // 3. Padam rekod tempahan berkaitan aset
+            
             $asset_id_list = implode(',', $asset_ids);
             $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
         }
         
-        // 4. Padam semua 'aset'
+        
         $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
         
-        // 5. Padam 'item' (jenis item)
+        
         $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
         $stmt->bind_param("i", $delete_id);
         $stmt->execute();
         $stmt->close();
         
-        $conn->commit(); // Sahkan transaksi
+        $conn->commit(); 
 
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
         log_activity($conn, 'admin', $admin_id_session, 'DELETE_ITEM_TYPE', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item type and all its units have been deleted.'];
 
     } catch (Exception $e) {
         $conn->rollback();
-        // Gagal (kemungkinan kerana rekod lama dalam 'reservation_items' yang tidak dipadam)
+        
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete. The item may be part of an old reservation record.'];
     }
     header("Location: manageItem_admin.php"); 
@@ -375,9 +375,9 @@ $item_details = $conn->query("
     ORDER BY i.item_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
 
-// Tutup sambungan jika tidak digunakan lagi di bahagian HTML
-// $conn->close(); 
-// Biarkan terbuka jika HTML di bawah perlukannya.
+
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -385,9 +385,9 @@ $item_details = $conn->query("
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>Manage Inventory — UniKL Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https:
+    <link rel="stylesheet" href="https:
+    <link href="https:
 <style>
     body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
     
@@ -776,8 +776,8 @@ $item_details = $conn->query("
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https:
+<script src="https:
 <script>
     <?php
     if (isset($_SESSION['message'])) {
@@ -795,29 +795,29 @@ $item_details = $conn->query("
     }
     ?>
 
-// 1. MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL
+
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('overlay');
     const menuToggle = document.getElementById('menuToggle');
 
-    // Fungsi untuk menukar keadaan sidebar
+    
     function toggleSidebar() {
         sidebar.classList.toggle('active');
-        // Nota: CSS kini mengendalikan paparan/sembunyi overlay secara automatik
-        // melalui selector `.sidebar.active ~ #overlay`
+        
+        
     }
 
-    // Apabila butang menu diklik
+    
     menuToggle.addEventListener('click', toggleSidebar);
 	
-	// Tutup sidebar apabila mengklik overlay (hanya berfungsi di mobile)
+	
     overlay.addEventListener('click', function() {
         if (sidebar.classList.contains('active')) {
             toggleSidebar();
         }
     });
 
-    // Tambahan: Tutup sidebar apabila mengubah saiz kepada desktop
+    
     window.addEventListener('resize', function() {
         if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
             sidebar.classList.remove('active');
@@ -830,14 +830,14 @@ $item_details = $conn->query("
         
         var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
         
-        // Hide the main category modal before showing the edit modal
+        
         var mainModalEl = document.getElementById('categoryModal');
         var mainModal = bootstrap.Modal.getInstance(mainModalEl);
         if (mainModal) {
             mainModal.hide();
         }
         
-        // Ensure the edit modal shows up properly
+        
         editModal.show();
     }
 
@@ -857,13 +857,13 @@ $item_details = $conn->query("
     }
 
     function openEditItemModal(item) {
-        // Isi butiran item sedia ada
+        
         document.getElementById('edit_item_id').value = item.item_id;
         document.getElementById('edit_item_name').value = item.item_name;
         document.getElementById('edit_category_id_select').value = item.category_id;
         document.getElementById('edit_description').value = item.description;
 
-        // Kosongkan dan tetapkan semula medan untuk stok baru
+        
         document.getElementById('edit_item_quantity').value = 0;
         document.getElementById('edit_item_brand').value = '';
         document.getElementById('edit_item_model').value = '';
