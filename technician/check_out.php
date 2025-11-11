@@ -7,30 +7,31 @@ if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
 }
-$tech_id = (int) $_SESSION['tech_id'];
+$tech_id = (int)$_SESSION['tech_id'];
 
 // Get technician info
 $stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?");
 $stmt_tech->bind_param("i", $tech_id);
 $stmt_tech->execute();
-$stmt_tech->bind_result($tname);
-$tech = $stmt_tech->fetch() ? ['name' => $tname] : ['name' => 'Technician'];
+$result_tech = $stmt_tech->get_result(); // Guna get_result() untuk keserasian
+$tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
 $stmt_tech->close();
+
 
 // Get single date filter data from URL (GET)
 $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_GET['filter_date'] : null;
 
 
 // Fetch Data By Status
-// ✨ FUNGSI INI DIKEMAS KINI UNTUK PRIORITY ✨
 function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $status_placeholders = implode(',', array_fill(0, count($statuses), '?'));
 
     // Base SQL
+    // KOD INI BETUL: Menggunakan 'ri.reserve_id = r.reserve_id'
     $sql = "SELECT
                 ri.id AS reservation_item_id, ri.status, ri.quantity, ri.reserve_date, ri.return_date,
                 r.created_at AS apply_date, 
-                r.priority, -- <-- 1. TAMBAH SELECT priority
+                r.priority, 
                 u.name AS user_name, u.phoneNum AS user_phone,
                 i.item_name, i.item_id
             FROM reservation_items ri
@@ -42,21 +43,18 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
 
-    // Add single date filter if it exists - FILTERING ON r.created_at
+    // Add single date filter if it exists
     if ($filter_date) {
-        // Filter based on the exact application date
         $sql .= " AND DATE(r.created_at) = ?";
         $bind_types .= 's';
         $bind_values[] = $filter_date;
     }
 
-    // *** 2. LOGIK SUSUNAN (ORDER BY) BAHARU ***
-    // Susun ikut Tarikh Acara -> Keutamaan (1=Tinggi) -> Tarikh Mohon (FCFS)
     $sql .= " ORDER BY ri.reserve_date ASC, r.priority ASC, r.created_at ASC";
 
     $stmt = $conn->prepare($sql);
 
-    // Use call_user_func_array for older PHP compatibility
+    // Bind parameters
     $bind_params = [];
     $bind_params[] = $bind_types;
     foreach ($bind_values as $key => $value) {
@@ -76,8 +74,6 @@ $completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected
 
 
 // Get other data for modals
-// ADD 1-DAY BUFFER LOGIC TO AVAILABLE ASSETS QUERY
-// Assumes 'assets' table has 'last_return_date' column updated during check-in
 $assetSql = "
     SELECT asset_id, item_id, asset_code
     FROM assets
@@ -85,13 +81,12 @@ $assetSql = "
         status = 'Available' AND
         (
             last_return_date IS NULL OR
-            -- Check if last_return_date is EARLIER than yesterday
             DATE(last_return_date) < DATE_SUB(CURDATE(), INTERVAL 1 DAY)
         )
 ";
 
 $assetResult = $conn->query($assetSql);
-if (!$assetResult) { // Add error checking
+if (!$assetResult) {
     die("Error fetching available assets: " . $conn->error);
 }
 $availableAssets = [];
@@ -99,13 +94,12 @@ while ($row = $assetResult->fetch_assoc()) { $availableAssets[$row['item_id']][]
 $availableAssets_json = json_encode($availableAssets);
 
 // Function to generate the table HTML
-// ✨ FUNGSI INI DIKEMAS KINI UNTUK PAPAR BADGE PRIORITY ✨
 function create_request_table($requests) {
     if (empty($requests)) {
         echo '<div class="text-center text-muted py-5"><i class="fa-solid fa-inbox fa-2x mb-2"></i><br>No reservations found matching the criteria.</div>';
         return;
     }
-    echo '<div class="table-responsive"><table class="table table-hover align-middle request-table">'; // Add 'request-table' class
+    echo '<div class="table-responsive"><table class="table table-hover align-middle request-table">';
     echo '<thead><tr><th>User / Item</th><th class="text-center">Qty</th><th>Duration</th><th>Status</th><th class="text-center">Actions</th></tr></thead><tbody>';
     foreach ($requests as $row) {
         $status = strtolower(trim($row['status']));
@@ -118,31 +112,30 @@ function create_request_table($requests) {
         if ($status == 'cancelled') $badgeClass = 'text-bg-secondary';
 
         $priority = isset($row['priority']) ? $row['priority'] : 3; 
-        $priority_text = 'Low Priority';        $priority_class = 'text-bg-info'; // Guna 'info' untuk rendah
+        $priority_text = 'Low Priority';        $priority_class = 'text-bg-info';
         if ($priority == 1) { $priority_text = 'High Priority'; $priority_class = 'text-bg-danger'; }
         if ($priority == 2) { $priority_text = 'Moderate Priority'; $priority_class = 'text-bg-warning'; }
-        // --- Tamat Logik Badge ---
 
         echo "<tr id='row-{$row['reservation_item_id']}' data-phone='" . htmlspecialchars($row['user_phone']) . "' data-itemname='" . htmlspecialchars($row['item_name']) . "' data-user-name='" . htmlspecialchars($row['user_name']) . "' data-item-id='{$row['item_id']}' data-qty='{$row['quantity']}'>";
         
-        // --- Paparan Badge Ditambah Di Sini ---
         echo "<td><strong>" . htmlspecialchars($row['user_name']) . "</strong>";
         echo "<div class='info-secondary'>" . htmlspecialchars($row['item_name']) . "</div>";
-        echo "<div><span class='badge rounded-pill $priority_class' style='font-size: 0.7em;'>Priority: $priority_text</span></div>"; // <-- BADGE BARU
+        echo "<div><span class='badge rounded-pill $priority_class' style='font-size: 0.7em;'>Priority: $priority_text</span></div>"; 
         echo "</td>";
-        // --- Tamat Paparan Badge ---
 
         echo "<td class='text-center'><strong>{$row['quantity']}</strong></td>";
         echo "<td>" . date('d M Y', strtotime($row['reserve_date'])) . " to " . date('d M Y', strtotime($row['return_date'])) . "<div class='info-secondary'>Applied: " . date('d M Y', strtotime($row['apply_date'])) . "</div></td>";
         echo "<td><span class='badge rounded-pill $badgeClass'>" . ucfirst(str_replace('_', ' ', $status)) . "</span></td>";
         echo "<td class='text-center'>";
+
+        // --- TAMBAH 'aria-label' UNTUK ACCESSIBILITY ---
         if ($status === 'pending') {
-            echo "<button class='btn btn-success btn-sm' title='Approve' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
-            echo "<button class='btn btn-danger btn-sm' title='Reject' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
+            echo "<button class='btn btn-success btn-sm' title='Approve' aria-label='Approve Request' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
+            echo "<button class='btn btn-danger btn-sm' title='Reject' aria-label='Reject Request' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
         } elseif ($status === 'approved') {
-            echo "<button class='btn btn-primary btn-sm' title='Check Out' onclick='checkOutItem({$row['reservation_item_id']})'><i class='fa-solid fa-box-open'></i></button>";
+            echo "<button class='btn btn-primary btn-sm' title='Check Out' aria-label='Check Out Item' onclick='checkOutItem({$row['reservation_item_id']})'><i class='fa-solid fa-box-open'></i></button>";
         } elseif ($status === 'checked out') {
-            echo "<button class='btn btn-warning btn-sm' title='Check In' onclick='checkInItem({$row['reservation_item_id']})'><i class='fa-solid fa-inbox'></i></button>";
+            echo "<button class='btn btn-warning btn-sm' title='Check In' aria-label='Check In Item' onclick='checkInItem({$row['reservation_item_id']})'><i class='fa-solid fa-inbox'></i></button>";
         } else {
             echo "<span class='text-muted'>—</span>";
         }
@@ -192,16 +185,17 @@ function create_request_table($requests) {
         .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
         .dataTables_info { font-size: 0.9rem; color: #64748b; padding-top: 0.5rem !important; }
 
-        /* ADDED FOR MOBILE RESPONSIVENESS */
+        /* --- PEMBETULAN (Performance & Accessibility) --- */
         @media (max-width: 991.98px) {
             .sidebar {
-                left: -250px; 
-                transition: left 0.3s ease-in-out;
+                /* Guna transform (laju) dan bukannya 'left' (perlahan) */
+                transform: translateX(-100%); 
+                transition: transform 0.3s ease-in-out;
                 z-index: 1050; 
                 box-shadow: 4px 0 12px rgba(0,0,0,0.1);
             }
             .sidebar.toggled {
-                left: 0;
+                transform: translateX(0);
             }
             .main-content {
                 margin-left: 0;
@@ -233,7 +227,7 @@ function create_request_table($requests) {
 <body>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div> 
-<div class="sidebar">
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
@@ -250,12 +244,16 @@ function create_request_table($requests) {
 <div class="main-content">
     <div class="topbar">
         <div class="d-flex align-items-center">
-            <button class="btn d-lg-none me-3" id="sidebarToggle"><i class="fa-solid fa-bars"></i></button>
+            <button class="btn d-lg-none me-3" id="sidebarToggle" aria-label="Toggle navigation menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
             <h3>Manage Requests</h3>
         </div>
         <div class="d-flex align-items-center gap-3">
             <span class="fw-bold"><?= htmlspecialchars($tech['name']) ?></span>
-            <a href="profile_tech.php" title="My Profile"><i class="fa-solid fa-user-circle fa-2x text-secondary"></i></a>
+            <a href="profile_tech.php" title="My Profile" aria-label="View My Profile">
+                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+            </a>
         </div>
     </div>
 
@@ -303,14 +301,13 @@ function create_request_table($requests) {
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="approveDetailsModal" tabindex="-1">
+<div class="modal fade" id="approveDetailsModal" tabindex="-1" role="dialog" aria-labelledby="approveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content"><div class="modal-header"><h5 class="modal-title">Approve Reservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="approveModalLabel">Approve Reservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <div class="modal-body">
                 <p><strong>User:</strong> <span id="userName"></span> (<span id="userPhone"></span>)</p>
                 <p><strong>Item:</strong> <span id="itemName"></span></p>
@@ -324,9 +321,9 @@ function create_request_table($requests) {
     </div>
 </div>
 
-<div class="modal fade" id="rejectModal" tabindex="-1">
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reject Reservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="rejectModalLabel">Reject Reservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <div class="modal-body">
                 <p>Please provide a reason for rejection:</p>
                 <textarea id="reject_reason" class="form-control" placeholder="e.g., Item unavailable, insufficient details..."></textarea>
@@ -337,12 +334,12 @@ function create_request_table($requests) {
     </div>
 </div>
 
-<div class="modal fade" id="checkInModal" tabindex="-1">
+<div class="modal fade" id="checkInModal" tabindex="-1" role="dialog" aria-labelledby="checkInModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Check In Item(s)</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="checkInModalLabel">Check In Item(s)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="checkInModalBody">
                 <div class="text-center p-4">
@@ -379,7 +376,6 @@ function openApproveModal(id) {
     const requiredQty = parseInt(row.dataset.qty);
     let html;
     if (assets.length < requiredQty) {
-        // Technician sees this message and should proceed to REJECT the request.
         html = `<div class='alert alert-danger mb-0'>❌ Only ${assets.length} unit(s) available. **Cannot fulfill this request.** Please **Reject** and state the reason.</div>`;
     } else if (assets.length > 0) {
         html = `<h6>Select ${requiredQty} asset(s) to assign:</h6>`;
@@ -387,16 +383,13 @@ function openApproveModal(id) {
             `<div class='form-check'><input class='form-check-input asset-checkbox' value='${a.asset_id}' type='checkbox' id='asset-${a.asset_id}'><label class='form-check-label' for='asset-${a.asset_id}'>${a.asset_code}</label></div>`
         ).join('');
     } else {
-         // This condition also implies insufficient assets
         html = "<div class='alert alert-danger mb-0'>❌ No available assets found for this item (considering buffer). Please **Reject** the request.</div>";
     }
     $('#assetListContainer').html(html);
     const $approveBtn = $('#confirmApproveBtn');
-    // Disable Approve button if insufficient assets are found
     $approveBtn.prop('disabled', assets.length < requiredQty);
     $('#assetListContainer').off('change.assetcheck').on('change.assetcheck', '.asset-checkbox', function() {
         const checkedCount = $('.asset-checkbox:checked').length;
-        // Button enabled only if the exact required quantity is checked
         $approveBtn.prop('disabled', checkedCount !== requiredQty);
     });
     new bootstrap.Modal('#approveDetailsModal').show();
@@ -412,7 +405,8 @@ $('#confirmApproveBtn').on('click', function() {
     }
     const btn = $(this).prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Approving...');
     $.ajax({
-        url: 'checkout_action.php', method: 'POST',
+        url: 'checkout_action.php', // Pastikan fail ini wujud di folder yang sama
+        method: 'POST',
         data: { action: 'approve', reservation_item_id, selectedAssets: selected },
         dataType: 'json',
         success: (data) => {
@@ -420,7 +414,12 @@ $('#confirmApproveBtn').on('click', function() {
             .then(() => location.reload());
         },
         error: (xhr) => {
-            Swal.fire('Error', (xhr.responseJSON ? xhr.responseJSON.message : 'An unknown error occurred during approval.'), 'error');
+            // DIKEMAS KINI: Tunjukkan ralat sebenar
+            let realErrorMessage = xhr.responseText;
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                realErrorMessage = xhr.responseJSON.message;
+            }
+            Swal.fire('AJAX Request Failed!', 'Details: ' + realErrorMessage, 'error');
             btn.prop('disabled', false).text('Approve Request');
         }
     });
@@ -446,7 +445,12 @@ $('#confirmRejectBtn').on('click', function() {
         Swal.fire({ title: 'Rejected!', text: data.message || 'Request rejected.', icon: 'success', timer: 1500, showConfirmButton: false })
         .then(() => location.reload());
     }, 'json').fail((xhr) => {
-        Swal.fire('Error', (xhr.responseJSON ? xhr.responseJSON.message : 'An error occurred during rejection.'), 'error');
+        // DIKEMAS KINI: Tunjukkan ralat sebenar
+        let realErrorMessage = xhr.responseText;
+        if (xhr.responseJSON && xhr.responseJSON.message) {
+            realErrorMessage = xhr.responseJSON.message;
+        }
+        Swal.fire('Error', 'An error occurred during rejection. Details: ' + realErrorMessage, 'error');
         btn.prop('disabled', false).text('Confirm Rejection');
     });
 });
@@ -458,14 +462,19 @@ function checkOutItem(id) {
         showCancelButton: true, confirmButtonColor: '#3b82f6', cancelButtonColor: '#6c757d', confirmButtonText: 'Yes, check it out!'
     }).then((result) => {
         if (result.isConfirmed) {
-             Swal.fire({ title: 'Processing...', text: 'Updating status.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+            Swal.fire({ title: 'Processing...', text: 'Updating status.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
             $.post('checkout_action.php', { action: 'checkout', reservation_item_id: id }, (data) => {
                 Swal.close();
                 Swal.fire({ title: 'Checked Out!', text: data.message, icon: 'success', timer: 1500, showConfirmButton: false })
                 .then(() => location.reload());
             }, 'json').fail((xhr) => {
                 Swal.close();
-                Swal.fire('Error', (xhr.responseJSON ? xhr.responseJSON.message : 'An error occurred during check-out.'), 'error');
+                // DIKEMAS KINI: Tunjukkan ralat sebenar
+                let realErrorMessage = xhr.responseText;
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    realErrorMessage = xhr.responseJSON.message;
+                }
+                Swal.fire('Error', 'An error occurred during check-out. Details: ' + realErrorMessage, 'error');
             });
         }
     });
@@ -476,26 +485,22 @@ function checkInItem(id) {
     const row = document.getElementById('row-' + id);
     if (!row) return;
 
-    // Dapatkan modal dan elemennya
     const $modal = $('#checkInModal');
     const $modalBody = $('#checkInModalBody');
     const $confirmBtn = $('#confirmCheckInBtn');
 
-    // Reset modal ke keadaan loading
     $modal.find('.modal-title').text('Check In: ' + row.dataset.itemname);
     $modalBody.html('<div class="text-center p-4"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br>Loading assets...</div>');
     $confirmBtn.prop('disabled', true);
 
-    // Tunjukkan modal
     const checkInModal = new bootstrap.Modal($modal[0]);
     checkInModal.show();
 
-    // Ambil senarai aset yang berkaitan dengan permintaan ini
     $.ajax({
         url: 'checkout_action.php',
         method: 'GET',
         data: {
-            action: 'get_assets_for_checkin', // Guna action GET baharu
+            action: 'get_assets_for_checkin',
             reservation_item_id: id
         },
         dataType: 'json',
@@ -505,15 +510,12 @@ function checkInItem(id) {
                 return;
             }
 
-            // Bina borang HTML secara dinamik
             let html = `<p>Please set the condition for each returned asset (${assets.length} unit(s)).</p>`;
             html += `<form id="checkInForm">`;
-            // Simpan ID tempahan dalam borang
             html += `<input type="hidden" id="checkin_reservation_item_id" value="${id}">`; 
 
             assets.forEach(asset => {
                 const asset_id = asset.asset_id;
-                // 'remarks' disembunyikan secara default
                 html += `
                     <div class="card mb-3 p-3 checkin-asset-card" data-asset-id="${asset_id}">
                         <h6 class="mb-2 fw-bold text-primary">${asset.asset_code}</h6>
@@ -537,13 +539,17 @@ function checkInItem(id) {
             
             html += '</form>';
             $modalBody.html(html);
-            $confirmBtn.prop('disabled', false); // Dayakan butang selepas borang dimuatkan
+            $confirmBtn.prop('disabled', false); 
             
-            // Trigger perubahan untuk menetapkan label remarks yang betul pada permulaan
             $modalBody.find('input[type="radio"]:checked').trigger('change');
         },
         error: function(xhr) {
-            $modalBody.html('<div class="alert alert-danger mb-0">Error loading asset list: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error') + '</div>');
+            // DIKEMAS KINI: Tunjukkan ralat sebenar
+            let realErrorMessage = xhr.responseText;
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                realErrorMessage = xhr.responseJSON.message;
+            }
+            $modalBody.html('<div class="alert alert-danger mb-0">Error loading asset list: ' + realErrorMessage + '</div>');
         }
     });
 }
@@ -551,27 +557,63 @@ function checkInItem(id) {
 
 $(document).ready(function() {
     
-    // === LOGIK MOBILE SIDEBAR TOGGLE (BARU) ===
+    // -----------------------------------------------------------------
+    // --- PEMBETULAN (Accessibility): Logik sidebar baru ---
+    // -----------------------------------------------------------------
+    const $sidebar = $('.sidebar');
+    const $overlay = $('#sidebarOverlay');
+    const $focusableElements = $sidebar.find('a, button');
+
+    function setSidebarState(open) {
+        if (open) {
+            $sidebar.addClass('toggled'); // 'toggled' ialah kelas 'open' anda
+            $overlay.addClass('active');
+            $focusableElements.attr('tabindex', '0'); // Boleh di-fokus
+        } else {
+            $sidebar.removeClass('toggled');
+            $overlay.removeClass('active');
+            $focusableElements.attr('tabindex', '-1'); // Tidak boleh di-fokus (betulkan ralat ARIA)
+        }
+    }
+
     $('#sidebarToggle').on('click', function(e) {
         e.preventDefault();
-        $('.sidebar').toggleClass('toggled');
-        $('#sidebarOverlay').toggleClass('active');
+        setSidebarState(!$sidebar.hasClass('toggled'));
     });
 
-    // Tutup sidebar apabila overlay diklik
     $('#sidebarOverlay').on('click', function() {
-        $('.sidebar').removeClass('toggled');
-        $(this).removeClass('active');
+        setSidebarState(false);
     });
 
-    // Pastikan sidebar terbuka by default pada desktop
+    // Tetapkan keadaan awal semasa muat halaman
     $(window).on('load resize', function() {
         if ($(window).width() >= 992) {
-            $('.sidebar').removeClass('toggled');
-            $('#sidebarOverlay').removeClass('active');
+            // Jika desktop
+            $sidebar.removeClass('toggled'); // Sentiasa tunjuk
+            $overlay.removeClass('active');  // Tiada overlay
+            $focusableElements.attr('tabindex', '0'); // Boleh di-fokus
+        } else {
+            // Jika mobile
+            // Pastikan ia bermula tertutup
+            $sidebar.removeClass('toggled');
+            $overlay.removeClass('active');
+            $focusableElements.attr('tabindex', '-1'); // Tidak boleh di-fokus
         }
     });
-    // === TAMAT LOGIK MOBILE SIDEBAR TOGGLE ===
+    // --- TAMAT LOGIK SIDEBAR ---
+    
+    
+    // -----------------------------------------------------------------
+    // --- PEMBETULAN UNTUK RALAT FOKUS 'aria-hidden' PADA MODAL ---
+    // -----------------------------------------------------------------
+    // Apabila mana-mana modal selesai ditutup, alihkan fokus ke <body>
+    $('.modal').on('hidden.bs.modal', function () {
+        // Alihkan fokus kembali ke elemen <body> utama.
+        // Ini menghalang fokus daripada "terperangkap" pada butang 
+        // yang kini halimunan.
+        document.body.focus();
+    });
+    // --- TAMAT PEMBETULAN ---
 
 
     // Initialize DataTables
@@ -599,7 +641,7 @@ $(document).ready(function() {
 
     // === LOGIK MODAL CHECK-IN BAHARU ===
 
-    // ✨ Tunjukkan/sembunyikan 'remarks' berdasarkan pilihan
+    // Tunjukkan/sembunyikan 'remarks' berdasarkan pilihan
     $('#checkInModalBody').on('change', 'input[type="radio"]', function() {
         const $card = $(this).closest('.checkin-asset-card');
         const $remarksContainer = $card.find('.remarks-container');
@@ -609,7 +651,6 @@ $(document).ready(function() {
             $remarksLabel.text('Remarks (Required if damaged):'); 
             $remarksContainer.slideDown();
         } else {
-            // Jika 'Good', tunjukkan juga tapi tukar label
             $remarksLabel.text('Remarks (Optional):'); 
             $remarksContainer.slideDown(); 
         }
@@ -637,7 +678,6 @@ $(document).ready(function() {
                 return false; 
             }
 
-            // ✨ LOGIK VALIDASI: Semak 'remarks' jika 'Damaged/Incomplete'
             if (condition === 'Damaged/Incomplete' && !remarks) {
                 isValid = false;
                 Swal.fire('Input Required', `Remarks are required for damaged asset (ID: ${asset_id}).`, 'warning');
@@ -662,7 +702,6 @@ $(document).ready(function() {
             return;
         }
 
-        // Simpan rujukan 'button'
         const $btn = $(this);
 
         // 2. Popup Pengesahan
@@ -689,7 +728,12 @@ $(document).ready(function() {
                     Swal.fire({ title: 'Checked In!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false })
                     .then(() => location.reload());
                 }, 'json').fail(function(xhr) {
-                    Swal.fire('Error', (xhr.responseJSON ? xhr.responseJSON.message : 'An error occurred during check-in.'), 'error');
+                    // DIKEMAS KINI: Tunjukkan ralat sebenar
+                    let realErrorMessage = xhr.responseText;
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        realErrorMessage = xhr.responseJSON.message;
+                    }
+                    Swal.fire('Error', 'An error occurred during check-in. Details: ' + realErrorMessage, 'error');
                     $btn.prop('disabled', false).text('Confirm Check-In');
                 });
             }

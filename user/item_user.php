@@ -55,8 +55,7 @@ if ($res_items) {
     }
 }
 
-// Jangan lupa close connection pada akhir script
-$conn->close();
+// $conn->close(); <-- Dipindahkan ke bahagian paling bawah fail
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -278,7 +277,23 @@ $conn->close();
 
     <div class="container-fluid">
         <div class="row">
-            <div class="col-lg-7">
+            
+            <div class="col-lg-5 order-lg-2">
+                <div class="card">
+                    <h5><i class="fa-solid fa-layer-group me-2 text-primary"></i> Item Categories</h5>
+                    <p class="text-muted small">A visual guide of our main categories.</p>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($categories as $category): ?>
+                            <div class="list-group-item d-flex align-items-center p-2">
+                                <img src="../<?= htmlspecialchars($category['image_url'] ?: 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
+                                <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7 order-lg-1">
                 <div class="card">
                     <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> Request Form</h5>
                     <p class="text-muted small">Fill in the details to check item availability in real-time.</p>
@@ -308,7 +323,6 @@ $conn->close();
                                 <?php
                                 $current_category = null;
                                 foreach ($items_for_dropdown as $item) {
-                                    // PENTING: Gunakan trim() untuk buang whitespace jika ada
                                     $item_category_name = trim($item['category_name']); 
                                     if ($item_category_name !== $current_category) {
                                         if ($current_category !== null) echo '</optgroup>';
@@ -340,7 +354,7 @@ $conn->close();
                         
                         <div class="mb-3">
                             <label class="form-label" for="reason">6. Purpose of Loan</label>
-                            <textarea id="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
+                            <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
                         </div>
                         
                         <div class="mb-3">
@@ -376,25 +390,9 @@ $conn->close();
                 </div>
             </div>
             
-            <div class="col-lg-5">
-                <div class="card">
-                    <h5><i class="fa-solid fa-layer-group me-2 text-primary"></i> Item Categories</h5>
-                    <p class="text-muted small">A visual guide of our main categories.</p>
-                    <div class="list-group list-group-flush">
-                        <?php foreach ($categories as $category): ?>
-                            <div class="list-group-item d-flex align-items-center p-2">
-                                <img src="../<?= htmlspecialchars($category['image_url'] ?: 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
-                                <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
-</div>
-
+    </div>
 <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -410,7 +408,7 @@ $conn->close();
                 <li><strong>Responsibility:</strong> The borrower is fully responsible for the borrowed item(s) from the moment of collection until they are returned and checked in by a technician.</li>
                 <li><strong>Condition of Items:</strong> The borrower must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the borrower may be held responsible.</li>
                 <li><strong>Damage or Loss:</strong> The borrower will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).</li>
-                <li><strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.i. RM10 per item per day) and a temporary suspension of borrowing privileges.</li>
+                <li><strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of borrowing privileges.</li>
                 <li><strong>Purpose:</strong> Items are to be used for academic or official university purposes only.</li>
                 <li><strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status, or the reservation may be cancelled.</li>
             </ol>
@@ -427,6 +425,7 @@ $conn->close();
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
 $(document).ready(function() {
     // Initialize Select2 dropdown
@@ -435,6 +434,7 @@ $(document).ready(function() {
         allowClear: true
     });
 
+    // Simpan salinan asal semua optgroups
     let allOptgroups = $('#item_select optgroup').clone();
 
     $(document).on('click', '.category-pill-filter', function(e) {
@@ -463,7 +463,6 @@ $(document).ready(function() {
         }
 
         // 6. Reset pilihan Select2 dan buka ia
-        // Select2 akan membaca opsyen baru secara automatik
         $select.val(null).trigger('change');
         $select.select2('open');
     });
@@ -556,38 +555,44 @@ $(document).ready(function() {
                 });
             } else {
                 statusDiv.html('');
-                addBtn.prop('disabled', false);
+                addBtn.prop('disabled', false); // Dayakan jika medan tidak lengkap
             }
-        }, 500);
+        }, 500); // 500ms debounce
     }
 
+    // Butang untuk terima cadangan kuantiti
     $(document).on('click', '#book-available-btn', function() {
         const availableCount = $(this).data('available');
         $('#quantity').val(availableCount); 
         checkAvailability(); 
     });
 
+    // Panggil checkAvailability apabila medan berubah
     $('#item_select').on('change', checkAvailability);
     $('#quantity').on('input', checkAvailability); 
 
+    // Konfigurasi Flatpickr
     const returnDatepicker = flatpickr("#returnDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
-        onClose: checkAvailability
+        onClose: checkAvailability // Semak ketersediaan apabila tarikh ditutup
     });
 
     const reserveDatepicker = flatpickr("#reserveDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
         onChange: (selectedDates) => {
+            // Pastikan tarikh pulang tidak boleh sebelum tarikh pinjam
             if (selectedDates.length > 0) {
                 returnDatepicker.set('minDate', selectedDates[0]);
             }
         },
-        onClose: checkAvailability
+        onClose: checkAvailability // Semak ketersediaan apabila tarikh ditutup
     });
 
-    let reservationItems = [];
+    let reservationItems = []; // Array untuk menyimpan item
+    
+    // Logik 'Add to List'
     $('#addMoreBtn').on('click', () => {
         const itemName = $('#item_select').val();
         const quantity = $('#quantity').val();
@@ -595,15 +600,22 @@ $(document).ready(function() {
         const ret = $('#returnDate').val();
         const reason = $('#reason').val(); // Ambil reason dari borang
 
+        // Pengesahan
         if (!itemName || !quantity || !reserve || !ret || !reason.trim()) {
             Swal.fire("Incomplete Form", "Please fill in all request details, including a reason.", "warning");
             return;
         }
         
-        // Semak ketersediaan lagi sebelum menambah ke senarai (untuk keselamatan)
+        // Semak ketersediaan lagi sebelum menambah ke senarai
         if ($('#availability-status').find('.alert-success').length === 0) {
             Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
             return;
+        }
+
+        // Semak item pendua
+        if (reservationItems.some(item => item.item_name === itemName)) {
+             Swal.fire("Duplicate Item", "This item is already in your list. Please remove it first if you want to change the details.", "info");
+             return;
         }
         
         // Cipta objek yang mengandungi semua data item
@@ -612,29 +624,30 @@ $(document).ready(function() {
             quantity: quantity, 
             reserve_date: reserve, 
             return_date: ret, 
+            // Simpan reason & program_type untuk setiap item (berguna jika anda mahu ia berbeza nanti)
             reason: reason,
-            program_type: $('#program_type').val() // Ambil program type dari borang utama
+            program_type: $('#program_type').val()
         };
         
         reservationItems.push(newItem);
-        renderItemsList();
+        renderItemsList(); // Panggil fungsi untuk memaparkan senarai
 
+        // Tunjuk notifikasi 'Toast'
         const Toast = Swal.mixin({
             toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
         });
         Toast.fire({ icon: 'success', title: 'Added to list!' });
 
-        // Reset the form fields for the next item
+        // Reset medan borang untuk item seterusnya
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         reserveDatepicker.clear();
         returnDatepicker.clear();
-        // **BARIS MASALAH DIPADAMKAN/DINYAHAKTIFKAN DI SINI:**
-        // $('#reason').val(''); 
+        // Jangan reset 'reason' atau 'program_type' kerana ia mungkin sama
         $('#availability-status').html('');
-        // NOTE: program_type tidak direset kerana ia biasanya sama untuk keseluruhan tempahan
     });
 
+    // Fungsi untuk memaparkan senarai item
     function renderItemsList() {
         const listDiv = $('#itemsList');
         if (reservationItems.length > 0) {
@@ -647,7 +660,7 @@ $(document).ready(function() {
                             <b>Purpose:</b> ${it.reason}
                         </small>
                     </div>
-                    <button type="button" onclick="removeItem(${i})" class="btn btn-sm btn-outline-danger ms-2"><i class="fa fa-trash-alt"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-item-btn" data-index="${i}"><i class="fa fa-trash-alt"></i></button>
                 </div>
             `).join('');
             listDiv.html(`<div class="p-2">${itemsHtml}</div>`);
@@ -655,23 +668,24 @@ $(document).ready(function() {
             listDiv.html(`<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p>Your request list is empty.</p></div>`);
         }
         
-        // Tambahkan input tersembunyi untuk menghantar Program Type (jika ada item)
-        // Kita hantar data item list sahaja, program_type akan diambil dari borang utama
+        // Kemas kini input tersembunyi dengan data JSON
         $('#allItems').val(JSON.stringify(reservationItems));
         
-        // Memastikan butang submit hanya berfungsi jika ada item
+        // Dayakan/nyahdayakan butang submit
         $('#reserveForm').find('button[type="submit"]').prop('disabled', reservationItems.length === 0);
     }
 
-    window.removeItem = function(index) {
-        reservationItems.splice(index, 1);
-        renderItemsList();
-    }
+    // Gunakan 'event delegation' untuk butang 'remove'
+    $('#itemsList').on('click', '.remove-item-btn', function() {
+        const index = $(this).data('index');
+        reservationItems.splice(index, 1); // Padam item dari array
+        renderItemsList(); // Lukis semula senarai
+    });
     
     // Inisiasi awal butang submit
     $('#reserveForm').find('button[type="submit"]').prop('disabled', true);
 
-
+    // Logik 'Submit Request'
     $('#reserveForm').on('submit', function (e) {
         e.preventDefault();
         
@@ -686,8 +700,7 @@ $(document).ready(function() {
             return; // Hentikan penghantaran
         }
         
-        // **Tambahan semakan: Walaupun item sudah ditambah, pastikan medan reason tidak kosong semasa submit**
-        // Ini melindungi jika pengguna hanya tambah 1 item dan tidak menggunakan addToList
+        // Pastikan 'reason' global diisi
         if (!$('#reason').val().trim()) {
             Swal.fire("Incomplete Form", "Please ensure the Purpose of Loan is filled in.", "warning");
             return;
@@ -696,23 +709,23 @@ $(document).ready(function() {
         const submitBtn = $(this).find('button[type="submit"]');
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
         
-        // Serialize the form data (termasuk user_id, program_type, dan allItems)
+        // Hantar borang menggunakan AJAX
         $.ajax({
             type: 'POST',
             url: 'submit_reservation.php',
-            data: $(this).serialize(),
+            data: $(this).serialize(), // .serialize() akan ambil 'all_items', 'reason', 'program_type', 'user_id'
             dataType: 'json',
             success: function(response) {
                 if(response.status === 'success') {
                     Swal.fire({
                         title: 'Success!',
-                        text: 'Your request has been submitted. You will be redirected to history page.',
+                        text: 'Your request has been submitted. You will be redirected to the history page.',
                         icon: 'success',
                         timer: 2000,
                         timerProgressBar: true,
                         showConfirmButton: false
                     }).then(() => {
-                        window.location.href = 'history.php';
+                        window.location.href = 'history.php'; // Halakan ke 'history.php'
                     });
                 } else {
                     Swal.fire("Submission Failed", response.message, "error");
@@ -722,12 +735,13 @@ $(document).ready(function() {
                 Swal.fire("Submission Failed", "A server error occurred. Please try again.", "error");
             },
             complete: function() {
+                // Kembalikan butang kepada keadaan asal
                 submitBtn.prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-2"></i> Submit Request');
             }
         });
     });
     
-    // Panggilan awal untuk memastikan list butang submit adalah betul
+    // Panggilan awal untuk memaparkan senarai (jika kosong)
     renderItemsList();
 });
 </script>

@@ -2,19 +2,20 @@
 session_start();
 include 'config.php'; 
 
+
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) { header("Location: user/dashboard_user.php"); exit(); }
 if (isset($_SESSION['tech_id'])) { header("Location: technician/dashboard_tech.php"); exit(); }
 if (isset($_SESSION['admin_id'])) { header("Location: admin/manageItem_admin.php"); exit(); }
 
-// Check for a failed login attempt OR a successful signup
+// Get login attempt details if they exist (from a failed login)
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
-// Clear session variables after reading
+// Clear the attempt data so it's only used once
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 
-// Retrieve and clear flash messages
+// Get error or success messages
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
 unset($_SESSION['error'], $_SESSION['success']);
@@ -23,11 +24,14 @@ unset($_SESSION['error'], $_SESSION['success']);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login - R-ILMS</title>
+    <title>Login - NexCheck</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
 <style>
@@ -35,10 +39,10 @@ unset($_SESSION['error'], $_SESSION['success']);
     /* GLOBAL & STRUCTURE (Centered Design) */
     /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147;      /* Dark Blue (Main Button, Text) */
-        --accent-cyan: #00A3C9;        /* Light Blue/Cyan (Main Accent) */
-        --accent-green: #A7D737;       /* Lime Green (Input Focus) */
-        --light-bg: #f5f8ff;           /* Light background */
+        --primary-color: #002147;     /* Dark Blue (Main Button, Text) */
+        --accent-cyan: #00A3C9;       /* Light Blue/Cyan (Main Accent) */
+        --accent-green: #A7D737;      /* Lime Green (Input Focus) */
+        --light-bg: #f5f8ff;          /* Light background */
         --border-color: #e2e8f0;
         --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15); /* Stronger shadow for card */
     }
@@ -49,13 +53,13 @@ unset($_SESSION['error'], $_SESSION['success']);
         font-family: 'Inter', sans-serif; 
         height: 100%; 
         background-color: var(--light-bg); 
-        display: flex; /* Menggunakan flex untuk pusatkan kandungan */
+        display: flex; /* Use flex to center content */
         align-items: center;
         justify-content: center;
         min-height: 100vh;
     }
     .form-wrapper { 
-        max-width: 450px; /* Lebar maksimum kad log masuk */
+        max-width: 450px; /* Max width of login card */
         width: 90%; 
         background: #fff; 
         padding: 40px; 
@@ -118,7 +122,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         cursor: pointer; 
         transition: all 0.3s ease-in-out;
         background-color: #ffffff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Shadow lebih ringan */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Lighter shadow */
     }
     .role-content i { 
         font-size: 24px; 
@@ -142,7 +146,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     }
     
     /* -------------------------------------------------------------------------- */
-    /* LOGIN FORM ELEMENTS (Kekalkan Gaya Sedia Ada) */
+    /* LOGIN FORM ELEMENTS */
     /* -------------------------------------------------------------------------- */
     #login-details-step { 
         opacity: 0; 
@@ -154,7 +158,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     #login-details-step.visible { 
         opacity: 1; 
         height: auto;
-        margin-top: 25px; /* Kurangkan margin atas */
+        margin-top: 25px; /* Reduce top margin */
     }
     .input-group { margin-bottom: 18px; text-align: left; position: relative; }
     .input-group label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: #1e293b; }
@@ -162,14 +166,32 @@ unset($_SESSION['error'], $_SESSION['success']);
         width: 100%; padding: 12px; border: 1px solid var(--border-color); 
         border-radius: 8px; box-sizing: border-box; font-size: 16px;
         transition: border-color 0.3s, box-shadow 0.3s;
+        /* Give space on the right for the icon */
+        padding-right: 40px; 
     }
     .input-group input:focus {
         border-color: var(--accent-green);
         box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
         outline: none;
     }
-    .toggle-password { position: absolute; right: 12px; top: 41px; cursor: pointer; color: #94a3b8; font-size: 16px; }
+    .toggle-password { 
+        position: absolute; 
+        right: 12px; 
+        /* Adjusted to center vertically with input */
+        top: 50%;
+        transform: translateY(-50%);
+        margin-top: 14px; /* Approx. half the label height + margin */
+        cursor: pointer; 
+        color: #94a3b8; 
+        font-size: 16px; 
+    }
+    /* Fix 'top' position if no label */
+    .input-group input:placeholder-shown + .toggle-password {
+        top: 50%;
+        margin-top: 0;
+    }
     .toggle-password:hover { color: var(--accent-cyan); }
+    
     .login-btn { 
         background: var(--primary-color); 
         color: white; border: none; width: 100%; padding: 13px; 
@@ -184,7 +206,33 @@ unset($_SESSION['error'], $_SESSION['success']);
     .form-footer { margin-top: 20px; font-size: 14px; text-align: center; }
     .form-footer a { color: var(--accent-cyan); text-decoration: none; font-weight: 600; }
     .form-footer a:hover { text-decoration: underline; color: var(--primary-color); }
-    .alert-message { border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 14px; }
+    
+    /* -------------------------------------------------------------------------- */
+    /* ALERT MESSAGES (IMPROVEMENT) */
+    /* -------------------------------------------------------------------------- */
+    .alert-message {
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid transparent;
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+    }
+
+    .error-message {
+        color: #721c24; /* Dark red text */
+        background-color: #f8d7da; /* Pink background */
+        border-color: #f5c6cb; /* Pink border */
+    }
+
+    .success-message {
+        color: #155724; /* Dark green text */
+        background-color: #d4edda; /* Light green background */
+        border-color: #c3e6cb; /* Light green border */
+    }
+    
     .instruction #role-title { color: var(--accent-cyan) !important; }
 
     /* -------------------------------------------------------------------------- */
@@ -195,16 +243,20 @@ unset($_SESSION['error'], $_SESSION['success']);
             width: 100%;
             max-width: none;
             padding: 30px 20px;
-            box-shadow: none; /* Buang shadow pada mobile penuh */
+            box-shadow: none; /* Remove shadow on full mobile */
             border-radius: 0;
             min-height: 100vh;
         }
         .roles {
-            grid-template-columns: 1fr; /* 1 kolum untuk skrin kecil */
+            grid-template-columns: 1fr; /* 1 column for small screens */
             gap: 10px;
         }
         .header-branding {
              margin-top: 15px;
+        }
+        /* Adjust toggle icon position on mobile if needed */
+        .toggle-password {
+            margin-top: 13px;
         }
     }
 </style>
@@ -252,6 +304,8 @@ unset($_SESSION['error'], $_SESSION['success']);
                 <div class="input-group">
                     <label for="password">Password</label>
                     <input type="password" name="password" id="password" required>
+                    
+                    <i class="fa-solid toggle-password" id="togglePassword"></i>
                 </div>
                 
                 <button type="submit" class="login-btn">Log In</button>
@@ -280,7 +334,8 @@ unset($_SESSION['error'], $_SESSION['success']);
         const togglePassword = document.querySelector("#togglePassword");
         const passwordField = document.querySelector("#password");
         
-        // --- 1. Alert Message Timeout ---
+        
+        // Fade-out logic for notifications
         if (alertMessages) {
             alertMessages.forEach(function(message) {
                 setTimeout(() => {
@@ -288,27 +343,33 @@ unset($_SESSION['error'], $_SESSION['success']);
                     setTimeout(() => {
                         message.style.display = 'none';
                     }, 500);
-                }, 5000); 
+                }, 5000); // 5 seconds
             });
         }
         
-        // --- 2. Role Selection Logic ---
+        
+        // Function to show the login form
         function showLoginDetails(role, title) {
             roleTitle.textContent = title;
             hiddenRoleInput.value = role;
             
-            // Show/Hide Sign Up Link
+            // Show "Sign Up" link only for users
             signUpLink.style.display = (role === 'user') ? 'block' : 'none';
             
-            // Show the Login Details Form (with smooth transition)
-            // Sembunyikan Role Selection
+            // Hide the role selection step
             document.getElementById('role-selection-step').style.display = 'none'; 
             
-            // Tunjukkan Login Details
+            // Show the login details step
             loginDetailsStep.classList.add('visible');
             
-            // Scroll ke borang (untuk skrin kecil)
-            loginDetailsStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Focus on the email input if it's empty
+            const emailInput = document.getElementById('email');
+            if (emailInput.value === '') {
+                emailInput.focus();
+            } else {
+                // If email is already filled (from a failed attempt), focus on password
+                passwordField.focus();
+            }
         }
 
         roleRadios.forEach(radio => {
@@ -317,28 +378,46 @@ unset($_SESSION['error'], $_SESSION['success']);
             });
         });
         
-        // --- 3. Password Toggle ---
-        // Sediakan ikon awal yang betul (fa-eye) jika type='password'
-        togglePassword.classList.add("fa-eye-slash"); 
         
-        togglePassword.addEventListener("click", function () {
-            const isPassword = passwordField.type === "password";
-            passwordField.type = isPassword ? "text" : "password";
+        // ------------------------------------------------------------------
+        // IMPROVED PASSWORD TOGGLE LOGIC (FIXES THE "TWO EYES" BUG)
+        // ------------------------------------------------------------------
+        if (togglePassword && passwordField) {
             
-            this.classList.toggle("fa-eye-slash");
-            this.classList.toggle("fa-eye");
-        });
+            // 1. Set the default icon (eye-slash)
+            togglePassword.classList.add("fa-eye-slash"); 
+            
+            togglePassword.addEventListener("click", function () {
+                // 2. Check the current input type
+                const isPassword = passwordField.type === "password";
+                
+                if (isPassword) {
+                    // 3. If it's 'password', change to 'text'
+                    passwordField.type = "text";
+                    // 4. Change icon: Remove 'slash' (closed), add 'eye' (open)
+                    this.classList.remove("fa-eye-slash");
+                    this.classList.add("fa-eye");
+                } else {
+                    // 5. If it's 'text', change back to 'password'
+                    passwordField.type = "password";
+                    // 6. Change icon: Remove 'eye' (open), add 'slash' (closed)
+                    this.classList.remove("fa-eye");
+                    this.classList.add("fa-eye-slash");
+                }
+            });
+        }
+        // ------------------------------------------------------------------
         
-        // --- 4. Failed Attempt / Pre-fill Logic ---
+        
+        // Logic to reshow the form if a login attempt failed
         const attemptedRole = '<?= $login_attempt_role ?>';
         if (attemptedRole) {
             const radio = document.querySelector(`input[name="role"][value="${attemptedRole}"]`);
             if (radio) {
-                // Check the radio button
+                
                 radio.checked = true;
                 
-                // Programmatically trigger the next step
-                // Kita guna setTimeout untuk memastikan CSS transition berfungsi
+                // Give a short delay for rendering before the transition
                 setTimeout(() => {
                     showLoginDetails(attemptedRole, radio.dataset.title);
                 }, 100); 

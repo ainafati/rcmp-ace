@@ -2,29 +2,29 @@
 session_start();
 include '../config.php';
 
-// Bahagian ini sangat penting - ia memuatkan library mPDF
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// 1. Pemeriksaan Sesi yang Ketat
+
 if (!isset($_SESSION['tech_id'])) {
-    // Jika sesi tidak wujud, hasilkan PDF ralat yang jelas
+    
     $mpdf = new \Mpdf\Mpdf();
     $mpdf->WriteHTML('<h1>Akses Ditolak</h1><p>Sesi anda telah tamat. Sila log masuk semula.</p>');
-    $mpdf->Output('error.pdf', 'I'); // 'I' bermaksud paparkan dalam browser
+    $mpdf->Output('error.pdf', 'I'); 
     exit();
 }
 
-// 2. Pemeriksaan Fail Templat
+
 $template_path = 'pdf_template.html';
 if (!file_exists($template_path)) {
-    // Jika fail templat tidak wujud, hasilkan PDF ralat
+    
     $mpdf = new \Mpdf\Mpdf();
     $mpdf->WriteHTML('<h1>Ralat Konfigurasi</h1><p>Fail templat PDF tidak dijumpai. Sila pastikan fail bernama <strong>pdf_template.html</strong> wujud.</p>');
     $mpdf->Output('error.pdf', 'I');
     exit();
 }
 
-// 3. Dapatkan Data (Kod yang sama seperti report.php)
+
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 
@@ -53,7 +53,7 @@ $result = $stmt->get_result();
 $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// 4. Bina Kandungan HTML
+
 $html = file_get_contents($template_path);
 $tableRows = '';
 if (empty($records)) {
@@ -80,12 +80,12 @@ if (empty($records)) {
     }
 }
 
-// Gantikan pemegang tempat
+
 $html = str_replace('{{start_date}}', htmlspecialchars($start_date), $html);
 $html = str_replace('{{end_date}}', htmlspecialchars($end_date), $html);
 $html = str_replace('{{table_rows}}', $tableRows, $html);
 
-// 5. Jana PDF
+
 try {
     $mpdf = new \Mpdf\Mpdf(['format' => 'A4-L']);
     $mpdf->SetHeader('UniKL Equipment Return Report | Generated: ' . date('Y-m-d H:i'));

@@ -2,95 +2,78 @@
 session_start();
 include 'config.php';
 
-// Ensure admin is logged in
+// 1. Pastikan admin yang log masuk
 if (!isset($_SESSION['admin_id'])) {
-    // Redirect non-admins
-    header("Location: login.php");
+    $_SESSION['error_message'] = "You must be logged in as an admin to perform this action.";
+    header("Location: manage_accounts.php");
     exit();
 }
+$admin_id = $_SESSION['admin_id'];
 
-// Check if the form was submitted via POST
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-
-    // 1. Get data from the form
+// 2. Semak jika kaedah adalah POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    
+    // 3. Dapatkan data dengan selamat dari borang
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $role = isset($_POST['role']) ? $_POST['role'] : '';
     $phoneNum = isset($_POST['phoneNum']) ? trim($_POST['phoneNum']) : '';
-    $status = isset($_POST['status']) ? $_POST['status'] : '';
-    // Get remarks from POST, default to null if not set
-    $remarks = isset($_POST['suspension_remarks']) ? trim($_POST['suspension_remarks']) : null;
+    $status_input = isset($_POST['status']) ? trim($_POST['status']) : ''; // 'Active' or 'Suspended'
+    $remarks = isset($_POST['suspension_remarks']) ? trim($_POST['suspension_remarks']) : '';
 
-    // 2. Validate essential input
-    if (empty($id) || empty($role) || empty($status)) {
-        $_SESSION['error_message'] = "Missing required information (ID, Role, or Status).";
-        header("Location: manage_accounts.php");
-        exit();
-    }
-
-    // 3. Validate remarks specifically if status is Suspended
-    if (strtolower($status) === 'suspended' && empty($remarks)) {
-         $_SESSION['error_message'] = "Suspension remarks are required when setting status to 'Suspended'.";
-         header("Location: manage_accounts.php");
-         exit();
-    }
-
-    // 4. IMPORTANT: Clear remarks ONLY if status is NOT 'Suspended'
-    if (strtolower($status) !== 'suspended') {
-        $remarks = null; // Ensure remarks are NULL if status is Active
-    }
-
-    // 5. Determine the table and ID column based on the role
-    $table = '';
+    // 4. Tentukan nama jadual dan kolum ID
+    $table_name = '';
     $id_column = '';
-    if ($role === 'Technician') {
-        $table = 'technician';
-        $id_column = 'tech_id';
-    } elseif ($role === 'User') {
-        $table = 'user';
+    if (strtolower($role) === 'user') {
+        $table_name = 'user';
         $id_column = 'user_id';
+    } elseif (strtolower($role) === 'technician') {
+        $table_name = 'technician';
+        $id_column = 'tech_id';
     } else {
-        $_SESSION['error_message'] = "Invalid user role specified.";
+        $_SESSION['error_message'] = "Invalid account role specified.";
         header("Location: manage_accounts.php");
         exit();
     }
 
-    // 6. Prepare and execute the UPDATE query (Ensure column name matches DB)
-    // Make sure your column name is exactly 'suspension_remarks' in BOTH tables
-    $sql = "UPDATE $table SET phoneNum = ?, status = ?, suspension_remarks = ? WHERE $id_column = ?";
+    // 5. Logik untuk tukar status (kini simpan perkataan penuh)
+    $db_status = '';
+    if (strtolower($status_input) === 'active') {
+        $db_status = 'Active'; // <-- DIKEMAS KINI
+        $remarks = NULL;       // Kosongkan remarks jika diaktifkan
+    } else {
+        $db_status = 'Suspended'; // <-- DIKEMAS KINI
+    }
+
+    // 6. Sediakan query kemas kini
+    $sql = "UPDATE $table_name SET phoneNum = ?, status = ?, suspension_remarks = ? WHERE $id_column = ?";
     $stmt = $conn->prepare($sql);
-
+    
     if ($stmt) {
-        // Bind parameters: s = string, i = integer. Remarks is string (s).
-        // Correct order: phoneNum (s), status (s), remarks (s), id (i)
-        $stmt->bind_param("sssi", $phoneNum, $status, $remarks, $id);
-
+        $stmt->bind_param("sssi", $phoneNum, $db_status, $remarks, $id);
+        
         if ($stmt->execute()) {
-            if ($stmt->affected_rows > 0) {
-                $_SESSION['success_message'] = "Account updated successfully.";
-            } else {
-                // Check if there was an error or just no change
-                if ($stmt->errno) {
-                     $_SESSION['error_message'] = "Error updating account: " . $stmt->error;
-                } else {
-                    $_SESSION['success_message'] = "No changes were made to the account."; // No data actually changed
-                }
+            $_SESSION['success_message'] = "Account for $role (ID: $id) updated successfully.";
+            
+            // Log aktiviti
+            if (function_exists('log_activity')) {
+                log_activity($conn, 'admin', $admin_id, 'ACCOUNT_UPDATE', "Admin updated $role account (ID: $id). Set status to $db_status.");
             }
         } else {
-            $_SESSION['error_message'] = "Error executing update: " . $stmt->error;
+            $_SESSION['error_message'] = "Failed to update account. Error: " . $stmt->error;
         }
         $stmt->close();
     } else {
-        $_SESSION['error_message'] = "Error preparing statement: " . $conn->error;
+        $_SESSION['error_message'] = "Failed to prepare statement. Error: " . $conn->error;
     }
-
+    
     $conn->close();
+    header("Location: manage_accounts.php");
+    exit();
 
 } else {
-    // If not a POST request, set an error message
+    // Bukan POST, halakan kembali
     $_SESSION['error_message'] = "Invalid request method.";
+    header("Location: manage_accounts.php");
+    exit();
 }
-
-// Redirect back to the manage accounts page
-header("Location: manage_accounts.php");
-exit();
 ?>

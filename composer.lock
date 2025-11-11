@@ -1,7 +1,7 @@
 {
     "_readme": [
         "This file locks the dependencies of your project to a known state",
-        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "Read more about it at https:
         "This file is @generated automatically"
     ],
     "content-hash": "37e5a3d428fecb3123f7f806176c5ec2",
@@ -11,12 +11,12 @@
             "version": "v8.2.6",
             "source": {
                 "type": "git",
-                "url": "https://github.com/mpdf/mpdf.git",
+                "url": "https:
                 "reference": "dd30e3b01061cf8dfe65e7041ab4cc46d8ebdd44"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mpdf/mpdf/zipball/dd30e3b01061cf8dfe65e7041ab4cc46d8ebdd44",
+                "url": "https:
                 "reference": "dd30e3b01061cf8dfe65e7041ab4cc46d8ebdd44",
                 "shasum": ""
             },
@@ -53,7 +53,7 @@
                     "Mpdf\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "GPL-2.0-only"
             ],
@@ -68,20 +68,20 @@
                 }
             ],
             "description": "PHP library generating PDF files from UTF-8 encoded HTML",
-            "homepage": "https://mpdf.github.io",
+            "homepage": "https:
             "keywords": [
                 "pdf",
                 "php",
                 "utf-8"
             ],
             "support": {
-                "docs": "https://mpdf.github.io",
-                "issues": "https://github.com/mpdf/mpdf/issues",
-                "source": "https://github.com/mpdf/mpdf"
+                "docs": "https:
+                "issues": "https:
+                "source": "https:
             },
             "funding": [
                 {
-                    "url": "https://www.paypal.me/mpdf",
+                    "url": "https:
                     "type": "custom"
                 }
             ],
@@ -92,12 +92,12 @@
             "version": "1.0.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/mpdf/psr-http-message-shim.git",
+                "url": "https:
                 "reference": "3206e6b80b6d2479e148ee497e9f2bebadc919db"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mpdf/psr-http-message-shim/zipball/3206e6b80b6d2479e148ee497e9f2bebadc919db",
+                "url": "https:
                 "reference": "3206e6b80b6d2479e148ee497e9f2bebadc919db",
                 "shasum": ""
             },
@@ -110,7 +110,7 @@
                     "Mpdf\\PsrHttpMessageShim\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
@@ -130,8 +130,8 @@
             ],
             "description": "Shim to allow support of different psr/message versions.",
             "support": {
-                "issues": "https://github.com/mpdf/psr-http-message-shim/issues",
-                "source": "https://github.com/mpdf/psr-http-message-shim/tree/1.0.0"
+                "issues": "https:
+                "source": "https:
             },
             "time": "2023-09-01T05:59:47+00:00"
         },
@@ -140,12 +140,12 @@
             "version": "v2.0.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/mpdf/psr-log-aware-trait.git",
+                "url": "https:
                 "reference": "7a077416e8f39eb626dee4246e0af99dd9ace275"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mpdf/psr-log-aware-trait/zipball/7a077416e8f39eb626dee4246e0af99dd9ace275",
+                "url": "https:
                 "reference": "7a077416e8f39eb626dee4246e0af99dd9ace275",
                 "shasum": ""
             },
@@ -158,7 +158,7 @@
                     "Mpdf\\PsrLogAwareTrait\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
@@ -174,8 +174,8 @@
             ],
             "description": "Trait to allow support of different psr/log versions.",
             "support": {
-                "issues": "https://github.com/mpdf/psr-log-aware-trait/issues",
-                "source": "https://github.com/mpdf/psr-log-aware-trait/tree/v2.0.0"
+                "issues": "https:
+                "source": "https:
             },
             "time": "2023-05-03T06:18:28+00:00"
         },
@@ -184,12 +184,12 @@
             "version": "1.7.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/myclabs/DeepCopy.git",
+                "url": "https:
                 "reference": "3b8a3a99ba1f6a3952ac2747d989303cbd6b7a3e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/3b8a3a99ba1f6a3952ac2747d989303cbd6b7a3e",
+                "url": "https:
                 "reference": "3b8a3a99ba1f6a3952ac2747d989303cbd6b7a3e",
                 "shasum": ""
             },
@@ -210,7 +210,7 @@
                     "DeepCopy\\": "src/DeepCopy/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
@@ -223,8 +223,8 @@
                 "object graph"
             ],
             "support": {
-                "issues": "https://github.com/myclabs/DeepCopy/issues",
-                "source": "https://github.com/myclabs/DeepCopy/tree/1.x"
+                "issues": "https:
+                "source": "https:
             },
             "time": "2017-10-19T19:58:43+00:00"
         },
@@ -233,12 +233,12 @@
             "version": "v2.0.21",
             "source": {
                 "type": "git",
-                "url": "https://github.com/paragonie/random_compat.git",
+                "url": "https:
                 "reference": "96c132c7f2f7bc3230723b66e89f8f150b29d5ae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/paragonie/random_compat/zipball/96c132c7f2f7bc3230723b66e89f8f150b29d5ae",
+                "url": "https:
                 "reference": "96c132c7f2f7bc3230723b66e89f8f150b29d5ae",
                 "shasum": ""
             },
@@ -257,7 +257,7 @@
                     "lib/random.php"
                 ]
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
@@ -265,7 +265,7 @@
                 {
                     "name": "Paragon Initiative Enterprises",
                     "email": "security@paragonie.com",
-                    "homepage": "https://paragonie.com"
+                    "homepage": "https:
                 }
             ],
             "description": "PHP 5.x polyfill for random_bytes() and random_int() from PHP 7",
@@ -277,8 +277,8 @@
             ],
             "support": {
                 "email": "info@paragonie.com",
-                "issues": "https://github.com/paragonie/random_compat/issues",
-                "source": "https://github.com/paragonie/random_compat"
+                "issues": "https:
+                "source": "https:
             },
             "time": "2022-02-16T17:07:03+00:00"
         },
@@ -287,12 +287,12 @@
             "version": "1.0.1",
             "source": {
                 "type": "git",
-                "url": "https://github.com/php-fig/http-message.git",
+                "url": "https:
                 "reference": "f6561bf28d520154e4b0ec72be95418abe6d9363"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-message/zipball/f6561bf28d520154e4b0ec72be95418abe6d9363",
+                "url": "https:
                 "reference": "f6561bf28d520154e4b0ec72be95418abe6d9363",
                 "shasum": ""
             },
@@ -310,18 +310,18 @@
                     "Psr\\Http\\Message\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
             "authors": [
                 {
                     "name": "PHP-FIG",
-                    "homepage": "http://www.php-fig.org/"
+                    "homepage": "http:
                 }
             ],
             "description": "Common interface for HTTP messages",
-            "homepage": "https://github.com/php-fig/http-message",
+            "homepage": "https:
             "keywords": [
                 "http",
                 "http-message",
@@ -331,7 +331,7 @@
                 "response"
             ],
             "support": {
-                "source": "https://github.com/php-fig/http-message/tree/master"
+                "source": "https:
             },
             "time": "2016-08-06T14:39:51+00:00"
         },
@@ -340,12 +340,12 @@
             "version": "1.1.4",
             "source": {
                 "type": "git",
-                "url": "https://github.com/php-fig/log.git",
+                "url": "https:
                 "reference": "d49695b909c3b7628b6289db5479a1c204601f11"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/log/zipball/d49695b909c3b7628b6289db5479a1c204601f11",
+                "url": "https:
                 "reference": "d49695b909c3b7628b6289db5479a1c204601f11",
                 "shasum": ""
             },
@@ -363,25 +363,25 @@
                     "Psr\\Log\\": "Psr/Log/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
             "authors": [
                 {
                     "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
+                    "homepage": "https:
                 }
             ],
             "description": "Common interface for logging libraries",
-            "homepage": "https://github.com/php-fig/log",
+            "homepage": "https:
             "keywords": [
                 "log",
                 "psr",
                 "psr-3"
             ],
             "support": {
-                "source": "https://github.com/php-fig/log/tree/1.1.4"
+                "source": "https:
             },
             "time": "2021-05-03T11:20:27+00:00"
         },
@@ -390,12 +390,12 @@
             "version": "v2.6.2",
             "source": {
                 "type": "git",
-                "url": "https://github.com/Setasign/FPDI.git",
+                "url": "https:
                 "reference": "9e013b376939c0d4029f54150d2a16f3c67a5797"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Setasign/FPDI/zipball/9e013b376939c0d4029f54150d2a16f3c67a5797",
+                "url": "https:
                 "reference": "9e013b376939c0d4029f54150d2a16f3c67a5797",
                 "shasum": ""
             },
@@ -422,7 +422,7 @@
                     "setasign\\Fpdi\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "notification-url": "https:
             "license": [
                 "MIT"
             ],
@@ -430,28 +430,28 @@
                 {
                     "name": "Jan Slabon",
                     "email": "jan.slabon@setasign.com",
-                    "homepage": "https://www.setasign.com"
+                    "homepage": "https:
                 },
                 {
                     "name": "Maximilian Kresse",
                     "email": "maximilian.kresse@setasign.com",
-                    "homepage": "https://www.setasign.com"
+                    "homepage": "https:
                 }
             ],
             "description": "FPDI is a collection of PHP classes facilitating developers to read pages from existing PDF documents and use them as templates in FPDF. Because it is also possible to use FPDI with TCPDF, there are no fixed dependencies defined. Please see suggestions for packages which evaluates the dependencies automatically.",
-            "homepage": "https://www.setasign.com/fpdi",
+            "homepage": "https:
             "keywords": [
                 "fpdf",
                 "fpdi",
                 "pdf"
             ],
             "support": {
-                "issues": "https://github.com/Setasign/FPDI/issues",
-                "source": "https://github.com/Setasign/FPDI/tree/v2.6.2"
+                "issues": "https:
+                "source": "https:
             },
             "funding": [
                 {
-                    "url": "https://tidelift.com/funding/github/packagist/setasign/fpdi",
+                    "url": "https:
                     "type": "tidelift"
                 }
             ],

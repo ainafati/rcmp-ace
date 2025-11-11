@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>R-ILMS (RCMP Management System-Inventory) - IT Asset Management</title>
+    <title>NexCheck (RCMP Inventory Reservation Check System) - IT Asset Management</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

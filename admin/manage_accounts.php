@@ -23,7 +23,9 @@ if ($admin_data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-// Fetch accounts including suspension remarks
+// -----------------------------------------------------------------
+// PEMBETULAN: Query SQL diringkaskan. Tiada lagi 'CASE' diperlukan.
+// -----------------------------------------------------------------
 $sql = "
     (SELECT tech_id AS id, name, email, ic_num, status, suspension_remarks, phoneNum, 'Technician' AS role, created_at FROM technician)
     UNION ALL
@@ -100,11 +102,11 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
             .sidebar.open { transform: translateX(0); }
             .main-content { margin-left: 0; width: 100%; }
-            .topbar { padding: 10px 15px; justify-content: flex-start; } /* Align left to fit toggle button */
+            .topbar { padding: 10px 15px; justify-content: flex-start; } 
             .topbar h3 { font-size: 16px; flex-grow: 1; }
             .topbar .d-flex { display: flex; align-items: center; }
             .topbar .btn { font-size: 12px; padding: .4rem .6rem; white-space: nowrap; }
-            .topbar .user-name { display: none; } /* Hide name on mobile */
+            .topbar .user-name { display: none; } 
             .container-fluid { padding: 10px 5px; }
             .card { padding: 15px; margin-bottom: 15px; }
             
@@ -112,9 +114,9 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             .search-bar { flex-direction: column; gap: 8px; }
             .search-bar input, .search-bar select { font-size: 14px; }
 
-            /* TABLE STYLES (Focus on essential data) */
+            /* TABLE STYLES */
             .table-responsive { overflow-x: auto; display: block; width: 100%; }
-            .table { width: 100%; min-width: 650px; } /* Force minimum width to enable scrolling */
+            .table { width: 100%; min-width: 650px; } 
 
             .table thead th {
                 font-size: 10px;
@@ -125,19 +127,9 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 padding: 0.4rem 0.3rem;
                 font-size: 14px;
             }
-
-            /* Adjust columns display for mobile */
-            .table tbody td:nth-child(2) { /* Email & Phone */
-                white-space: normal; /* Allow wrap for long emails */
-            }
-            .table tbody td:nth-child(5) { /* Actions */
-                white-space: nowrap; /* Keep buttons together */
-                min-width: 100px;
-            }
-            .table tbody td .btn-sm {
-                padding: 0.3rem 0.4rem;
-                font-size: 0.7rem;
-            }
+            .table tbody td:nth-child(2) { white-space: normal; }
+            .table tbody td:nth-child(5) { white-space: nowrap; min-width: 100px; }
+            .table tbody td .btn-sm { padding: 0.3rem 0.4rem; font-size: 0.7rem; }
         }
     </style>
 </head>
@@ -168,7 +160,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 <span class="user-name"><?= htmlspecialchars($admin['name']) ?></span>
                 <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
-            </a>
+                </a>
             </div>
         </div>
     </div>
@@ -227,9 +219,14 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                         )">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
-                                    <a href="delete_user.php?id=<?= $a['id'] ?>&role=<?= urlencode($a['role']) ?>" onclick="return confirm('Are you sure you want to delete this account? This action cannot be undone.')" class="btn btn-sm btn-outline-danger" title="Delete User">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </a>
+                                    
+                                    <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this account? This action cannot be undone.');">
+                                        <input type="hidden" name="id" value="<?= $a['id'] ?>">
+                                        <input type="hidden" name="role" value="<?= htmlspecialchars($a['role']) ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
@@ -251,16 +248,18 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             </div>
             <div class="modal-body">
                 <div class="mb-3"><label class="form-label">Name</label><input type="text" name="username" class="form-control" required></div>
+                
                 <div class="mb-3"><label class="form-label">Email (UniKL)</label>
                     <input type="email" name="email" class="form-control" required
-                            pattern="[a-zA-Z0-9._%+-]+@unikl\.edu\.my"
-                            title="Please enter a valid UniKL email address (e.g., name@unikl.edu.my)">
+                           pattern="[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my"
+                           title="Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)">
                 </div>
+                
                 <div class="mb-3"><label class="form-label">IC Number (12-digit)</label>
                     <input type="text" name="ic_num" class="form-control" required
-                            pattern="\d{12}"
-                            title="Enter 12 digits IC number without dash (-)"
-                            placeholder="e.g., 990101105000">
+                           pattern="\d{12}"
+                           title="Enter 12 digits IC number without dash (-)"
+                           placeholder="e.g., 990101105000">
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
@@ -309,8 +308,8 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                     </select>
                 </div>
                 <div id="editRemarksContainer" style="display: none;">
-                     <label for="editRemarks" class="form-label">Suspension Remarks <span class="text-danger">*</span></label>
-                     <textarea name="suspension_remarks" id="editRemarks" class="form-control" rows="3" placeholder="Reason for suspension..."></textarea>
+                       <label for="editRemarks" class="form-label">Suspension Remarks <span class="text-danger">*</span></label>
+                       <textarea name="suspension_remarks" id="editRemarks" class="form-control" rows="3" placeholder="Reason for suspension..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -340,7 +339,6 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleBtn.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
         
-        // Tutup sidebar jika pautan diklik (untuk navigasi)
         const sidebarLinks = sidebar.querySelectorAll('a');
         sidebarLinks.forEach(link => {
             link.addEventListener('click', function() {
@@ -365,17 +363,16 @@ function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     document.getElementById('editPhone').value = phone;
     document.getElementById('editStatus').value = status.trim();
     document.getElementById('editRole').value = role.trim();
-    document.getElementById('editRemarks').value = remarks; // Set remarks
+    document.getElementById('editRemarks').value = remarks; 
 
-    // Show/Hide Remarks container based on initial status
     const remarksContainer = document.getElementById('editRemarksContainer');
     const remarksTextarea = document.getElementById('editRemarks');
     if (status.trim().toLowerCase() === 'suspended') {
         remarksContainer.style.display = 'block';
-        remarksTextarea.required = true; // Make required if suspended
+        remarksTextarea.required = true; 
     } else {
         remarksContainer.style.display = 'none';
-        remarksTextarea.required = false; // Make not required if active
+        remarksTextarea.required = false; 
     }
 
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
@@ -390,10 +387,8 @@ function filterTable() {
     rows.forEach(row => {
         const name = row.cells[0].textContent.toLowerCase();
         const emailPhone = row.cells[1].textContent.toLowerCase();
-        // Ensure status text is correctly extracted (might be inside a span)
         const statusSpan = row.cells[2].querySelector('.badge');
         const userStatus = statusSpan ? statusSpan.textContent.toLowerCase().trim() : '';
-        // Ensure role text is correctly extracted
         const roleSpan = row.cells[3].querySelector('.badge');
         const userRole = roleSpan ? roleSpan.textContent.toLowerCase().trim() : '';
 
@@ -409,22 +404,25 @@ function filterTable() {
 document.getElementById('addAccountForm').addEventListener('submit', function(e) {
     const emailInput = this.querySelector('input[name="email"]');
     const email = emailInput.value.trim();
+    
+    // Gunakan Regex untuk menyemak kedua-dua domain
+    const uniklEmailPattern = /^[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my$/;
 
-    if (!email.endsWith('@unikl.edu.my')) {
+    if (!uniklEmailPattern.test(email)) { // <-- DIKEMAS KINI
         e.preventDefault(); // Stop form submission
         Swal.fire({
             icon: 'error',
             title: 'Invalid Email',
-            text: 'Please enter a valid UniKL email address (e.g., name@unikl.edu.my)',
+            text: 'Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)', // Mesej dikemas kini
             didClose: () => {
-                emailInput.focus(); // Re-focus the email input after closing
+                emailInput.focus(); // Re-focus
             }
         });
     }
     // IC validation is handled by the 'pattern' attribute
 });
 
-// Show/Hide Suspension Remarks in Edit Modal based on Status dropdown
+// Show/Hide Suspension Remarks in Edit Modal
 document.getElementById('editStatus').addEventListener('change', function() {
     const selectedStatus = this.value.toLowerCase();
     const remarksContainer = document.getElementById('editRemarksContainer');
@@ -432,15 +430,15 @@ document.getElementById('editStatus').addEventListener('change', function() {
 
     if (selectedStatus === 'suspended') {
         remarksContainer.style.display = 'block';
-        remarksTextarea.required = true; // Make required
+        remarksTextarea.required = true; 
     } else {
         remarksContainer.style.display = 'none';
-        remarksTextarea.required = false; // Make not required
-        remarksTextarea.value = ''; // Clear remarks when switching to Active
+        remarksTextarea.required = false; 
+        remarksTextarea.value = ''; 
     }
 });
 
-// Client-side validation for Edit Account form (Remarks required if suspended)
+// Client-side validation for Edit Account form
 document.getElementById('editAccountForm').addEventListener('submit', function(e) {
     const status = document.getElementById('editStatus').value.toLowerCase();
     const remarksTextarea = document.getElementById('editRemarks');
@@ -460,4 +458,4 @@ document.getElementById('editAccountForm').addEventListener('submit', function(e
 </script>
 
 </body>
-</html> 
+</html>
