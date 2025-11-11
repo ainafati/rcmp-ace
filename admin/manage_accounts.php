@@ -43,14 +43,19 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <title>Manage User Accounts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden; }
+        
+        /* DESKTOP STYLES */
+        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
+        .sidebar-overlay.active { display: block; }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
         .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
@@ -59,7 +64,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
+        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
@@ -77,122 +82,70 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         .search-bar { display:flex; gap:10px; margin-bottom:20px; }
         .search-bar input, .search-bar select { border-radius: 8px; }
         #editRemarksContainer { margin-top: 1rem; }
-        
-        /* MOBILE STYLES START */
-        .sidebar { transition: transform 0.3s ease-in-out; z-index: 1001; }
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
-        .menu-toggle-btn { display: none; } /* Sembunyikan pada desktop */
-        
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5); 
-            z-index: 999; 
-            display: none; 
+
+        /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+        #sidebar-toggle-btn {
+            display: none; /* Default: hide on desktop */
+            background: none;
+            border: none;
+            color: #334155;
+            font-size: 20px;
+            padding: 0;
+            margin-right: 15px;
         }
 
-        @media (max-width: 992px) {
-            /* Mobile Sidebar & Main Content Control (Kekal) */
-            .sidebar { 
-                transform: translateX(-250px); 
-                left: 0;
-                width: 250px;
-            }
-            .sidebar.active {
-                transform: translateX(0); 
-            }
-            .sidebar.active ~ #overlay {
-                display: block;
-            }
-            .main-content { 
-                margin-left: 0; 
-                width: 100%;
-            }
-            .topbar {
-                padding: 10px 15px;
-                position: sticky;
-                top: 0;
-            }
-            .topbar h3 {
-                font-size: 18px;
-            }
-            .topbar .user-name {
-                display: none; 
-            }
-            .menu-toggle-btn { 
-                display: inline-block; 
-                order: -1; 
-            }
-            .container-fluid {
-                padding: 15px;
-            }
-            .card {
-                padding: 15px;
-            }
-            .search-bar {
-                flex-direction: column;
-            }
+        @media (max-width: 768px) {
+            /* GENERAL LAYOUT */
+            #sidebar-toggle-btn { display: block; }
+            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; width: 100%; }
+            .topbar { padding: 10px 15px; justify-content: flex-start; } /* Align left to fit toggle button */
+            .topbar h3 { font-size: 16px; flex-grow: 1; }
+            .topbar .d-flex { display: flex; align-items: center; }
+            .topbar .btn { font-size: 12px; padding: .4rem .6rem; white-space: nowrap; }
+            .topbar .user-name { display: none; } /* Hide name on mobile */
+            .container-fluid { padding: 10px 5px; }
+            .card { padding: 15px; margin-bottom: 15px; }
             
-            /* Table Responsiveness: Wajib untuk tatal mendatar */
-            .table-responsive {
-                overflow-x: auto;
-            }
-            
-            /* === STYLING JADUAL JADI SANGAT PADAT (AGRESIF) === */
-            .table {
-                min-width: 700px; /* Lebar minimum untuk mengelakkan teks 'berlonggok' */
-                font-size: 12px; /* Saiz fon kecil */
-            }
-            
-            /* PADDING SANGAT KETAT */
-            .table tbody td {
-                padding: 4px 6px; /* Kurangkan padding atas/bawah & kiri/kanan secara drastik */
-            }
+            /* FILTER & SEARCH BAR */
+            .search-bar { flex-direction: column; gap: 8px; }
+            .search-bar input, .search-bar select { font-size: 14px; }
+
+            /* TABLE STYLES (Focus on essential data) */
+            .table-responsive { overflow-x: auto; display: block; width: 100%; }
+            .table { width: 100%; min-width: 650px; } /* Force minimum width to enable scrolling */
+
             .table thead th {
-                padding: 3px 6px; /* Header pun rapat */
-                font-size: 11px;
+                font-size: 10px;
+                padding: 0.5rem 0.3rem;
+                white-space: nowrap;
             }
-            
-            /* Saiz teks */
-            .table tbody td strong {
-                font-size: 13px; /* Kekalkan nama agar senang dibaca sedikit */
-                display: block;
-            }
-            .table tbody td small {
-                font-size: 9px; /* Kecilkan fon nombor telefon */
-                opacity: 0.8; 
-            }
-            .table tbody td:nth-child(2) { /* Rapat lagi untuk Email & Phone */
-                white-space: nowrap; /* Elak email terputus baris */
-            }
-            
-            /* Jadikan butang Action sangat rapat dan kecil */
-            .table tbody td .btn {
-                padding: 3px 5px; /* Butang sangat kecil */
-                font-size: 9px;
-                margin-right: 1px;
-                line-height: 1; /* Rapatkan baris */
-            }
-            .table tbody td .btn i {
-                font-size: 10px; /* Saiz ikon pun kecil */
+            .table tbody td {
+                padding: 0.4rem 0.3rem;
+                font-size: 14px;
             }
 
-            /* Pastikan badge kecil */
-            .badge.rounded-pill {
-                font-size: 8px; /* Badge paling kecil */
-                padding: .1em .3em;
+            /* Adjust columns display for mobile */
+            .table tbody td:nth-child(2) { /* Email & Phone */
+                white-space: normal; /* Allow wrap for long emails */
+            }
+            .table tbody td:nth-child(5) { /* Actions */
+                white-space: nowrap; /* Keep buttons together */
+                min-width: 100px;
+            }
+            .table tbody td .btn-sm {
+                padding: 0.3rem 0.4rem;
+                font-size: 0.7rem;
             }
         }
     </style>
 </head>
 <body>
 
-<div id="overlay"></div> 
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-<div class="sidebar">
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
@@ -207,12 +160,10 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 
 <div class="main-content">
     <div class="topbar">
-        <button class="btn btn-sm btn-outline-secondary menu-toggle-btn" id="menuToggle">
-            <i class="fa fa-bars"></i>
-        </button>
+        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
         <h3>Manage User Account</h3>
         <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add New Account</button>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add Account</button>
             <div class="user-profile">
                 <span class="user-name"><?= htmlspecialchars($admin['name']) ?></span>
                 <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
@@ -272,7 +223,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                             '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
                                             '<?= htmlspecialchars(addslashes($a['role'])) ?>',
                                             '<?= htmlspecialchars(addslashes($a['status'])) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>' 
+                                            '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
                                         )">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
@@ -313,7 +264,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
-                <p class="text-muted small">This form will automatically create a **Technician** account.</p>
+                <p class="text-muted small">This form will automatically create a <strong>Technician</strong> account.</p>
                 <input type="hidden" name="role" value="Technician">
             </div>
             <div class="modal-footer">
@@ -358,8 +309,8 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                     </select>
                 </div>
                 <div id="editRemarksContainer" style="display: none;">
-                    <label for="editRemarks" class="form-label">Suspension Remarks <span class="text-danger">*</span></label>
-                    <textarea name="suspension_remarks" id="editRemarks" class="form-control" rows="3" placeholder="Reason for suspension..."></textarea>
+                     <label for="editRemarks" class="form-label">Suspension Remarks <span class="text-danger">*</span></label>
+                     <textarea name="suspension_remarks" id="editRemarks" class="form-control" rows="3" placeholder="Reason for suspension..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -369,44 +320,43 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         </form>
     </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-// --- MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL ---
-const sidebar = document.querySelector('.sidebar');
-const overlay = document.getElementById('overlay');
-const menuToggle = document.getElementById('menuToggle');
-
-// Fungsi untuk menukar keadaan sidebar
-function toggleSidebar() {
-    sidebar.classList.toggle('active');
+// --- FUNGSI JAVASCRIPT UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const overlay = document.getElementById('sidebar-overlay');
     
-    // Kawal paparan overlay
-    if (sidebar.classList.contains('active')) {
-        overlay.style.display = 'block';
-    } else {
-        overlay.style.display = 'none';
-    }
-}
+    if (toggleBtn) {
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
 
-// Apabila butang menu diklik
-menuToggle.addEventListener('click', toggleSidebar);
-
-// Tutup sidebar apabila mengklik overlay (hanya berfungsi di mobile)
-if (overlay) { 
-    overlay.addEventListener('click', toggleSidebar); 
-}
-
-// Tutup sidebar apabila mengubah saiz kepada desktop
-window.addEventListener('resize', function() {
-    if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
-        sidebar.classList.remove('active');
-        overlay.style.display = 'none';
+        toggleBtn.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+        
+        // Tutup sidebar jika pautan diklik (untuk navigasi)
+        const sidebarLinks = sidebar.querySelectorAll('a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 768) {
+                    setTimeout(() => { 
+                        sidebar.classList.remove('open');
+                        overlay.classList.remove('active');
+                    }, 100);
+                }
+            });
+        });
     }
 });
-// ------------------------------------------------
 
+
+// Function to populate and show the Edit modal
 function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     document.getElementById('editId').value = id;
     document.getElementById('editName').value = name;
@@ -510,4 +460,4 @@ document.getElementById('editAccountForm').addEventListener('submit', function(e
 </script>
 
 </body>
-</html>
+</html> 

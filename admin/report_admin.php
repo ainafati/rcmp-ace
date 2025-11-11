@@ -1,5 +1,10 @@
 <?php
-// Fungsi untuk membina query string pagination
+// PHP LOGIC (PART 1)
+session_start();
+include '../config.php';
+include_once '../logger.php'; 
+
+// Fungsi pembantu untuk membina query string pagination
 function build_pagination_query($page_param_name, $page_number) {
     $params = $_GET; // Dapatkan semua parameter URL sedia ada
     
@@ -12,27 +17,13 @@ function build_pagination_query($page_param_name, $page_number) {
         }
     }
     
-    // Pastikan nombor halaman lebih besar daripada 0
-    if ($page_number < 1) {
-        $page_number = 1;
-    }
-    
     $params[$page_param_name] = $page_number; // Tetapkan nombor halaman baru
-    
-    // Buang parameter pagination yang tidak berkaitan untuk tab aktif
-    if ($page_param_name == 'page_returns') {
-        unset($params['page_logs']);
-    } elseif ($page_param_name == 'page_logs') {
-        unset($params['page_returns']);
-    }
+    // Pastikan parameter pagination lain dibuang jika menukar tab
+    if ($page_param_name == 'page_returns' && isset($params['page_logs'])) unset($params['page_logs']);
+    if ($page_param_name == 'page_logs' && isset($params['page_returns'])) unset($params['page_returns']);
     
     return http_build_query($params); // Bina semula query string
 }
-?>
-<?php
-session_start();
-include '../config.php';
-include_once '../logger.php'; 
 
 // --- Pengesahan (pastikan admin sudah log masuk) ---
 if (!isset($_SESSION['admin_id'])) {
@@ -58,7 +49,7 @@ $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' :
 
 
 // =======================================================
-// 📦 SEKSYEN 1: LAPORAN PEMULANGAN (TAB 1)
+// --- SEKSYEN 1: LAPORAN PEMULANGAN (TAB RETURNS) ---
 // =======================================================
 $records = array();
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
@@ -68,20 +59,17 @@ $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 $items_per_page_returns = 10;
 $page_returns = isset($_GET['page_returns']) ? (int)$_GET['page_returns'] : 1;
 if ($page_returns < 1) $page_returns = 1;
-$offset_returns = ($page_returns - 1) * $items_per_page_returns;
-$total_records_returns = 0;
-$total_pages_returns = 0;
 
 // Borang ini GUNA GET
 $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-// Logik untuk menetapkan nilai bulan/tahun untuk dropdown filter (berdasarkan start_date)
+// Menetapkan nilai drop-down bulan/tahun
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
-// Bina Asas Query (sama untuk COUNT dan SELECT)
+// Query Pembinaan
 $sql_base_report = "FROM reservation_items ri
      JOIN reservations r ON ri.reserve_id = r.reserve_id
      JOIN user u ON r.user_id = u.user_id
@@ -107,10 +95,9 @@ if ($report_category_id > 0) {
 
 $sql_where_report = " WHERE " . implode(' AND ', $where_clauses_report);
 
-// 1. Query untuk COUNT (Kira Jumlah)
+// 1. Query untuk COUNT
 $stmt_count_report = $conn->prepare("SELECT COUNT(ri.id) " . $sql_base_report . $sql_where_report);
 if ($stmt_count_report) {
-    // Guna call_user_func_array untuk bind_param
     $bind_params_count = array();
     $bind_params_count[] = $param_types_report;
     for ($i = 0; $i < count($param_values_report); $i++) {
@@ -124,46 +111,47 @@ if ($stmt_count_report) {
     $stmt_count_report->close();
     
     $total_pages_returns = ceil($total_records_returns / $items_per_page_returns);
+    if ($total_pages_returns == 0) $total_pages_returns = 1;
     if ($page_returns > $total_pages_returns && $total_records_returns > 0) $page_returns = $total_pages_returns;
-    $offset_returns = ($page_returns - 1) * $items_per_page_returns; // Kira semula offset
+    $offset_returns = ($page_returns - 1) * $items_per_page_returns; 
+} else {
+    // Jika tiada rekod atau ralat, tetapkan nilai lalai
+    $total_records_returns = 0;
+    $total_pages_returns = 1;
+    $offset_returns = 0;
 }
 
-// 2. Query untuk SELECT (Dapatkan Data)
+// 2. Query untuk SELECT
 $sql_report = "SELECT 
-                u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-                ri.reserve_date, ri.return_date, ri.return_condition,
-                COALESCE(tech.name, adm.name) AS technician_name
-             " . $sql_base_report . $sql_where_report . " 
-             ORDER BY ri.return_date DESC, ri.id DESC
-             LIMIT ? OFFSET ?"; // *PEMBETULAN ORDER BY: Susun ikut tarikh pemulangan terbaru*
+                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
+                 ri.reserve_date, ri.return_date, ri.return_condition,
+                 COALESCE(tech.name, adm.name) AS technician_name
+              " . $sql_base_report . $sql_where_report . " 
+              ORDER BY ri.return_date DESC
+              LIMIT ? OFFSET ?";
 
-// Salin semula nilai parameter asal (kerana ia 'by reference' dan mungkin berubah)
-$param_values_select = array($report_start_date, $report_end_date);
-if ($report_category_id > 0) {
-    $param_values_select[] = $report_category_id;
-}
-$param_types_select = $param_types_report . "ii"; // Tambah 'integer' untuk LIMIT dan OFFSET
+$param_values_select = array_merge($param_values_report); // Salin parameter asal
+$param_types_select = $param_types_report . "ii"; 
 $param_values_select[] = $items_per_page_returns;
 $param_values_select[] = $offset_returns;
 
 $stmt_report = $conn->prepare($sql_report);
-if ($stmt_report === false) { die("SQL Error (SELECT): " . htmlspecialchars($conn->error)); }
-
-// Bina parameter untuk call_user_func_array (dengan LIMIT/OFFSET)
-$bind_params_select = array();
-$bind_params_select[] = $param_types_select;
-for ($i = 0; $i < count($param_values_select); $i++) {
-    $bind_params_select[] = &$param_values_select[$i];
+if ($stmt_report) {
+    $bind_params_select = array();
+    $bind_params_select[] = $param_types_select;
+    for ($i = 0; $i < count($param_values_select); $i++) {
+        $bind_params_select[] = &$param_values_select[$i];
+    }
+    call_user_func_array(array($stmt_report, 'bind_param'), $bind_params_select);
+    $stmt_report->execute();
+    $result_report = $stmt_report->get_result();
+    $records = $result_report->fetch_all(MYSQLI_ASSOC);
+    $stmt_report->close();
 }
-call_user_func_array(array($stmt_report, 'bind_param'), $bind_params_select);
 
-$stmt_report->execute();
-$result_report = $stmt_report->get_result();
-$records = $result_report->fetch_all(MYSQLI_ASSOC);
-$stmt_report->close();
 
 // =======================================================
-// 📋 SEKSYEN 2: LOG AKTIVITI (TAB 2)
+// --- SEKSYEN 2: LOG AKTIVITI (TAB ACTIVITY) ---
 // =======================================================
 $logs = array();
 
@@ -171,9 +159,6 @@ $logs = array();
 $items_per_page_logs = 10;
 $page_logs = isset($_GET['page_logs']) ? (int)$_GET['page_logs'] : 1;
 if ($page_logs < 1) $page_logs = 1;
-$offset_logs = ($page_logs - 1) * $items_per_page_logs;
-$total_records_logs = 0;
-$total_pages_logs = 0;
 
 $log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : date('Y-m-d');
 $log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
@@ -200,10 +185,9 @@ if (!empty($log_search)) {
 }
 $sql_where_log = " WHERE " . implode(' AND ', $where_clauses_log);
 
-// 1. Query untuk COUNT (Kira Jumlah)
+// 1. Query untuk COUNT
 $stmt_count_log = $conn->prepare("SELECT COUNT(log_id) " . $sql_base_log . $sql_where_log);
 if ($stmt_count_log) {
-    // Bina parameter untuk call_user_func_array
     $bind_params_count_log = array();
     $bind_params_count_log[] = $param_types_log;
     for ($i = 0; $i < count($param_values_log); $i++) {
@@ -215,59 +199,63 @@ if ($stmt_count_log) {
     $stmt_count_log->bind_result($total_records_logs);
     $stmt_count_log->fetch();
     $stmt_count_log->close();
+    
     $total_pages_logs = ceil($total_records_logs / $items_per_page_logs);
+    if ($total_pages_logs == 0) $total_pages_logs = 1;
     if ($page_logs > $total_pages_logs && $total_records_logs > 0) $page_logs = $total_pages_logs;
-    $offset_logs = ($page_logs - 1) * $items_per_page_logs; // Kira semula offset
+    $offset_logs = ($page_logs - 1) * $items_per_page_logs; 
+} else {
+    $total_records_logs = 0;
+    $total_pages_logs = 1;
+    $offset_logs = 0;
 }
 
-// 2. Query untuk SELECT (Dapatkan Data)
+
+// 2. Query untuk SELECT
 $sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address 
-             " . $sql_base_log . $sql_where_log . " 
-             ORDER BY timestamp DESC 
-             LIMIT ? OFFSET ?"; // Susun ikut timestamp DESC (terbaru di atas)
+              " . $sql_base_log . $sql_where_log . " 
+              ORDER BY timestamp DESC
+              LIMIT ? OFFSET ?"; // Order by DESC untuk log terbaru di atas
 
-// Salin semula nilai parameter (sama seperti di atas)
-$param_values_select_log = array($log_start_date, $end_date_sql);
-if (!empty($log_user_type)) {
-    $param_values_select_log[] = $log_user_type;
-}
-if (!empty($log_search)) {
-    $param_values_select_log[] = $search_like;
-    $param_values_select_log[] = $search_like;
-}
-
-$param_types_select_log = $param_types_log . "ii"; // Tambah 'integer' untuk LIMIT dan OFFSET
+$param_values_select_log = array_merge($param_values_log); // Salin parameter asal
+$param_types_select_log = $param_types_log . "ii"; 
 $param_values_select_log[] = $items_per_page_logs;
 $param_values_select_log[] = $offset_logs;
 
 $stmt_log = $conn->prepare($sql_log);
-if ($stmt_log === false) { die("SQL Error (Log SELECT): " . htmlspecialchars($conn->error)); }
-
-// Bina parameter untuk call_user_func_array (dengan LIMIT/OFFSET)
-$bind_params_select_log = array();
-$bind_params_select_log[] = $param_types_select_log;
-for ($i = 0; $i < count($param_values_select_log); $i++) {
-    $bind_params_select_log[] = &$param_values_select_log[$i];
+if ($stmt_log) {
+    $bind_params_select_log = array();
+    $bind_params_select_log[] = $param_types_select_log;
+    for ($i = 0; $i < count($param_values_select_log); $i++) {
+        $bind_params_select_log[] = &$param_values_select_log[$i];
+    }
+    call_user_func_array(array($stmt_log, 'bind_param'), $bind_params_select_log);
+    $stmt_log->execute();
+    $result_log = $stmt_log->get_result();
+    $logs = $result_log->fetch_all(MYSQLI_ASSOC);
+    $stmt_log->close();
 }
-call_user_func_array(array($stmt_log, 'bind_param'), $bind_params_select_log);
 
-$stmt_log->execute();
-$result_log = $stmt_log->get_result();
-$logs = $result_log->fetch_all(MYSQLI_ASSOC);
-$stmt_log->close();
+$conn->close();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <title>System Reports — UniKL Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden;}
+        
+        /* DESKTOP STYLES */
+        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
+        .sidebar-overlay.active { display: block; }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
         .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
@@ -276,7 +264,7 @@ $stmt_log->close();
         .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
+        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .topbar .admin-profile { display: flex; align-items: center; gap: 12px; }
@@ -322,10 +310,81 @@ $stmt_log->close();
         .pagination .page-item.disabled .page-link {
             color: #94a3b8;
         }
+
+        /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+        #sidebar-toggle-btn {
+            display: none; /* Default: hide on desktop */
+            background: none;
+            border: none;
+            color: #334155;
+            font-size: 20px;
+            padding: 0;
+            margin-right: 15px;
+        }
+
+        @media (max-width: 768px) {
+            /* GENERAL LAYOUT */
+            #sidebar-toggle-btn { display: block; }
+            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; width: 100%; }
+            .topbar { padding: 10px 15px; justify-content: flex-start; } 
+            .topbar h3 { font-size: 16px; flex-grow: 1; }
+            .topbar .admin-name { display: none; }
+            .topbar .admin-profile { margin-left: auto; }
+            .container-fluid { padding: 10px 5px; }
+            .card { padding: 15px; margin-bottom: 15px; }
+            
+            /* TABS */
+            .nav-tabs .nav-link { padding: 10px 12px; font-size: 14px; }
+
+            /* FILTER FORMS */
+            #reportForm .row, #logForm .row { 
+                --bs-gutter-x: 0.5rem; /* Kurangkan padding sisi */
+            }
+            #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6, 
+            #logForm .col-md-3 {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+            .form-label { font-size: 14px; }
+            
+            /* TABLES */
+            .table-responsive { overflow-x: auto; display: block; width: 100%; }
+            .table { width: 100%; min-width: 650px; } /* Force minimum width to enable scrolling */
+            
+            .table thead th {
+                font-size: 10px;
+                padding: 0.5rem 0.3rem;
+                white-space: nowrap;
+            }
+            .table tbody td {
+                padding: 0.4rem 0.3rem;
+                font-size: 14px;
+            }
+            /* Export buttons layout */
+            .d-flex.justify-content-between.align-items-center.mb-3 {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 10px;
+            }
+            .d-flex.justify-content-between.align-items-center.mb-3 > div, 
+            .d-flex.justify-content-between.align-items-center.mb-3 > a,
+            .d-flex.justify-content-between.align-items-center.mb-3 > div a {
+                width: 100%;
+                text-align: center;
+            }
+            .d-flex.justify-content-between.align-items-center.mb-3 > div a:first-child {
+                margin-bottom: 5px;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="sidebar">
+
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
@@ -333,13 +392,14 @@ $stmt_log->close();
         </div>
         <a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-		<a href="report_admin.php" class="active"><i class="fa-solid fa-chart-pie"></i> System Report</a>
-	</div>
+        <a href="report_admin.php" class="active"><i class="fa-solid fa-chart-pie"></i> System Report</a>
+    </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
 <div class="main-content">
     <div class="topbar">
+        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
         <h3>System Reports</h3>
         <div class="admin-profile">
             <span class="admin-name"><?= htmlspecialchars($admin['name']) ?></span>
@@ -382,9 +442,7 @@ $stmt_log->close();
                                     <?php for ($m = 1; $m <= 12; $m++) {
                                         $month_name = date('F', mktime(0, 0, 0, $m, 1));
                                         $selected = ($m == $current_month) ? 'selected' : '';
-                                        // Padding bulan dengan 0 jika kurang dari 10
-                                        $month_value = str_pad($m, 2, '0', STR_PAD_LEFT);
-                                        echo "<option value='$month_value' $selected>$month_name</option>";
+                                        echo "<option value='$m' $selected>$month_name</option>";
                                     } ?>
                                 </select>
                             </div>
@@ -432,10 +490,10 @@ $stmt_log->close();
                         <h5 class="mb-0">Returned Items (<?= $total_records_returns ?> records found)</h5>
                         <div>
                             <a href="generate_pdf_admin.php?start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i>Export as PDF</a>
-							<a href="export_excel.php?export=returns&start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-success">
-							<i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
-						</a>                       
-					   </div>
+                            <a href="export_excel.php?export=returns&start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-success">
+                            <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
+                        </a>                    
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
@@ -528,16 +586,16 @@ $stmt_log->close();
                         </div>
                     </form>
                     
-			<hr class="my-4">
+                    <hr class="my-4">
 
-			<div class="d-flex justify-content-between align-items-center mb-3">
-			<h5 class="mb-0">Log Records (<?= $total_records_logs ?> records found)</h5>
-    
-			<a href="export_excel.php?export=activity&log_start_date=<?= urlencode($log_start_date) ?>&log_end_date=<?= urlencode($log_end_date) ?>&user_type=<?= urlencode($log_user_type) ?>&search=<?= urlencode($log_search) ?>" target="_blank" class="btn btn-success">
-				<i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
-			</a>
-			</div>
-				   <div class="table-responsive">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Log Records (<?= $total_records_logs ?> records found)</h5>
+        
+                    <a href="export_excel.php?export=activity&log_start_date=<?= urlencode($log_start_date) ?>&log_end_date=<?= urlencode($log_end_date) ?>&user_type=<?= urlencode($log_user_type) ?>&search=<?= urlencode($log_search) ?>" target="_blank" class="btn btn-success">
+                        <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
+                    </a>
+                    </div>
+                       <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
@@ -594,9 +652,49 @@ $stmt_log->close();
                 </div>
             </div>
 
-        </div> </div> </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        </div> 
+    </div> 
+</div> 
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+    // --- JS UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('admin-sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle-btn');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        if (toggleBtn) {
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            }
+
+            toggleBtn.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', toggleSidebar);
+            
+            // Tutup sidebar jika pautan diklik (untuk navigasi)
+            const sidebarLinks = sidebar.querySelectorAll('a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        // Tambah sedikit kelewatan untuk membolehkan navigasi berlaku
+                        setTimeout(() => { 
+                            sidebar.classList.remove('open');
+                            overlay.classList.remove('active');
+                        }, 100);
+                    }
+                });
+            });
+        }
+        
+        // --- BLOK KOD YANG MENYEBABKAN MASALAH TELAH DIBUANG ---
+        // Kod yang cuba .click() tab (returnsTab / activityTab) telah dipadam
+        // Kerana PHP anda sudah mengendalikan tab 'active' dengan betul.
+        // ---
+    });
+
     // --- JS UNTUK TAB 1 (RETURNED ITEMS) ---
     flatpickr("#start_date", { dateFormat: "Y-m-d" });
     flatpickr("#end_date", { dateFormat: "Y-m-d" });
@@ -604,9 +702,6 @@ $stmt_log->close();
     var monthFilter = document.getElementById('month_filter');
     var yearFilter = document.getElementById('year_filter');
     var categoryFilter = document.getElementById('category_filter');
-    // var reportForm = document.getElementById('reportForm'); // Tidak diperlukan lagi
-    var startDateInput = document.getElementById('start_date');
-    var endDateInput = document.getElementById('end_date');
     
     function updateAndSubmit() {
         var year = yearFilter.value;
@@ -615,23 +710,21 @@ $stmt_log->close();
         // Cipta objek URLSearchParams untuk kekalkan filter lain
         var params = new URLSearchParams(window.location.search);
         
-        // Kira tarikh mula dan akhir bulan yang dipilih
+        // Tetapkan tarikh
         var startDate = new Date(year, month - 1, 1);
-        var endDate = new Date(year, month, 0); // Hari ke-0 bulan berikutnya adalah hari terakhir bulan ini
+        var endDate = new Date(year, month, 0);
         
         var formatDate = function(date) {
             var y = date.getFullYear();
-            var m = ('0' + (date.getMonth() + 1)).slice(-2); // Bulan bermula dari 0
+            // Pembetulan: Pastikan concatenation menggunakan '+'
+            var m = ('0' + (date.getMonth() + 1)).slice(-2); 
             var d = ('0' + date.getDate()).slice(-2);
             return y + '-' + m + '-' + d;
         };
-        
-        var newStartDate = formatDate(startDate);
-        var newEndDate = formatDate(endDate);
 
-        // Set nilai pada URL params. Ini adalah penting untuk PHP mengambil data
-        params.set('start_date', newStartDate);
-        params.set('end_date', newEndDate);
+        // Set nilai pada URL params
+        params.set('start_date', formatDate(startDate));
+        params.set('end_date', formatDate(endDate));
         params.set('category_id', categoryFilter.value); // Ambil nilai kategori juga
         params.set('tab', 'returns'); // Pastikan tab betul
         params.delete('page_returns'); // Reset ke halaman 1 bila filter
@@ -644,7 +737,7 @@ $stmt_log->close();
     if (monthFilter) monthFilter.addEventListener('change', updateAndSubmit);
     if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
     if (categoryFilter) categoryFilter.addEventListener('change', updateAndSubmit);
-    
+
     // --- JS UNTUK TAB 2 (ACTIVITY LOG) ---
     flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
     flatpickr("#log_end_date", { dateFormat: "Y-m-d" });

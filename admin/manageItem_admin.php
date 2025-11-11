@@ -374,158 +374,195 @@ $item_details = $conn->query("
     GROUP BY i.item_id
     ORDER BY i.item_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
-
-// Tutup sambungan jika tidak digunakan lagi di bahagian HTML
-// $conn->close(); 
-// Biarkan terbuka jika HTML di bawah perlukannya.
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>Manage Inventory — UniKL Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"> 
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-    body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-    
-    /* Desktop Sidebar Style */
-    .sidebar { 
-        width: 250px; 
-        position: fixed; 
-        top: 0; 
-        bottom: 0; 
-        left: 0; 
-        background: #ffffff; 
-        padding: 20px; 
-        border-right: 1px solid #e5e7eb; 
-        z-index: 1000; 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: space-between; 
-        transition: transform 0.3s ease-in-out; 
-    }
-    .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-    .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-    .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-    .logo-text span { font-size: 12px; color: #94a3b8; }
-    .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-    .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-    .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-    .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-    
-    /* Desktop Main Content Style */
-    .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
-    
-    .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 999; }
-    .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
-    .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-    .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
-    .container-fluid { padding: 30px; }
-    .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-    .card h5, .modal-title { font-weight: 600; color: #1e293b; }
-    .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-    .table tbody td { border-bottom: 1px solid #f1f5f9; }
-    .table tbody tr:last-child td { border-bottom: none; }
-    .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-    .form-label { font-weight: 500; color: #334155; }
-    .form-control, .form-select { border-radius: 8px; }
-    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-    .btn-primary { background-color: #3b82f6; border: none; }
-    .btn-primary:hover { background-color: #2563eb; }
-    .category-img-sm { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-right: 15px; }
-    
-    /* Mobile Specific Styles */
-    .menu-toggle-btn { display: none; } /* Sembunyikan pada desktop */
-    
-    @media (max-width: 992px) {
-        /* Mobile Sidebar */
-        .sidebar { 
-            transform: translateX(-250px); 
-            left: 0;
-            width: 250px;
-        }
-        .sidebar.active {
-            transform: translateX(0); 
+    <style>
+        body { 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            background-color: #f8fafc; 
+            color: #334155; 
+            min-height: 100vh; 
+            overflow-x: hidden; 
         }
         
-        /* Mobile Main Content */
+        /* CSS Sidebar (Desktop View) */
+        .sidebar { 
+            width: 250px; 
+            position: fixed; 
+            top: 0; 
+            bottom: 0; 
+            left: 0; 
+            background: #ffffff; 
+            padding: 20px; 
+            border-right: 1px solid #e5e7eb; 
+            z-index: 1000; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            transition: transform 0.3s ease; 
+        }
+        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
+        .logo-text span { font-size: 12px; color: #94a3b8; }
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
+        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
+        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
+        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
+        
+        /* CSS Main Content (Desktop View) */
         .main-content { 
-            margin-left: 0; 
-            width: 100%;
+            margin-left: 250px; 
+            transition: margin-left 0.3s ease;
         }
-        .topbar {
-            padding: 10px 15px;
+        .topbar { 
+            background: #ffffff; 
+            padding: 15px 30px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #e5e7eb; 
         }
-        .topbar h3 {
-            font-size: 18px;
+        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
+        .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
+        .container-fluid { padding: 30px; }
+        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        
+        /* Gaya Umum Jadual */
+        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+        .table tbody td { border-bottom: 1px solid #f1f5f9; }
+        
+        /* Gaya Button Actions (Desktop - Kekal Sebaris) */
+        .table td.action-cell {
+            white-space: nowrap; 
+            padding-right: 10px;
+            padding-left: 10px;
         }
-        .topbar .user-profile {
-            gap: 8px;
+        .table td.action-cell .btn {
+            padding: 0.5rem 0.8rem; 
+            font-size: 0.85rem; 
+            margin-right: 2px; 
+            display: inline-block;
         }
-        .topbar .user-name {
-            display: none; 
-        }
+        .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
 
-        /* Show Toggle Button */
-        .menu-toggle-btn { 
-            display: inline-block; 
-            order: -1; 
+        /* --- CSS MOBILE VIEW --- */
+        #sidebar-toggle-btn {
+            display: none; /* Sembunyi secara default */
+            background: none;
+            border: none;
+            color: #334155;
+            font-size: 20px;
+            padding: 0;
+            margin-right: 15px;
         }
-
-        /* Full width for forms and tables */
-        .container-fluid {
-            padding: 15px;
-        }
-        .card {
-            padding: 15px;
-        }
-
-        /* Table Responsiveness: Allow Horizontal Scroll */
-        .table-responsive {
-            overflow-x: auto;
-        }
-        .table {
-            min-width: 600px; 
-        }
-        .btn {
-            padding: 8px 12px;
-            font-size: 14px;
-        }
-		#overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5); /* Hitam 50% lutsinar */
-    z-index: 999; /* Di bawah sidebar (1000), tetapi di atas topbar (999) */
-    display: none; /* Sembunyikan secara lalai */
+        
+        @media (max-width: 768px) {
+            #sidebar-toggle-btn {
+                display: block; 
+            }
+            
+            /* Sidebar */
+            .sidebar {
+                transform: translateX(-100%); 
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+                z-index: 1050; 
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0; 
+                width: 100%;
+            }
+            
+            /* Topbar - KEKALKAN TAJUK */
+            .topbar {
+                padding: 10px 15px;
+                justify-content: space-between;
+            }
+            .topbar .d-flex:first-child h3 {
+                display: block; /* Kekalkan Tajuk */
+                font-size: 16px; 
+                margin-right: auto;
+            }
+.topbar .user-profile {
+    /* display: none; */ /* Komenkan baris ini */
+    display: flex; /* Tukar kepada flex untuk memastikan ikon dan nama dipaparkan */
+    font-size: 14px; /* Laraskan saiz font supaya muat */
 }
+.topbar .user-profile .user-name {
+     /* Sembunyikan nama, kekalkan ikon sahaja jika ruang tak cukup */
+     display: none;
+}            
+            /* Pelarasan Content & Cards */
+            .container-fluid {
+                padding: 10px 5px; /* Kurangkan padding keseluruhan */
+            }
+            .card {
+                padding: 15px; 
+                margin-bottom: 15px;
+            }
+            
+            /* JADUAL PADAT */
+            .table thead th {
+                font-size: 10px; 
+                padding: 0.5rem 0.3rem; 
+            }
+            .table tbody td {
+                padding: 0.4rem 0.3rem;
+            }
+            
+            /* BADGE PADAT */
+            .badge.rounded-pill {
+                padding: .3em .6em; 
+                font-size: 0.75rem;
+                display: block; 
+                width: 100%;
+            }
 
-.sidebar {
-    /* ... kod sedia ada ... */
-    z-index: 1001; /* Pastikan ia lebih tinggi daripada overlay (999) */ 
-    /* ... kod sedia ada ... */
-}
-
-/* KEMAS KINI DI DALAM @media (max-width: 992px) */
-@media (max-width: 992px) {
-    /* ... kod sedia ada ... */
-    
-    /* Tambah ini di akhir @media block */
-    .sidebar.active ~ #overlay {
-        display: block; /* Tunjukkan overlay apabila sidebar aktif */
-    }
-	
-    }
-</style>
+            /* BUTANG ACTIONS MENEGAK */
+            .table td.action-cell {
+                white-space: normal; /* Benarkan butang turun baris */
+                padding-right: 0px; 
+                padding-left: 0px; 
+                text-align: center; /* Butang di tengah sel */
+                width: 50px; 
+            }
+            .table td.action-cell .btn {
+                padding: 0.3rem 0.4rem; /* Padding butang minimum */
+                font-size: 0.7rem;      /* Font butang sangat kecil */
+                margin: 1px auto; /* Margin menegak di antara butang */
+                display: block; /* MESTI 'block' untuk susunan menegak */
+                width: 80%; 
+            }
+            /* Sembunyikan kolum Kategori di mobile untuk jimat ruang */
+            /* Kolum kedua adalah Category */
+            .table tbody td:nth-child(2) {
+                display: none; 
+            }
+            /* Ubah struktur Item Type di kolum pertama untuk masukkan Category (sebab kolum kedua disembunyi) */
+            .table tbody td:first-child {
+                max-width: 150px;
+                white-space: normal;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
@@ -540,10 +577,11 @@ $item_details = $conn->query("
 
 <div class="main-content">
     <div class="topbar">
-        <button class="btn btn-sm btn-outline-secondary menu-toggle-btn" id="menuToggle">
-            <i class="fa fa-bars"></i>
-        </button>
-        <h3>Inventory Management</h3>
+        <div class="d-flex align-items-center">
+             <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
+            <h3>Inventory Management</h3>
+        </div>
+        
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
             <div class="user-profile">
@@ -557,7 +595,7 @@ $item_details = $conn->query("
 
     <div class="container-fluid">
         <div class="row g-4">
-            <div class="col-12 col-lg-4">
+            <div class="col-lg-4">
                 <div class="card shadow-sm p-4 mb-4">
                     <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
                     <p class="text-muted small">Create a new item type and add initial stock in one step.</p>
@@ -582,7 +620,7 @@ $item_details = $conn->query("
                             <label class="form-label">Description</label>
                             <textarea name="description" class="form-control" rows="2"></textarea>
                         </div>
-                        <h6 class="mt-4">B. Item Details (Optional)</h6>
+                        <h6 class="mt-4">B. Bulk Unit Details (Optional)</h6>
                         <hr class="mt-1">
                         <div class="mb-3">
                             <label class="form-label">Brand</label>
@@ -603,26 +641,30 @@ $item_details = $conn->query("
                     </form>
                 </div>
             </div>
-            <div class="col-12 col-lg-8">
+            <div class="col-lg-8">
                 <div class="card h-100">
                     <h5><i class="fa fa-list-check me-2 text-primary"></i> Item Type Summary</h5>
                     <p class="text-muted small">Overview of all item types. Click <i class="fa fa-eye"></i> to view individual units.</p>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
-                            <thead><tr><th>Item Type</th><th>Category</th><th class="text-center">Total</th><th class="text-center">Available</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Item Type</th><th class="d-none d-sm-table-cell">Category</th><th class="text-center">Total</th><th class="text-center">Available</th><th>Actions</th></tr></thead>
                             <tbody>
                             <?php if (empty($item_details)): ?>
                                 <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-box-open fa-2x mb-2"></i><br>No items found. Add one using the form.</td></tr>
                             <?php else: foreach($item_details as $item): ?>
                                 <tr>
-                                    <td><strong><?= htmlspecialchars($item['item_name']) ?></strong></td>
-                                    <td><?= htmlspecialchars($item['category_name']) ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($item['item_name']) ?></strong>
+                                        <span class="d-block d-sm-none text-muted small">(<?= htmlspecialchars($item['category_name']) ?>)</span>
+                                    </td>
+                                    <td class="d-none d-sm-table-cell"><?= htmlspecialchars($item['category_name']) ?></td>
+                                    
                                     <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-success"><?= $item['available_units'] ?></span></td>
-                                    <td>
-                                        <a href="view_assets.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
-                                        <button class="btn btn-sm btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
+                                    <td class="action-cell">
+                                        <a href="view_assets.php?item_id=<?= $item['item_id'] ?>" class="btn btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
+                                        <button class="btn btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; endif; ?>
@@ -644,7 +686,7 @@ $item_details = $conn->query("
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <div class="col-12 col-md-5">
+                    <div class="col-md-5">
                         <h6>Add New Category</h6>
                         <hr>
                         <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
@@ -660,7 +702,7 @@ $item_details = $conn->query("
                             <button type="submit" class="btn btn-primary w-100">Add Category</button>
                         </form>
                     </div>
-                    <div class="col-12 col-md-7">
+                    <div class="col-md-7">
                         <h6>Existing Categories</h6>
                         <hr>
                         <div class="list-group" style="max-height: 300px; overflow-y: auto;">
@@ -668,9 +710,9 @@ $item_details = $conn->query("
                                 <p class="text-center text-muted">No categories found.</p>
                             <?php else: foreach($categories as $cat): ?>
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
+                                    <div>
                                         <?php if (!empty($cat['image_url'])): ?>
-                                            <img src="../<?= htmlspecialchars($cat['image_url']) ?>" class="category-img-sm" alt="Category Image">
+                                            <img src="../<?= htmlspecialchars($cat['image_url']) ?>" class="category-img-sm" alt="">
                                         <?php endif; ?>
                                         <span><?= htmlspecialchars($cat['category_name']) ?></span>
                                     </div>
@@ -718,59 +760,41 @@ $item_details = $conn->query("
     </div>
 </div>
 
-
-<div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">
+<div class="modal fade" id="editItemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editItemModalLabel"><i class="fa fa-edit me-2"></i> Edit Item Type</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="post" action="manageItem_admin.php">
+            <div class="modal-header"><h5 class="modal-title">Edit Item Type</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
 
-                    <h6>A. Item Type Information</h6>
-                    <hr class="mt-1">
-                    <div class="mb-3">
-                        <label for="edit_item_name" class="form-label">Item Type Name</label>
-                        <input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_category_id_select" class="form-label">Category</label>
+                    <h6>Item Details</h6>
+                    <div class="mb-3"><label class="form-label">Item Name</label><input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Category</label>
                         <select id="edit_category_id_select" name="edit_category_id" class="form-select" required>
-                            <option value="">Select Category</option>
-                            <?php foreach($categories as $cat): ?>
-                            <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
-                            <?php endforeach; ?>
+                            <?php foreach($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option><?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="edit_description" class="form-label">Description</label>
-                        <textarea id="edit_description" name="edit_description" class="form-control" rows="2"></textarea>
-                    </div>
+                    <div class="mb-3"><label class="form-label">Description</label><textarea id="edit_description" name="edit_description" class="form-control" rows="2"></textarea></div>
 
-                    <h6 class="mt-4">B. Add New Units (Optional)</h6>
-                    <hr class="mt-1">
-                    <p class="text-muted small">Use this section **ONLY** if you want to add more stock of this item.</p>
+                    <hr>
+                    <h6 class="mt-3">Add More Units (Optional)</h6>
+                    <p class="small text-muted">Fill this section only if you want to add new stock for this item.</p>
                     <div class="mb-3">
-                        <label for="edit_item_quantity" class="form-label">Number of New Units to Add</label>
-                        <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0">
+                        <label class="form-label">Number of New Units to Add</label>
+                        <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
                     </div>
                     <div class="mb-3">
-                        <label for="edit_item_brand" class="form-label">Brand (for new units)</label>
-                        <input type="text" id="edit_item_brand" name="batch_brand" class="form-control">
+                        <label class="form-label">Brand for New Units</label>
+                        <input type="text" id="edit_item_brand" name="batch_brand" class="form-control" placeholder="e.g., Dell">
                     </div>
                     <div class="mb-3">
-                        <label for="edit_item_model" class="form-label">Model (for new units)</label>
-                        <input type="text" id="edit_item_model" name="batch_model" class="form-control">
+                        <label class="form-label">Model for New Units</label>
+                        <input type="text" id="edit_item_model" name="batch_model" class="form-control" placeholder="e.g., Latitude 5420">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa fa-save me-2"></i> Save Changes</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
         </div>
     </div>
@@ -779,12 +803,49 @@ $item_details = $conn->query("
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // --- FUNGSI JAVASCRIPT UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('admin-sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle-btn');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        if (toggleBtn) {
+            // Fungsi untuk buka/tutup sidebar
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            }
+
+            // Pasang event listeners
+            toggleBtn.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', toggleSidebar);
+            
+            // Tutup sidebar apabila pautan diklik (untuk mobile experience yang lebih baik)
+            const sidebarLinks = sidebar.querySelectorAll('a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    // Semak jika dalam mobile view (lebar kurang dari 768px)
+                    if (window.innerWidth <= 768) {
+                        setTimeout(() => { // Tunda sedikit supaya link sempat diproses
+                            sidebar.classList.remove('open');
+                            overlay.classList.remove('active');
+                        }, 100);
+                    }
+                });
+            });
+        }
+    });
+
+    // --- 1. HANDLE NOTIFICATION TOAST (SweetAlert2) ---
     <?php
+    // Memaparkan mesej (Success/Error) selepas redirect
     if (isset($_SESSION['message'])) {
         $message = $_SESSION['message'];
+        // Pastikan teks diletakkan dalam petikan bagi string JS
+        $message_text_js = str_replace("'", "\'", $message['text']);
         echo "Swal.fire({
             icon: '{$message['type']}',
-            title: '{$message['text']}',
+            title: '{$message_text_js}', 
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
@@ -795,75 +856,52 @@ $item_details = $conn->query("
     }
     ?>
 
-// 1. MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('overlay');
-    const menuToggle = document.getElementById('menuToggle');
-
-    // Fungsi untuk menukar keadaan sidebar
-    function toggleSidebar() {
-        sidebar.classList.toggle('active');
-        // Nota: CSS kini mengendalikan paparan/sembunyi overlay secara automatik
-        // melalui selector `.sidebar.active ~ #overlay`
-    }
-
-    // Apabila butang menu diklik
-    menuToggle.addEventListener('click', toggleSidebar);
-	
-	// Tutup sidebar apabila mengklik overlay (hanya berfungsi di mobile)
-    overlay.addEventListener('click', function() {
-        if (sidebar.classList.contains('active')) {
-            toggleSidebar();
-        }
-    });
-
-    // Tambahan: Tutup sidebar apabila mengubah saiz kepada desktop
-    window.addEventListener('resize', function() {
-        if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
-            sidebar.classList.remove('active');
-        }
-    });
-	
+    // --- 2. FUNGSI EDIT KATEGORI (Membuka Modal) ---
     function openEditCategoryModal(category) {
         document.getElementById('edit_category_id').value = category.category_id;
         document.getElementById('edit_category_name').value = category.category_name;
         
         var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
         
-        // Hide the main category modal before showing the edit modal
+        // Sembunyikan modal utama sebelum memaparkan modal edit
         var mainModalEl = document.getElementById('categoryModal');
         var mainModal = bootstrap.Modal.getInstance(mainModalEl);
         if (mainModal) {
             mainModal.hide();
         }
         
-        // Ensure the edit modal shows up properly
+        // Paparkan modal edit
         editModal.show();
     }
 
+    // --- 3. FUNGSI PADAM KATEGORI (SweetAlert Confirmation) ---
     function deleteCategory(id, name) {
         Swal.fire({
             title: `Delete '${name}'?`,
-            text: "This action cannot be undone!",
+            text: "This action cannot be undone. Items under this category might prevent deletion.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
+                // Redirect ke skrip PHP untuk tindakan padam
                 window.location.href = 'manageItem_admin.php?delete_category_id=' + id;
             }
         });
     }
 
+    // --- 4. FUNGSI EDIT ITEM (Membuka Modal) ---
     function openEditItemModal(item) {
         // Isi butiran item sedia ada
         document.getElementById('edit_item_id').value = item.item_id;
         document.getElementById('edit_item_name').value = item.item_name;
+        // Pilih kategori yang betul
         document.getElementById('edit_category_id_select').value = item.category_id;
         document.getElementById('edit_description').value = item.description;
 
-        // Kosongkan dan tetapkan semula medan untuk stok baru
+        // Kosongkan dan tetapkan semula medan untuk stok baru (penting)
         document.getElementById('edit_item_quantity').value = 0;
         document.getElementById('edit_item_brand').value = '';
         document.getElementById('edit_item_model').value = '';
@@ -871,16 +909,19 @@ $item_details = $conn->query("
         new bootstrap.Modal(document.getElementById('editItemModal')).show();
     }
 
+    // --- 5. FUNGSI PADAM ITEM (SweetAlert Confirmation) ---
     function deleteItem(id, name) {
         Swal.fire({
             title: `Delete '${name}' and all its units?`,
             text: "This will permanently delete the item type AND all of its associated asset units. This action cannot be undone!",
-            icon: 'warning',
+            icon: 'error', // Guna 'error' atau 'warning' untuk tindakan serius
             showCancelButton: true,
             confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d',
             confirmButtonText: 'Yes, delete everything!'
         }).then((result) => {
             if (result.isConfirmed) {
+                // Redirect ke skrip PHP untuk tindakan padam
                 window.location.href = 'manageItem_admin.php?delete_item_id=' + id;
             }
         });

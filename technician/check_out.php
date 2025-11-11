@@ -20,29 +20,6 @@ $stmt_tech->close();
 // Get single date filter data from URL (GET)
 $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_GET['filter_date'] : null;
 
-function get_reservation_item_count($conn, $status) {
-    // Hanya kira item yang berstatus 'Pending'
-    $sql = "SELECT COUNT(id) AS count 
-            FROM reservation_items 
-            WHERE status = ?";
-    
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        error_log("Prepare failed: (" . $conn->errno . ") " . $conn->error);
-        return 0;
-    }
-    
-    $stmt->bind_param("s", $status);
-    $stmt->execute();
-    $result = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    
-    return $result ? (int) $result['count'] : 0;
-}
-
-// Dapatkan kiraan yang diperlukan untuk dashboard
-$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
-
 
 // Fetch Data By Status
 // ✨ FUNGSI INI DIKEMAS KINI UNTUK PRIORITY ✨
@@ -140,7 +117,7 @@ function create_request_table($requests) {
         if ($status == 'returned') $badgeClass = 'text-bg-success';
         if ($status == 'cancelled') $badgeClass = 'text-bg-secondary';
 
-        $priority = isset($row['priority']) ? $row['priority'] : 3; // <-- BARIS 121 (INI KOD YANG DIBETULKAN)
+        $priority = isset($row['priority']) ? $row['priority'] : 3; 
         $priority_text = 'Low Priority';        $priority_class = 'text-bg-info'; // Guna 'info' untuk rendah
         if ($priority == 1) { $priority_text = 'High Priority'; $priority_class = 'text-bg-danger'; }
         if ($priority == 2) { $priority_text = 'Moderate Priority'; $priority_class = 'text-bg-warning'; }
@@ -178,6 +155,7 @@ function create_request_table($requests) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician - Manage Requests</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -194,18 +172,7 @@ function create_request_table($requests) {
         .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        /* 5. SIDEBAR BADGE STYLE (Penambahan) */
-.sidebar a .badge {
-    margin-left: auto; /* Tolak badge ke kanan */
-    font-size: 0.75rem;
-    padding: 0.4em 0.6em;
-    font-weight: 700;
-    border-radius: 10px;
-    background-color: #ef4444; /* Merah untuk menarik perhatian */
-    color: white;
-}
-
-		.main-content { margin-left: 250px; }
+        .main-content { margin-left: 250px; }
         .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
         .topbar h3 { font-weight: 600; color: #1e293b; margin: 0; font-size: 22px; }
         .container-fluid { padding: 30px; }
@@ -224,89 +191,56 @@ function create_request_table($requests) {
         .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
         .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
         .dataTables_info { font-size: 0.9rem; color: #64748b; padding-top: 0.5rem !important; }
-    /* --- KOD MOBILE VIEW (RESPONSIF) MULA --- */
 
-@media (max-width: 992px) {
-    .sidebar {
-        /* Sembunyikan secara lalai (guna transformasi) */
-        transform: translateX(-100%);
-        transition: transform 0.3s ease-in-out;
-        width: 280px;
-        display: block; /* Kekalkan sebagai block untuk di-toggle */
-        position: fixed; /* Kekalkan ini walaupun ia sudah ada */
-        z-index: 1000;
-    }
-
-    /* Kelas baru untuk mobile yang AKTIF */
-    .sidebar.active {
-        transform: translateX(0);
-        box-shadow: 4px 0 10px rgba(0,0,0,0.1);
-    }
-
-    /* Main content guna 100% lebar skrin, tiada margin kiri */
-    .main-content {
-        margin-left: 0;
-    }
-    
-    /* Tambah padding di atas untuk memberi ruang kepada topbar fixed */
-    body {
-        padding-top: 70px;
-    }
-
-    /* Jadikannya fixed di atas */
-    .topbar {
-        position: fixed; 
-        top: 0; 
-        left: 0; 
-        right: 0;
-        z-index: 999;
-        padding: 15px 20px;
-    }
-    .topbar h3 {
-        font-size: 20px;
-        margin-left: 15px; /* Jarakkan dari toggle button */
-        flex-grow: 1; /* Biar ia ambil ruang */
-    }
-    .topbar .d-flex {
-        gap: 12px;
-    }
-    /* Tunjukkan toggle menu di mobile */
-    .menu-toggle {
-        display: block !important; 
-        font-size: 24px;
-        cursor: pointer;
-        color: #334155;
-    }
-
-    /* Laraskan padding container */
-    .container-fluid {
-        padding: 20px;
-    }
-    
-    /* Jadual: Pastikan scrollable secara mendatar */
-    .table-responsive {
-        overflow-x: auto;
-    }
-}
-/* --- KOD MOBILE VIEW (RESPONSIF) TAMAT --- */
-	
-	</style>
+        /* ADDED FOR MOBILE RESPONSIVENESS */
+        @media (max-width: 991.98px) {
+            .sidebar {
+                left: -250px; 
+                transition: left 0.3s ease-in-out;
+                z-index: 1050; 
+                box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+            }
+            .sidebar.toggled {
+                left: 0;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .topbar {
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+            }
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1040;
+                display: none;
+            }
+            .sidebar-overlay.active {
+                display: block;
+            }
+        }
+        .btn.d-lg-none {
+            border: none;
+        }
+    </style>
 </head>
 <body>
 
-<div class="sidebar" id="offcanvasSidebar">
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
+<div class="sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><span>Dashboard</span></div>
         </div>
-        <a href="dashboard_tech.php" ><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php" class="active">
-            <i class="fa-solid fa-dolly"></i> Manage Requests
-            <?php if ($pending_count_for_badge > 0): ?>
-                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
-            <?php endif; ?>
-        </a>
+        <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
+        <a href="check_out.php" class="active"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
         <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
@@ -315,7 +249,10 @@ function create_request_table($requests) {
 
 <div class="main-content">
     <div class="topbar">
-        <h3>Manage Requests</h3>
+        <div class="d-flex align-items-center">
+            <button class="btn d-lg-none me-3" id="sidebarToggle"><i class="fa-solid fa-bars"></i></button>
+            <h3>Manage Requests</h3>
+        </div>
         <div class="d-flex align-items-center gap-3">
             <span class="fw-bold"><?= htmlspecialchars($tech['name']) ?></span>
             <a href="profile_tech.php" title="My Profile"><i class="fa-solid fa-user-circle fa-2x text-secondary"></i></a>
@@ -426,40 +363,7 @@ function create_request_table($requests) {
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 
-
 <script>
-    // --- Mobile Sidebar Toggle Logic ---
-    const sidebar = document.getElementById('offcanvasSidebar');
-    const toggleBtn = document.getElementById('sidebarToggle');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    const body = document.body;
-
-    // Function to handle opening/closing sidebar
-    function toggleSidebar() {
-        // Check actual visibility state using the CSS transform property
-        const isOpen = sidebar.style.transform === 'translateX(0px)';
-        
-        if (isOpen) {
-            // Close sidebar
-            sidebar.style.transform = 'translateX(-100%)';
-            backdrop.style.display = 'none';
-            body.classList.remove('offcanvas-open');
-        } else {
-            // Open sidebar
-            sidebar.style.transform = 'translateX(0px)';
-            backdrop.style.display = 'block';
-            body.classList.add('offcanvas-open');
-        }
-    }
-
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', toggleSidebar);
-    }
-    
-    if (backdrop) {
-        backdrop.addEventListener('click', toggleSidebar);
-    }
-
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
 // --- Approve Logic ---
@@ -556,7 +460,7 @@ function checkOutItem(id) {
         if (result.isConfirmed) {
              Swal.fire({ title: 'Processing...', text: 'Updating status.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
             $.post('checkout_action.php', { action: 'checkout', reservation_item_id: id }, (data) => {
-                 Swal.close();
+                Swal.close();
                 Swal.fire({ title: 'Checked Out!', text: data.message, icon: 'success', timer: 1500, showConfirmButton: false })
                 .then(() => location.reload());
             }, 'json').fail((xhr) => {
@@ -634,6 +538,9 @@ function checkInItem(id) {
             html += '</form>';
             $modalBody.html(html);
             $confirmBtn.prop('disabled', false); // Dayakan butang selepas borang dimuatkan
+            
+            // Trigger perubahan untuk menetapkan label remarks yang betul pada permulaan
+            $modalBody.find('input[type="radio"]:checked').trigger('change');
         },
         error: function(xhr) {
             $modalBody.html('<div class="alert alert-danger mb-0">Error loading asset list: ' + (xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error') + '</div>');
@@ -643,6 +550,29 @@ function checkInItem(id) {
 
 
 $(document).ready(function() {
+    
+    // === LOGIK MOBILE SIDEBAR TOGGLE (BARU) ===
+    $('#sidebarToggle').on('click', function(e) {
+        e.preventDefault();
+        $('.sidebar').toggleClass('toggled');
+        $('#sidebarOverlay').toggleClass('active');
+    });
+
+    // Tutup sidebar apabila overlay diklik
+    $('#sidebarOverlay').on('click', function() {
+        $('.sidebar').removeClass('toggled');
+        $(this).removeClass('active');
+    });
+
+    // Pastikan sidebar terbuka by default pada desktop
+    $(window).on('load resize', function() {
+        if ($(window).width() >= 992) {
+            $('.sidebar').removeClass('toggled');
+            $('#sidebarOverlay').removeClass('active');
+        }
+    });
+    // === TAMAT LOGIK MOBILE SIDEBAR TOGGLE ===
+
 
     // Initialize DataTables
     $('.request-table').DataTable({
@@ -669,20 +599,19 @@ $(document).ready(function() {
 
     // === LOGIK MODAL CHECK-IN BAHARU ===
 
-    // ✨ KEMBALIKAN BLOK INI: Tunjukkan/sembunyikan 'remarks' berdasarkan pilihan
-    // Ini juga akan tukar label 'remarks'
+    // ✨ Tunjukkan/sembunyikan 'remarks' berdasarkan pilihan
     $('#checkInModalBody').on('change', 'input[type="radio"]', function() {
         const $card = $(this).closest('.checkin-asset-card');
         const $remarksContainer = $card.find('.remarks-container');
         const $remarksLabel = $remarksContainer.find('label');
 
         if ($(this).val() === 'Damaged/Incomplete') {
-            $remarksLabel.text('Remarks (Required if damaged):'); // Teks asal
+            $remarksLabel.text('Remarks (Required if damaged):'); 
             $remarksContainer.slideDown();
         } else {
             // Jika 'Good', tunjukkan juga tapi tukar label
-            $remarksLabel.text('Remarks (Optional):'); // Teks baharu
-            $remarksContainer.slideDown(); // Sentiasa slideDown
+            $remarksLabel.text('Remarks (Optional):'); 
+            $remarksContainer.slideDown(); 
         }
     });
 
@@ -708,7 +637,7 @@ $(document).ready(function() {
                 return false; 
             }
 
-            // ✨ LOGIK VALIDASI ASAL: Hanya semak 'remarks' jika 'Damaged/Incomplete'
+            // ✨ LOGIK VALIDASI: Semak 'remarks' jika 'Damaged/Incomplete'
             if (condition === 'Damaged/Incomplete' && !remarks) {
                 isValid = false;
                 Swal.fire('Input Required', `Remarks are required for damaged asset (ID: ${asset_id}).`, 'warning');
@@ -719,7 +648,7 @@ $(document).ready(function() {
             asset_conditions.push({
                 asset_id: asset_id,
                 condition: condition,
-                remarks: remarks // 'remarks' akan jadi string kosong jika 'Good' & tidak diisi
+                remarks: remarks 
             });
         });
 
