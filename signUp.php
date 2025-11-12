@@ -1,14 +1,11 @@
 <?php
 session_start();
-// Pastikan fail config.php anda betul-betul di direktori yang sama
 include 'config.php'; 
 
-// Semak sambungan pangkalan data
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// Jika borang dihantar
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = $_POST['name'];
     $email = $_POST['email'];
@@ -18,13 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $phoneNum = $_POST['phoneNum'];
     $status = 'active';
 
-    // 1. PENGESAHAN DOMAIN EMAIL
     $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my'];
     $is_valid_domain = false;
     $lower_email = strtolower($email);
 
     foreach ($allowed_domains as $domain) {
-        // Semak jika email berakhir dengan domain yang dibenarkan
         if (substr($lower_email, -strlen($domain)) === $domain) {
              $is_valid_domain = true;
              break;
@@ -37,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // 2. PENGESAHAN KATA LALUAN
     if ($password !== $confirm_password) {
         $_SESSION['error'] = "Passwords do not match!";
         header("Location: signUp.php");
@@ -55,9 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // 3. SEMAKAN DUPLIKASI MERENTAS SEMUA PERANAN (user, admin, technician)
-    
-    // Union ALL untuk mencari rekod dalam 3 jadual sekaligus
     $sql_check = "
         (SELECT 'user' AS role, email, ic_num FROM user WHERE email = ? OR ic_num = ?)
         UNION ALL
@@ -74,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
     
-    // Binding 6 parameters: email, ic_num (untuk setiap 3 SELECT)
     $stmt->bind_param("ssssss", $email, $ic_num, $email, $ic_num, $email, $ic_num);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -82,7 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         
-        // Tetapkan mesej ralat berdasarkan peranan yang ditemui
         $role_found = strtoupper($row['role']);
         
         if ($row['email'] === $email) {
@@ -97,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     $stmt->close();
 
-    // 4. MASUKKAN PENGGUNA BARU KE DALAM JADUAL 'user'
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     
     $sql = "INSERT INTO user (name, email, ic_num, password, phoneNum, status) VALUES (?, ?, ?, ?, ?, ?)";
@@ -113,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if ($stmt->execute()) {
         $_SESSION['success'] = "Account created successfully. Please log in.";
-        // Simpan butiran log masuk sementara untuk kemudahan log masuk
+        
         $_SESSION['login_attempt_role'] = 'user'; 
         $_SESSION['login_attempt_email'] = $email; 
         header("Location: login.php");
@@ -399,7 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     const submitBtn = document.getElementById('submitBtn');
     const matchError = document.getElementById('password-match-error');
     
-    // Requirements object 
+    
     const reqs = {
         length: { el: document.getElementById('length'), valid: false, regex: /.{8,}/ },
         lowercase: { el: document.getElementById('lowercase'), valid: false, regex: /[a-z]/ },
@@ -446,10 +434,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const isPasswordStrong = validatePassword();
         const doPasswordsMatch = validateConfirmPassword();
         
-        // Semak pengesahan HTML5 (required fields, pattern, email type)
+        
         const form = document.getElementById('signupForm');
-        // Gunakan reportValidity() untuk memaksa semakan pengesahan HTML5
-        // Nota: checkValidity() sahaja cukup untuk semak keadaan borang tanpa memaparkan mesej ralat HTML5
+        
+        
         const isFormFilled = form.checkValidity();
 
         if (isPasswordStrong && doPasswordsMatch && isFormFilled) {
@@ -459,7 +447,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Listener untuk setiap input yang boleh menjejaskan keesahan borang
+    
     passwordInput.addEventListener('input', checkFormValidity);
     confirmPasswordInput.addEventListener('input', checkFormValidity);
     document.getElementById('name').addEventListener('input', checkFormValidity);
@@ -467,7 +455,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     document.getElementById('email').addEventListener('input', checkFormValidity);
     document.getElementById('phoneNum').addEventListener('input', checkFormValidity);
     
-    // Panggilan awal jika pengguna kembali ke halaman dengan data yang sudah diisi
+    
     document.addEventListener('DOMContentLoaded', checkFormValidity);
 
 </script>

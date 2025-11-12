@@ -1,13 +1,13 @@
 <?php
 session_start();
-include '../config.php'; // Correct path to config
+include '../config.php'; 
 
-// Check database connection
+
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// Ensure user is logged in
+
 if (!isset($_SESSION['user_id'])){
     header("Location: login.php");
     exit();
@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])){
 
 $user_id = (int) $_SESSION['user_id'];
 
-// Fetch user info
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -29,7 +29,7 @@ if (!$user) {
     exit();
 }
 
-// Fetch categories
+
 $categories = [];
 $res_cat = $conn->query("SELECT * FROM categories ORDER BY category_name");
 if ($res_cat) {
@@ -38,7 +38,7 @@ if ($res_cat) {
     }
 }
 
-// Fetch items for the dropdown
+
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
@@ -55,7 +55,7 @@ if ($res_items) {
     }
 }
 
-// $conn->close(); <-- Dipindahkan ke bahagian paling bawah fail
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -351,22 +351,26 @@ if ($res_items) {
                                 <input type="text" id="returnDate" class="form-control" placeholder="Select a date...">
                             </div>
                         </div>
-                        
+                                                
+<div class="mb-3">
+    <label class="form-label" for="program_type">6. Program Type / Purpose</label>
+    
+    <div class="form-text text-muted mb-2">
+		Please select <strong>a</strong> category that represents the main purpose of this booking, even if you are booking multiple items.
+    </div>
+    
+    <select name="program_type" id="program_type" class="form-select" required>
+        <option value="3" selected>Academic Project/Class</option>
+        <option value="2">Club/Association Program</option>
+        <option value="1">Official University Ceremony</option>
+    </select>
+</div>  
                         <div class="mb-3">
-                            <label class="form-label" for="reason">6. Purpose of Loan</label>
+                            <label class="form-label" for="reason">7. Purpose of Loan</label>
                             <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label" for="program_type">7. Program Type (Priority)</label>
-                            <select name="program_type" id="program_type" class="form-select" required>
-                                <option value="3" selected>Academic Project/Class</option>
-                                <option value="2">Club/Association Program</option>
-                                <option value="1">Official University Ceremony</option>
-                            </select>
-                        </div>
-                        
-                        <div id="availability-status" class="mt-3"></div>
+
+                      <div id="availability-status" class="mt-3"></div>
                         
                         <div class="form-check mt-4">
                             <input class="form-check-input" type="checkbox" value="" id="agreeTerms">
@@ -397,24 +401,39 @@ if ($res_items) {
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
         <div class="modal-header">
-            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions of Borrowing</h5>
+            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions of <strong>Equipment Usage</strong></h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-            <p>Please read the following terms carefully before submitting your request:</p>
-            <ol>
-                <li><strong>Eligibility:</strong> All items are available for loan only to registered students and staff of UniKL with a valid ID.</li>
-                <li><strong>Loan Period:</strong> The loan period is as specified in your request. Any extensions must be requested through the system 24 hours before the due date and are subject to availability.</li>
-                <li><strong>Responsibility:</strong> The borrower is fully responsible for the borrowed item(s) from the moment of collection until they are returned and checked in by a technician.</li>
-                <li><strong>Condition of Items:</strong> The borrower must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the borrower may be held responsible.</li>
-                <li><strong>Damage or Loss:</strong> The borrower will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).</li>
-                <li><strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of borrowing privileges.</li>
-                <li><strong>Purpose:</strong> Items are to be used for academic or official university purposes only.</li>
-                <li><strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status, or the reservation may be cancelled.</li>
-            </ol>
-            <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
-        </div>
-        <div class="modal-footer">
+<div class="modal-body">
+    <p>Please read the following terms carefully before submitting your <strong>reservation</strong> request:</p>
+    <ol>
+        <li>
+            <strong>Eligibility:</strong> All equipment is available for <strong>reservation</strong> only to registered students and staff of UniKL with a valid ID.
+        </li>
+        <li>
+            <strong>Reservation Duration:</strong> The <strong>duration</strong> of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
+        </li>
+        <li>
+            <strong>Responsibility:</strong> The party making the reservation is fully responsible for the <strong>reserved equipment</strong> from the moment of collection until they are returned and checked in by a technician.
+        </li>
+        <li>
+            <strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
+        </li>
+        <li>
+            <strong>Damage or Loss:</strong> The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
+        </li>
+        <li>
+            <strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of **reservation** privileges.
+        </li>
+        <li>
+            <strong>Purpose of Use:</strong> Items are to be used for academic or official university purposes only, as specified in the reservation form.
+        </li>
+        <li>
+            <strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
+        </li>
+    </ol>
+    <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
+</div>        <div class="modal-footer">
             <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
         </div>
         </div>
@@ -428,13 +447,13 @@ if ($res_items) {
 
 <script>
 $(document).ready(function() {
-    // Initialize Select2 dropdown
+    
     $('#item_select').select2({
         placeholder: "-- Search and select an item --",
         allowClear: true
     });
 
-    // Simpan salinan asal semua optgroups
+    
     let allOptgroups = $('#item_select optgroup').clone();
 
     $(document).on('click', '.category-pill-filter', function(e) {
@@ -442,18 +461,18 @@ $(document).ready(function() {
         const categoryName = $(this).data('category').toString().trim();
         const $select = $('#item_select');
 
-        // 2. Kemas kini rupa butang 'pill'
+        
         $('.category-pill-filter').removeClass('btn-primary').addClass('btn-outline-secondary');
         $(this).removeClass('btn-outline-secondary').addClass('btn-primary');
 
-        // 3. Kosongkan select box (tinggalkan opsyen placeholder)
+        
         $select.empty().append('<option value="">-- Search and select an item --</option>');
 
         if (categoryName === "") {
-            // 4. Jika 'All Items', masukkan semua optgroup yang telah disimpan
+            
             $select.append(allOptgroups.clone());
         } else {
-            // 5. Jika kategori khusus, cari dan masukkan optgroup yang sepadan sahaja
+            
             allOptgroups.each(function() {
                 const optgroupLabel = $(this).attr('label').trim();
                 if (optgroupLabel === categoryName) {
@@ -462,17 +481,17 @@ $(document).ready(function() {
             });
         }
 
-        // 6. Reset pilihan Select2 dan buka ia
+        
         $select.val(null).trigger('change');
         $select.select2('open');
     });
     
-    // --- MOBILE SIDEBAR TOGGLE & OVERLAY CONTROL ---
+    
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('overlay');
     const menuToggle = document.getElementById('menuToggle');
 
-    // Fungsi untuk menukar keadaan sidebar
+    
     if (menuToggle) {
         menuToggle.addEventListener('click', function() {
             sidebar.classList.toggle('active');
@@ -484,7 +503,7 @@ $(document).ready(function() {
         });
     }
 
-    // Tutup sidebar apabila mengklik overlay
+    
     if (overlay) { 
         overlay.addEventListener('click', function() {
             sidebar.classList.remove('active');
@@ -492,14 +511,14 @@ $(document).ready(function() {
         }); 
     }
     
-    // Tutup sidebar apabila mengubah saiz kepada desktop
+    
     window.addEventListener('resize', function() {
         if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
             sidebar.classList.remove('active');
             overlay.style.display = 'none';
         }
     });
-    // --- END MOBILE SIDEBAR TOGGLE ---
+    
     
     let debounceTimer;
 
@@ -543,7 +562,7 @@ $(document).ready(function() {
                             statusDiv.html(suggestionHTML);
                             addBtn.prop('disabled', true); 
 
-                        } else { // This is for 'error' status
+                        } else { 
                             statusDiv.html(`<div class="alert alert-danger py-2">❌ <strong>Not Available:</strong> ${response.message}</div>`);
                             addBtn.prop('disabled', true);
                         }
@@ -555,99 +574,99 @@ $(document).ready(function() {
                 });
             } else {
                 statusDiv.html('');
-                addBtn.prop('disabled', false); // Dayakan jika medan tidak lengkap
+                addBtn.prop('disabled', false); 
             }
-        }, 500); // 500ms debounce
+        }, 500); 
     }
 
-    // Butang untuk terima cadangan kuantiti
+    
     $(document).on('click', '#book-available-btn', function() {
         const availableCount = $(this).data('available');
         $('#quantity').val(availableCount); 
         checkAvailability(); 
     });
 
-    // Panggil checkAvailability apabila medan berubah
+    
     $('#item_select').on('change', checkAvailability);
     $('#quantity').on('input', checkAvailability); 
 
-    // Konfigurasi Flatpickr
+    
     const returnDatepicker = flatpickr("#returnDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
-        onClose: checkAvailability // Semak ketersediaan apabila tarikh ditutup
+        onClose: checkAvailability 
     });
 
     const reserveDatepicker = flatpickr("#reserveDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
         onChange: (selectedDates) => {
-            // Pastikan tarikh pulang tidak boleh sebelum tarikh pinjam
+            
             if (selectedDates.length > 0) {
                 returnDatepicker.set('minDate', selectedDates[0]);
             }
         },
-        onClose: checkAvailability // Semak ketersediaan apabila tarikh ditutup
+        onClose: checkAvailability 
     });
 
-    let reservationItems = []; // Array untuk menyimpan item
+    let reservationItems = []; 
     
-    // Logik 'Add to List'
+    
     $('#addMoreBtn').on('click', () => {
         const itemName = $('#item_select').val();
         const quantity = $('#quantity').val();
         const reserve = $('#reserveDate').val();
         const ret = $('#returnDate').val();
-        const reason = $('#reason').val(); // Ambil reason dari borang
+        const reason = $('#reason').val(); 
 
-        // Pengesahan
+        
         if (!itemName || !quantity || !reserve || !ret || !reason.trim()) {
             Swal.fire("Incomplete Form", "Please fill in all request details, including a reason.", "warning");
             return;
         }
         
-        // Semak ketersediaan lagi sebelum menambah ke senarai
+        
         if ($('#availability-status').find('.alert-success').length === 0) {
             Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
             return;
         }
 
-        // Semak item pendua
+        
         if (reservationItems.some(item => item.item_name === itemName)) {
              Swal.fire("Duplicate Item", "This item is already in your list. Please remove it first if you want to change the details.", "info");
              return;
         }
         
-        // Cipta objek yang mengandungi semua data item
+        
         const newItem = { 
             item_name: itemName, 
             quantity: quantity, 
             reserve_date: reserve, 
             return_date: ret, 
-            // Simpan reason & program_type untuk setiap item (berguna jika anda mahu ia berbeza nanti)
+            
             reason: reason,
             program_type: $('#program_type').val()
         };
         
         reservationItems.push(newItem);
-        renderItemsList(); // Panggil fungsi untuk memaparkan senarai
+        renderItemsList(); 
 
-        // Tunjuk notifikasi 'Toast'
+        
         const Toast = Swal.mixin({
             toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
         });
         Toast.fire({ icon: 'success', title: 'Added to list!' });
 
-        // Reset medan borang untuk item seterusnya
+        
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         reserveDatepicker.clear();
         returnDatepicker.clear();
-        // Jangan reset 'reason' atau 'program_type' kerana ia mungkin sama
+        
         $('#availability-status').html('');
     });
 
-    // Fungsi untuk memaparkan senarai item
+    
     function renderItemsList() {
         const listDiv = $('#itemsList');
         if (reservationItems.length > 0) {
@@ -668,24 +687,24 @@ $(document).ready(function() {
             listDiv.html(`<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p>Your request list is empty.</p></div>`);
         }
         
-        // Kemas kini input tersembunyi dengan data JSON
+        
         $('#allItems').val(JSON.stringify(reservationItems));
         
-        // Dayakan/nyahdayakan butang submit
+        
         $('#reserveForm').find('button[type="submit"]').prop('disabled', reservationItems.length === 0);
     }
 
-    // Gunakan 'event delegation' untuk butang 'remove'
+    
     $('#itemsList').on('click', '.remove-item-btn', function() {
         const index = $(this).data('index');
-        reservationItems.splice(index, 1); // Padam item dari array
-        renderItemsList(); // Lukis semula senarai
+        reservationItems.splice(index, 1); 
+        renderItemsList(); 
     });
     
-    // Inisiasi awal butang submit
+    
     $('#reserveForm').find('button[type="submit"]').prop('disabled', true);
 
-    // Logik 'Submit Request'
+    
     $('#reserveForm').on('submit', function (e) {
         e.preventDefault();
         
@@ -694,13 +713,13 @@ $(document).ready(function() {
             return;
         }
 
-        // PENGESAHAN TERMA & SYARAT
+        
         if (!$('#agreeTerms').is(':checked')) {
             Swal.fire("Terms and Conditions", "You must agree to the Terms and Conditions to proceed.", "warning");
-            return; // Hentikan penghantaran
+            return; 
         }
         
-        // Pastikan 'reason' global diisi
+        
         if (!$('#reason').val().trim()) {
             Swal.fire("Incomplete Form", "Please ensure the Purpose of Loan is filled in.", "warning");
             return;
@@ -709,11 +728,11 @@ $(document).ready(function() {
         const submitBtn = $(this).find('button[type="submit"]');
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
         
-        // Hantar borang menggunakan AJAX
+        
         $.ajax({
             type: 'POST',
             url: 'submit_reservation.php',
-            data: $(this).serialize(), // .serialize() akan ambil 'all_items', 'reason', 'program_type', 'user_id'
+            data: $(this).serialize(), 
             dataType: 'json',
             success: function(response) {
                 if(response.status === 'success') {
@@ -725,7 +744,7 @@ $(document).ready(function() {
                         timerProgressBar: true,
                         showConfirmButton: false
                     }).then(() => {
-                        window.location.href = 'history.php'; // Halakan ke 'history.php'
+                        window.location.href = 'history.php'; 
                     });
                 } else {
                     Swal.fire("Submission Failed", response.message, "error");
@@ -735,13 +754,13 @@ $(document).ready(function() {
                 Swal.fire("Submission Failed", "A server error occurred. Please try again.", "error");
             },
             complete: function() {
-                // Kembalikan butang kepada keadaan asal
+                
                 submitBtn.prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-2"></i> Submit Request');
             }
         });
     });
     
-    // Panggilan awal untuk memaparkan senarai (jika kosong)
+    
     renderItemsList();
 });
 </script>

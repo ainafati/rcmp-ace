@@ -1,14 +1,13 @@
 <?php
-// PHP LOGIC (PART 1)
+
 session_start();
 include '../config.php';
 include_once '../logger.php'; 
 
-// Fungsi pembantu untuk membina query string pagination
 function build_pagination_query($page_param_name, $page_number) {
-    $params = $_GET; // Dapatkan semua parameter URL sedia ada
+    $params = $_GET; 
     
-    // Set parameter tab (jika belum ada)
+
     if (!isset($params['tab'])) {
         if ($page_param_name == 'page_returns') {
             $params['tab'] = 'returns';
@@ -17,22 +16,19 @@ function build_pagination_query($page_param_name, $page_number) {
         }
     }
     
-    $params[$page_param_name] = $page_number; // Tetapkan nombor halaman baru
-    // Pastikan parameter pagination lain dibuang jika menukar tab
+    $params[$page_param_name] = $page_number; 
     if ($page_param_name == 'page_returns' && isset($params['page_logs'])) unset($params['page_logs']);
     if ($page_param_name == 'page_logs' && isset($params['page_returns'])) unset($params['page_returns']);
     
-    return http_build_query($params); // Bina semula query string
+    return http_build_query($params); 
 }
 
-// --- Pengesahan (pastikan admin sudah log masuk) ---
 if (!isset($_SESSION['admin_id'])) {
     header("Location: ../login.php");
     exit();
 }
 $admin_id = (int)$_SESSION['admin_id'];
 
-// --- Dapatkan Info Admin ---
 $admin = array('name' => 'Admin');
 if ($stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?")) {
     $stmt_admin->bind_param("i", $admin_id);
@@ -44,32 +40,27 @@ if ($stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?")) {
     $stmt_admin->close();
 }
 
-// --- Tentukan Tab Aktif ---
 $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' : 'returns';
 
 
-// =======================================================
-// --- SEKSYEN 1: LAPORAN PEMULANGAN (TAB RETURNS) ---
-// =======================================================
 $records = array();
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 
-// Tetapan Pagination
 $items_per_page_returns = 10;
 $page_returns = isset($_GET['page_returns']) ? (int)$_GET['page_returns'] : 1;
 if ($page_returns < 1) $page_returns = 1;
 
-// Borang ini GUNA GET
+
 $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-// Menetapkan nilai drop-down bulan/tahun
+
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
-// Query Pembinaan
+
 $sql_base_report = "FROM reservation_items ri
      JOIN reservations r ON ri.reserve_id = r.reserve_id
      JOIN user u ON r.user_id = u.user_id
@@ -95,7 +86,7 @@ if ($report_category_id > 0) {
 
 $sql_where_report = " WHERE " . implode(' AND ', $where_clauses_report);
 
-// 1. Query untuk COUNT
+
 $stmt_count_report = $conn->prepare("SELECT COUNT(ri.id) " . $sql_base_report . $sql_where_report);
 if ($stmt_count_report) {
     $bind_params_count = array();
@@ -115,13 +106,13 @@ if ($stmt_count_report) {
     if ($page_returns > $total_pages_returns && $total_records_returns > 0) $page_returns = $total_pages_returns;
     $offset_returns = ($page_returns - 1) * $items_per_page_returns; 
 } else {
-    // Jika tiada rekod atau ralat, tetapkan nilai lalai
+    
     $total_records_returns = 0;
     $total_pages_returns = 1;
     $offset_returns = 0;
 }
 
-// 2. Query untuk SELECT
+
 $sql_report = "SELECT 
                  u.name AS user_name, i.item_name, a.asset_code, c.category_name,
                  ri.reserve_date, ri.return_date, ri.return_condition,
@@ -130,7 +121,7 @@ $sql_report = "SELECT
               ORDER BY ri.return_date DESC
               LIMIT ? OFFSET ?";
 
-$param_values_select = array_merge($param_values_report); // Salin parameter asal
+$param_values_select = array_merge($param_values_report); 
 $param_types_select = $param_types_report . "ii"; 
 $param_values_select[] = $items_per_page_returns;
 $param_values_select[] = $offset_returns;
@@ -150,12 +141,12 @@ if ($stmt_report) {
 }
 
 
-// =======================================================
-// --- SEKSYEN 2: LOG AKTIVITI (TAB ACTIVITY) ---
-// =======================================================
+
+
+
 $logs = array();
 
-// Tetapan Pagination
+
 $items_per_page_logs = 10;
 $page_logs = isset($_GET['page_logs']) ? (int)$_GET['page_logs'] : 1;
 if ($page_logs < 1) $page_logs = 1;
@@ -185,7 +176,7 @@ if (!empty($log_search)) {
 }
 $sql_where_log = " WHERE " . implode(' AND ', $where_clauses_log);
 
-// 1. Query untuk COUNT
+
 $stmt_count_log = $conn->prepare("SELECT COUNT(log_id) " . $sql_base_log . $sql_where_log);
 if ($stmt_count_log) {
     $bind_params_count_log = array();
@@ -211,13 +202,13 @@ if ($stmt_count_log) {
 }
 
 
-// 2. Query untuk SELECT
+
 $sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address 
               " . $sql_base_log . $sql_where_log . " 
               ORDER BY timestamp DESC
-              LIMIT ? OFFSET ?"; // Order by DESC untuk log terbaru di atas
+              LIMIT ? OFFSET ?"; 
 
-$param_values_select_log = array_merge($param_values_log); // Salin parameter asal
+$param_values_select_log = array_merge($param_values_log); 
 $param_types_select_log = $param_types_log . "ii"; 
 $param_values_select_log[] = $items_per_page_logs;
 $param_values_select_log[] = $offset_logs;
@@ -659,7 +650,7 @@ $conn->close();
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // --- JS UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+    
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -674,12 +665,12 @@ $conn->close();
             toggleBtn.addEventListener('click', toggleSidebar);
             overlay.addEventListener('click', toggleSidebar);
             
-            // Tutup sidebar jika pautan diklik (untuk navigasi)
+            
             const sidebarLinks = sidebar.querySelectorAll('a');
             sidebarLinks.forEach(link => {
                 link.addEventListener('click', function() {
                     if (window.innerWidth <= 768) {
-                        // Tambah sedikit kelewatan untuk membolehkan navigasi berlaku
+                        
                         setTimeout(() => { 
                             sidebar.classList.remove('open');
                             overlay.classList.remove('active');
@@ -689,13 +680,13 @@ $conn->close();
             });
         }
         
-        // --- BLOK KOD YANG MENYEBABKAN MASALAH TELAH DIBUANG ---
-        // Kod yang cuba .click() tab (returnsTab / activityTab) telah dipadam
-        // Kerana PHP anda sudah mengendalikan tab 'active' dengan betul.
-        // ---
+        
+        
+        
+        
     });
 
-    // --- JS UNTUK TAB 1 (RETURNED ITEMS) ---
+    
     flatpickr("#start_date", { dateFormat: "Y-m-d" });
     flatpickr("#end_date", { dateFormat: "Y-m-d" });
 
@@ -707,38 +698,38 @@ $conn->close();
         var year = yearFilter.value;
         var month = monthFilter.value;
         
-        // Cipta objek URLSearchParams untuk kekalkan filter lain
+        
         var params = new URLSearchParams(window.location.search);
         
-        // Tetapkan tarikh
+        
         var startDate = new Date(year, month - 1, 1);
         var endDate = new Date(year, month, 0);
         
         var formatDate = function(date) {
             var y = date.getFullYear();
-            // Pembetulan: Pastikan concatenation menggunakan '+'
+            
             var m = ('0' + (date.getMonth() + 1)).slice(-2); 
             var d = ('0' + date.getDate()).slice(-2);
             return y + '-' + m + '-' + d;
         };
 
-        // Set nilai pada URL params
+        
         params.set('start_date', formatDate(startDate));
         params.set('end_date', formatDate(endDate));
-        params.set('category_id', categoryFilter.value); // Ambil nilai kategori juga
-        params.set('tab', 'returns'); // Pastikan tab betul
-        params.delete('page_returns'); // Reset ke halaman 1 bila filter
+        params.set('category_id', categoryFilter.value); 
+        params.set('tab', 'returns'); 
+        params.delete('page_returns'); 
         
-        // Submit borang dengan redirect GET
+        
         window.location.search = params.toString();
     }
 
-    // Elak 'null' error
+    
     if (monthFilter) monthFilter.addEventListener('change', updateAndSubmit);
     if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
     if (categoryFilter) categoryFilter.addEventListener('change', updateAndSubmit);
 
-    // --- JS UNTUK TAB 2 (ACTIVITY LOG) ---
+    
     flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
     flatpickr("#log_end_date", { dateFormat: "Y-m-d" });
     

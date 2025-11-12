@@ -1,7 +1,7 @@
 <?php
 
 session_start();
-include 'config.php'; // Sambungan pangkalan data
+include 'config.php'; 
 
 /**
  * Masukkan logger khas.
@@ -9,7 +9,7 @@ include 'config.php'; // Sambungan pangkalan data
 if (file_exists('logger.php')) {
     include 'logger.php';
 } else {
-    // Fungsi logger sandaran
+    
     if (!function_exists('log_activity')) {
         function log_activity($conn, $user_type, $user_id, $action, $details) {
             error_log("Logger function not found. Log attempt: $details");
@@ -67,7 +67,7 @@ function check_email_in_other_roles($conn, $email, $current_role) {
                 $result = $stmt->get_result();
                 if ($result->num_rows === 1) {
                     $stmt->close();
-                    return $role_name; // Dijumpai!
+                    return $role_name; 
                 }
                 $stmt->close();
             }
@@ -75,32 +75,32 @@ function check_email_in_other_roles($conn, $email, $current_role) {
             error_log("Cross-check error for $table_name: " . $e->getMessage());
         }
     }
-    return null; // Tidak dijumpai
+    return null; 
 }
 
 
-// 1. Semak jika kaedah adalah POST
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     header("Location: login.php");
     exit();
 }
 
-// 2. Dapatkan data POST
+
 $role = isset($_POST['role']) ? $_POST['role'] : '';
 $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 $password = isset($_POST['password']) ? $_POST['password'] : '';
 
-// 3. Semak jika ada medan kosong
+
 if (empty($role) || empty($email) || empty($password)) {
     handle_failed_login($conn, $email, $role, "Please fill in all fields.", null, 'LOGIN_FAIL_EMPTY');
 }
 
-// 4. Tentukan jadual pengguna
+
 $table_name = '';
 $id_column = '';
 $name_column = 'name';
 $password_column = 'password';
-$status_column = 'status'; // Guna nama kolum anda
+$status_column = 'status'; 
 $dashboard_redirect = '';
 $session_key = '';
 $allowed_domains = []; 
@@ -131,13 +131,13 @@ switch ($role) {
         handle_failed_login($conn, $email, $role, "Invalid role selected.", null, 'LOGIN_FAIL_ROLE');
 }
 
-// 5. Lakukan pengesahan domain
+
 if (!is_valid_domain($email, $allowed_domains)) {
     $error_message = "Invalid email domain for '{$role}' role. Please use an authorized email.";
     handle_failed_login($conn, $email, $role, $error_message, null, 'LOGIN_FAIL_INVALID_DOMAIN');
 }
 
-// 6. Sediakan query SQL
+
 $sql = "SELECT $id_column, $name_column, $password_column, $status_column FROM $table_name WHERE email = ? LIMIT 1";
 $stmt = $conn->prepare($sql);
 
@@ -150,41 +150,41 @@ $stmt->bind_param("s", $email);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// 7. Proses hasil query
+
 if ($result->num_rows === 1) {
     $row = $result->fetch_assoc();
     
     $user_id = $row[$id_column];
     $user_name = $row[$name_column];
     $hashed_password = $row[$password_column];
-    $status = $row[$status_column]; // Dapatkan status
+    $status = $row[$status_column]; 
 
-    // -----------------------------------------------------------------
-    // LANGKAH 8: LOGIK STATUS DIKEMAS KINI (LEBIH MUDAH)
-    // -----------------------------------------------------------------
-    // Semak jika status BUKAN 'Active'
+    
+    
+    
+    
     if (strtolower($status) !== 'active') {
         
-        // Cipta mesej ralat (cth: "Your account is currently Suspended...")
+        
         $error_message = "Your account is currently '{$status}'. Please contact the administrator for assistance.";
         $action_code = strtoupper($role) . '_LOGIN_FAIL_STATUS_' . strtoupper($status);
         
         $stmt->close();
         handle_failed_login($conn, $email, $role, $error_message, $user_id, $action_code);
     }
-    // -----------------------------------------------------------------
-    // AKHIR LOGIK BARU
-    // -----------------------------------------------------------------
+    
+    
+    
 
-    // 9. Sahkan kata laluan
+    
     if (password_verify($password, $hashed_password)) {
-        // Kata laluan betul
+        
         session_regenerate_id(true); 
         $_SESSION[$session_key] = $user_id;
         $_SESSION['name'] = $user_name;
         $_SESSION['role'] = $role;
 
-        // Log
+        
         $action_code = strtoupper($role) . '_LOGIN_SUCCESS'; 
         $log_details = "User '{$user_name}' (ID: {$user_id}) successfully logged in as '{$role}'.";
         log_activity($conn, $role, $user_id, $action_code, $log_details);
@@ -195,21 +195,21 @@ if ($result->num_rows === 1) {
         exit();
 
     } else {
-        // Kata laluan gagal
+        
         $action_code = strtoupper($role) . '_LOGIN_FAIL_PASSWORD';
         $stmt->close();
         handle_failed_login($conn, $email, $role, "Incorrect email or password.", $user_id, $action_code);
     }
 
 } else {
-    // Emel tidak dijumpai di jadual ini.
+    
     $stmt->close(); 
 
-    // Semak jika emel ini wujud di role lain.
+    
     $found_in_role = check_email_in_other_roles($conn, $email, $role);
 
     if ($found_in_role !== null) {
-        // Emel wujud, tetapi di role yang salah
+        
         $correct_role_name = ucfirst($found_in_role); 
         $current_role_name = ucfirst($role);
         $error_message = "That email is registered as '{$correct_role_name}', not '{$current_role_name}'. Please select the '{$correct_role_name}' role and try again.";
@@ -217,7 +217,7 @@ if ($result->num_rows === 1) {
         handle_failed_login($conn, $email, $role, $error_message, null, $action_code);
 
     } else {
-        // Emel memang tidak wujud
+        
         $action_code = strtoupper($role) . '_LOGIN_FAIL_EMAIL';
         handle_failed_login($conn, $email, $role, "Incorrect email or password.", null, $action_code);
     }

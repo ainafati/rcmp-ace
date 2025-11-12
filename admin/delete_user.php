@@ -1,8 +1,7 @@
 <?php
 session_start();
-include 'config.php'; // Sambungan pangkalan data
+include 'config.php';
 
-// 1. SEMAKAN KESELAMATAN: Pastikan hanya admin yang log masuk
 if (!isset($_SESSION['admin_id'])) {
     $_SESSION['error_message'] = "You must be logged in as an admin to perform this action.";
     header("Location: manage_accounts.php");
@@ -10,14 +9,12 @@ if (!isset($_SESSION['admin_id'])) {
 }
 $admin_id = $_SESSION['admin_id']; // Dapatkan ID admin untuk log
 
-// 2. SEMAK KAEDAH: Pastikan borang dihantar (POST)
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // 3. Dapatkan data dari borang POST
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $role = isset($_POST['role']) ? $_POST['role'] : '';
 
-    // 4. Tentukan nama jadual dan kolum ID
     $table_name = '';
     $id_column = '';
     if (strtolower($role) === 'user') {
@@ -32,7 +29,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // 5. Laksanakan delete
     if ($id > 0) {
         $sql = "DELETE FROM $table_name WHERE $id_column = ?";
         $stmt = $conn->prepare($sql);
@@ -62,7 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
 } else {
-    // Jika diakses guna GET (cth: taip URL terus)
     $_SESSION['error_message'] = "Invalid request method.";
 }
 

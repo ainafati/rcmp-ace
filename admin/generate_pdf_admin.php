@@ -1,11 +1,9 @@
 <?php
-// File: /admin/generate_pdf_admin.php
 session_start();
 include '../config.php';
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// 1. Pemeriksaan Sesi untuk Admin
 if (!isset($_SESSION['admin_id'])) {
     $mpdf = new \Mpdf\Mpdf();
     $mpdf->WriteHTML('<h1>Access Denied</h1><p>Your session has expired. Please log in again.</p>');
@@ -13,7 +11,6 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-// 2. Pemeriksaan Fail Templat
 $template_path = 'pdf_template_admin.php';
 if (!file_exists($template_path)) {
     $mpdf = new \Mpdf\Mpdf();
@@ -22,12 +19,10 @@ if (!file_exists($template_path)) {
     exit();
 }
 
-// 3. Dapatkan Data dengan Logik Penapis yang Sama
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $category_filter_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-// Bina query secara dinamik
 $sql_base = "SELECT 
                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
                 ri.reserve_date, ri.return_date, ri.return_condition,
@@ -60,7 +55,6 @@ $sql = $sql_base . " WHERE " . implode(' AND ', $where_clauses) . " ORDER BY ri.
 $stmt = $conn->prepare($sql);
 if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
 
-// Gunakan call_user_func_array untuk bind_param
 $bind_params = array();
 $bind_params[] = $param_types;
 for ($i = 0; $i < count($param_values); $i++) {
@@ -73,7 +67,6 @@ $result = $stmt->get_result();
 $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Dapatkan nama kategori untuk tajuk laporan
 $category_name = 'All Categories';
 if ($category_filter_id > 0) {
     $cat_stmt = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
@@ -84,7 +77,6 @@ if ($category_filter_id > 0) {
     $cat_stmt->close();
 }
 
-// 4. Bina Kandungan HTML
 $html = file_get_contents($template_path);
 $tableRows = '';
 if (empty($records)) {
@@ -109,13 +101,11 @@ if (empty($records)) {
     }
 }
 
-// Gantikan pemegang tempat
 $html = str_replace('{{start_date}}', htmlspecialchars(date("d M Y", strtotime($start_date))), $html);
 $html = str_replace('{{end_date}}', htmlspecialchars(date("d M Y", strtotime($end_date))), $html);
 $html = str_replace('{{category_name}}', htmlspecialchars($category_name), $html);
 $html = str_replace('{{table_rows}}', $tableRows, $html);
 
-// 5. Jana PDF
 try {
     $mpdf = new \Mpdf\Mpdf(array('format' => 'A4-L'));
     $mpdf->SetHeader('UniKL Equipment Return Report | Generated: ' . date('d M Y, H:i'));

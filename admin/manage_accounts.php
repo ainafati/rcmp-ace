@@ -2,12 +2,10 @@
 session_start();
 include 'config.php';
 
-// Check database connection
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// Ensure admin is logged in
 if (!isset($_SESSION['admin_id'])) {
     header("Location: login.php");
     exit();
@@ -23,9 +21,6 @@ if ($admin_data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-// -----------------------------------------------------------------
-// PEMBETULAN: Query SQL diringkaskan. Tiada lagi 'CASE' diperlukan.
-// -----------------------------------------------------------------
 $sql = "
     (SELECT tech_id AS id, name, email, ic_num, status, suspension_remarks, phoneNum, 'Technician' AS role, created_at FROM technician)
     UNION ALL
@@ -38,7 +33,6 @@ if (!$result) {
     die("Error executing query: ". $conn->error);
 }
 
-// Fetch all results into the accounts array
 $accounts = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -324,7 +318,6 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-// --- FUNGSI JAVASCRIPT UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('admin-sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -353,8 +346,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-
-// Function to populate and show the Edit modal
 function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     document.getElementById('editId').value = id;
     document.getElementById('editName').value = name;
@@ -378,7 +369,6 @@ function editUser(id, name, email, ic_num, phone, role, status, remarks) {
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
 }
 
-// Function to filter the table based on search and dropdowns
 function filterTable() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const role = document.getElementById('roleFilter').value.toLowerCase();
@@ -400,12 +390,10 @@ function filterTable() {
     });
 }
 
-// Client-side validation for Add Account form (UniKL email)
 document.getElementById('addAccountForm').addEventListener('submit', function(e) {
     const emailInput = this.querySelector('input[name="email"]');
     const email = emailInput.value.trim();
     
-    // Gunakan Regex untuk menyemak kedua-dua domain
     const uniklEmailPattern = /^[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my$/;
 
     if (!uniklEmailPattern.test(email)) { // <-- DIKEMAS KINI
@@ -419,10 +407,8 @@ document.getElementById('addAccountForm').addEventListener('submit', function(e)
             }
         });
     }
-    // IC validation is handled by the 'pattern' attribute
 });
 
-// Show/Hide Suspension Remarks in Edit Modal
 document.getElementById('editStatus').addEventListener('change', function() {
     const selectedStatus = this.value.toLowerCase();
     const remarksContainer = document.getElementById('editRemarksContainer');
@@ -438,7 +424,6 @@ document.getElementById('editStatus').addEventListener('change', function() {
     }
 });
 
-// Client-side validation for Edit Account form
 document.getElementById('editAccountForm').addEventListener('submit', function(e) {
     const status = document.getElementById('editStatus').value.toLowerCase();
     const remarksTextarea = document.getElementById('editRemarks');

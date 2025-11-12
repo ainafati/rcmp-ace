@@ -1,21 +1,20 @@
 <?php
 session_start();
-include 'config.php'; 
+include 'config.php';
 
 
-// Redirect if already logged in
 if (isset($_SESSION['user_id'])) { header("Location: user/dashboard_user.php"); exit(); }
 if (isset($_SESSION['tech_id'])) { header("Location: technician/dashboard_tech.php"); exit(); }
 if (isset($_SESSION['admin_id'])) { header("Location: admin/manageItem_admin.php"); exit(); }
 
-// Get login attempt details if they exist (from a failed login)
+
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
-// Clear the attempt data so it's only used once
+
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 
-// Get error or success messages
+
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
 unset($_SESSION['error'], $_SESSION['success']);
@@ -39,10 +38,10 @@ unset($_SESSION['error'], $_SESSION['success']);
     /* GLOBAL & STRUCTURE (Centered Design) */
     /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147;     /* Dark Blue (Main Button, Text) */
-        --accent-cyan: #00A3C9;       /* Light Blue/Cyan (Main Accent) */
-        --accent-green: #A7D737;      /* Lime Green (Input Focus) */
-        --light-bg: #f5f8ff;          /* Light background */
+        --primary-color: #002147;      /* Dark Blue (Main Button, Text) */
+        --accent-cyan: #00A3C9;        /* Light Blue/Cyan (Main Accent) */
+        --accent-green: #A7D737;       /* Lime Green (Input Focus) */
+        --light-bg: #f5f8ff;           /* Light background */
         --border-color: #e2e8f0;
         --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15); /* Stronger shadow for card */
     }
@@ -160,15 +159,48 @@ unset($_SESSION['error'], $_SESSION['success']);
         height: auto;
         margin-top: 25px; /* Reduce top margin */
     }
-    .input-group { margin-bottom: 18px; text-align: left; position: relative; }
-    .input-group label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: #1e293b; }
-    .input-group input { 
-        width: 100%; padding: 12px; border: 1px solid var(--border-color); 
-        border-radius: 8px; box-sizing: border-box; font-size: 16px;
-        transition: border-color 0.3s, box-shadow 0.3s;
-        /* Give space on the right for the icon */
-        padding-right: 40px; 
+    .input-group { 
+        margin-bottom: 18px; 
+        text-align: left; 
+        position: relative; 
+        z-index: 10; 
     }
+    .input-group label { 
+        font-weight: 600; 
+        font-size: 14px; 
+        display: block; 
+        margin-bottom: 6px; 
+        color: #1e293b; 
+    }
+    .input-group input { 
+        width: 100%; 
+        padding: 12px; 
+        border: 1px solid var(--border-color); 
+        border-radius: 8px; 
+        box-sizing: border-box; 
+        font-size: 16px;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        /* Padding lebih besar untuk ikon toggle */
+        padding-right: 50px; 
+    }
+    
+    /* ********** PEMBETULAN UTAMA: HILANGKAN IKON LALAI PELAYAR ********** */
+    /* Sembunyikan ikon Reveal Password lalai dari Chrome/Edge/Safari/IE/Edge */
+    input[type=password]::-ms-reveal,
+    input[type=password]::-ms-clear {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    input[type=password]::-webkit-contacts-auto-fill-button,
+    input[type=password]::-webkit-credentials-auto-fill-button {
+        visibility: hidden;
+        pointer-events: none;
+        position: absolute;
+        right: 0;
+    }
+    /* ********************************************************** */
+
     .input-group input:focus {
         border-color: var(--accent-green);
         box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
@@ -176,14 +208,15 @@ unset($_SESSION['error'], $_SESSION['success']);
     }
     .toggle-password { 
         position: absolute; 
-        right: 12px; 
-        /* Adjusted to center vertically with input */
+        right: 8px; 
         top: 50%;
         transform: translateY(-50%);
         margin-top: 14px; /* Approx. half the label height + margin */
         cursor: pointer; 
         color: #94a3b8; 
         font-size: 16px; 
+        /* Pastikan ikon anda berada di atas segalanya */
+        z-index: 100; 
     }
     /* Fix 'top' position if no label */
     .input-group input:placeholder-shown + .toggle-password {
@@ -222,15 +255,15 @@ unset($_SESSION['error'], $_SESSION['success']);
     }
 
     .error-message {
-        color: #721c24; /* Dark red text */
-        background-color: #f8d7da; /* Pink background */
-        border-color: #f5c6cb; /* Pink border */
+        color: #721c24; 
+        background-color: #f8d7da; 
+        border-color: #f5c6cb; 
     }
 
     .success-message {
-        color: #155724; /* Dark green text */
-        background-color: #d4edda; /* Light green background */
-        border-color: #c3e6cb; /* Light green border */
+        color: #155724; 
+        background-color: #d4edda; 
+        border-color: #c3e6cb; 
     }
     
     .instruction #role-title { color: var(--accent-cyan) !important; }
@@ -243,29 +276,28 @@ unset($_SESSION['error'], $_SESSION['success']);
             width: 100%;
             max-width: none;
             padding: 30px 20px;
-            box-shadow: none; /* Remove shadow on full mobile */
+            box-shadow: none; 
             border-radius: 0;
             min-height: 100vh;
         }
         .roles {
-            grid-template-columns: 1fr; /* 1 column for small screens */
+            grid-template-columns: 1fr; 
             gap: 10px;
         }
         .header-branding {
-             margin-top: 15px;
+            margin-top: 15px;
         }
         /* Adjust toggle icon position on mobile if needed */
         .toggle-password {
             margin-top: 13px;
         }
     }
-</style>
-</head>
+</style></head>
 <body>
 
 <div class="form-wrapper">
     <div class="header-branding">
-         <img src="assets/unikl-logo.png" alt="UniKL Logo">
+        <img src="assets/unikl-logo.png" alt="UniKL Logo">
         <h1>RCMP NexCheck</h1>
         <p>IT Department Inventory Management Portal.</p>
     </div>
@@ -304,7 +336,6 @@ unset($_SESSION['error'], $_SESSION['success']);
                 <div class="input-group">
                     <label for="password">Password</label>
                     <input type="password" name="password" id="password" required>
-                    
                     <i class="fa-solid toggle-password" id="togglePassword"></i>
                 </div>
                 
@@ -335,7 +366,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         const passwordField = document.querySelector("#password");
         
         
-        // Fade-out logic for notifications
+        
         if (alertMessages) {
             alertMessages.forEach(function(message) {
                 setTimeout(() => {
@@ -343,31 +374,31 @@ unset($_SESSION['error'], $_SESSION['success']);
                     setTimeout(() => {
                         message.style.display = 'none';
                     }, 500);
-                }, 5000); // 5 seconds
+                }, 5000); 
             });
         }
         
         
-        // Function to show the login form
+        
         function showLoginDetails(role, title) {
             roleTitle.textContent = title;
             hiddenRoleInput.value = role;
             
-            // Show "Sign Up" link only for users
+            
             signUpLink.style.display = (role === 'user') ? 'block' : 'none';
             
-            // Hide the role selection step
+            
             document.getElementById('role-selection-step').style.display = 'none'; 
             
-            // Show the login details step
+            
             loginDetailsStep.classList.add('visible');
             
-            // Focus on the email input if it's empty
+            
             const emailInput = document.getElementById('email');
             if (emailInput.value === '') {
                 emailInput.focus();
             } else {
-                // If email is already filled (from a failed attempt), focus on password
+                
                 passwordField.focus();
             }
         }
@@ -379,37 +410,38 @@ unset($_SESSION['error'], $_SESSION['success']);
         });
         
         
-        // ------------------------------------------------------------------
-        // IMPROVED PASSWORD TOGGLE LOGIC (FIXES THE "TWO EYES" BUG)
-        // ------------------------------------------------------------------
+        
+        
+        
         if (togglePassword && passwordField) {
             
-            // 1. Set the default icon (eye-slash)
+            
+            
             togglePassword.classList.add("fa-eye-slash"); 
             
             togglePassword.addEventListener("click", function () {
-                // 2. Check the current input type
+                
                 const isPassword = passwordField.type === "password";
                 
                 if (isPassword) {
-                    // 3. If it's 'password', change to 'text'
+                    
                     passwordField.type = "text";
-                    // 4. Change icon: Remove 'slash' (closed), add 'eye' (open)
+                    
                     this.classList.remove("fa-eye-slash");
                     this.classList.add("fa-eye");
                 } else {
-                    // 5. If it's 'text', change back to 'password'
+                    
                     passwordField.type = "password";
-                    // 6. Change icon: Remove 'eye' (open), add 'slash' (closed)
+                    
                     this.classList.remove("fa-eye");
                     this.classList.add("fa-eye-slash");
                 }
             });
         }
-        // ------------------------------------------------------------------
         
         
-        // Logic to reshow the form if a login attempt failed
+        
+        
         const attemptedRole = '<?= $login_attempt_role ?>';
         if (attemptedRole) {
             const radio = document.querySelector(`input[name="role"][value="${attemptedRole}"]`);
@@ -417,7 +449,7 @@ unset($_SESSION['error'], $_SESSION['success']);
                 
                 radio.checked = true;
                 
-                // Give a short delay for rendering before the transition
+                
                 setTimeout(() => {
                     showLoginDetails(attemptedRole, radio.dataset.title);
                 }, 100); 

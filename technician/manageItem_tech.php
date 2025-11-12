@@ -1,10 +1,10 @@
 <?php
 session_start();
-// Pastikan laluan (path) ke fail config dan logger adalah betul mengikut struktur folder anda
+
 include '../config.php'; 
 include_once '../logger.php'; 
 
-// --- 1. AUTHENTICATION & USER INFO ---
+
 if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
@@ -20,7 +20,7 @@ if ($tech_data = $result_tech->fetch_assoc()) {
 }
 $stmt_tech->close();
 
-// Sediakan pembolehubah untuk log
+
 $tech_id_session = (int)$_SESSION['tech_id'];
 $tech_name_session = $tech['name'];
 
@@ -31,7 +31,7 @@ function safe_unlink($filepath) {
 }
 
 function get_reservation_item_count($conn, $status) {
-    // Hanya kira item yang berstatus 'Pending'
+    
     $sql = "SELECT COUNT(id) AS count 
             FROM reservation_items 
             WHERE status = ?";
@@ -50,12 +50,12 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
-// Dapatkan kiraan yang diperlukan untuk dashboard
+
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
 
-// --- 2. CATEGORY MANAGEMENT LOGIC ---
 
-// --- TAMBAH KATEGORI ---
+
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
     $db_path = "";
@@ -73,10 +73,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     if ($stmt->execute()) {
         $new_cat_id = $stmt->insert_id;
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
         log_activity($conn, 'tech', $tech_id_session, 'TECH_ADD_CATEGORY', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
     }
@@ -84,7 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     header("Location: manageItem_tech.php"); exit();
 }
 
-// --- KEMAS KINI KATEGORI ---
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $category_id = (int)$_POST['edit_category_id'];
     $category_name = trim($_POST['edit_category_name']);
@@ -112,10 +112,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     if (isset($stmt)) {
         if ($stmt->execute()) {
             
-            // --- MULA REKOD LOG ---
+            
             $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
             log_activity($conn, 'tech', $tech_id_session, 'TECH_EDIT_CATEGORY', $log_details);
-            // --- TAMAT REKOD LOG ---
+            
             
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
         }
@@ -126,11 +126,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     header("Location: manageItem_tech.php"); exit();
 }
 
-// --- PADAM KATEGORI ---
+
 if (isset($_GET['delete_category_id'])) {
     $delete_id = (int)$_GET['delete_category_id'];
     
-    // 1. Dapatkan info untuk log & padam imej
+    
     $stmt_info = $conn->prepare("SELECT category_name, image_url FROM categories WHERE category_id = ?");
     $stmt_info->bind_param("i", $delete_id);
     $stmt_info->execute();
@@ -138,7 +138,7 @@ if (isset($_GET['delete_category_id'])) {
     $stmt_info->fetch();
     $stmt_info->close();
     
-    // 2. Padam imej
+    
     if (!empty($image_url_to_delete)) {
         safe_unlink('../' . $image_url_to_delete);
     }
@@ -147,10 +147,10 @@ if (isset($_GET['delete_category_id'])) {
     $stmt->bind_param("i", $delete_id);
     if ($stmt->execute()) {
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
         log_activity($conn, 'tech', $tech_id_session, 'TECH_DELETE_CATEGORY', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
     } else {
@@ -161,7 +161,7 @@ if (isset($_GET['delete_category_id'])) {
 }
 
 
-// --- 3. ITEM MANAGEMENT LOGIC ---
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     $item_name = trim($_POST['item_name']);
     $category_id = (int)$_POST['category_id'];
@@ -205,10 +205,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         }
         $conn->commit();
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
         log_activity($conn, 'tech', $tech_id_session, 'TECH_ADD_ITEM_UNITS', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Successfully created ' . htmlspecialchars($item_name) . ' with ' . $quantity . ' units.'];
     } catch (Exception $e) {
@@ -271,10 +271,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
         $conn->commit();
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
         log_activity($conn, 'tech', $tech_id_session, 'TECH_EDIT_ITEM_UNITS', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item updated successfully' . $message_part_2 . '!'];
     } catch (Exception $e) {
@@ -288,7 +288,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 if (isset($_GET['delete_item_id'])) {
     $delete_id = (int)$_GET['delete_item_id'];
     
-    // 1. Dapatkan nama item untuk log
+    
     $stmt_name = $conn->prepare("SELECT item_name FROM item WHERE item_id = ?");
     $stmt_name->bind_param("i", $delete_id);
     $stmt_name->execute();
@@ -312,10 +312,10 @@ if (isset($_GET['delete_item_id'])) {
         $stmt->close();
         $conn->commit();
         
-        // --- MULA REKOD LOG ---
+        
         $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
         log_activity($conn, 'tech', $tech_id_session, 'TECH_DELETE_ITEM_TYPE', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item type and all its units have been deleted.'];
     } catch (Exception $e) {
@@ -325,7 +325,7 @@ if (isset($_GET['delete_item_id'])) {
     header("Location: manageItem_tech.php"); exit();
 }
 
-// --- 4. FETCH DATA FOR DISPLAY ---
+
 $categories = $conn->query("SELECT * FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
 $item_details = $conn->query("
     SELECT 
@@ -344,7 +344,7 @@ $item_details = $conn->query("
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Inventory — UniKL Technician</title>
+<title>Manage Inventory — UniKL Technician</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -580,12 +580,13 @@ $item_details = $conn->query("
                                     <td><?= htmlspecialchars($item['category_name']) ?></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-success"><?= $item['available_units'] ?></span></td>
-                                    <td>
+                                    
+                                    <td class="d-flex gap-2">
                                         <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
                                         <button class="btn btn-sm btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
                                         <button class="btn btn-sm btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
                                     </td>
-                                </tr>
+                                    </tr>
                             <?php endforeach; endif; ?>
                             </tbody>
                         </table>
@@ -720,13 +721,13 @@ $item_details = $conn->query("
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https:
+<script src="https:
 <script>
     <?php
     if (isset($_SESSION['message'])) {
         $message = $_SESSION['message'];
-        // Pastikan teks dilarikan (escaped) untuk JS string
+        
         $text_escaped = str_replace("'", "\'", $message['text']);
         echo "Swal.fire({
             icon: '{$message['type']}',
@@ -747,7 +748,7 @@ $item_details = $conn->query("
         
         var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
         
-        // Sembunyikan modal utama (Manage Categories)
+        
         var mainModalEl = document.getElementById('categoryModal');
         var mainModal = bootstrap.Modal.getInstance(mainModalEl);
         if (mainModal) {
@@ -776,11 +777,11 @@ $item_details = $conn->query("
     function openEditItemModal(item) {
         document.getElementById('edit_item_id').value = item.item_id;
         document.getElementById('edit_item_name').value = item.item_name;
-        // Set category select
+        
         document.getElementById('edit_category_id_select').value = item.category_id; 
         document.getElementById('edit_description').value = item.description;
 
-        // Reset fields for adding new units
+        
         document.getElementById('edit_item_quantity').value = 0;
         document.getElementById('edit_item_brand').value = '';
         document.getElementById('edit_item_model').value = '';
@@ -804,28 +805,28 @@ $item_details = $conn->query("
         });
     }
 
-    // --- KOD BARU UNTUK TOGGLE SIDEBAR MULA ---
+    
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.querySelector('.sidebar');
         const toggleButton = document.getElementById('sidebarToggle');
-        const links = document.querySelectorAll('.sidebar a'); // Dapatkan semua link sidebar
+        const links = document.querySelectorAll('.sidebar a'); 
 
         if (toggleButton && sidebar) {
             toggleButton.addEventListener('click', function() {
                 sidebar.classList.toggle('active');
             });
 
-            // Sembunyikan sidebar secara automatik selepas klik link (UX yang baik)
+            
             links.forEach(link => {
                 link.addEventListener('click', () => {
-                    // Hanya sembunyikan jika ia dalam mode mobile
+                    
                     if (window.innerWidth <= 992) {
                         sidebar.classList.remove('active');
                     }
                 });
             });
 
-            // Apabila modal Edit Kategori ditutup, buka semula modal Kategori utama jika perlu
+            
             const editCatModal = document.getElementById('editCategoryModal');
             editCatModal.addEventListener('hidden.bs.modal', function () {
                 const mainModalEl = document.getElementById('categoryModal');
@@ -840,7 +841,7 @@ $item_details = $conn->query("
             });
         }
     });
-    // --- KOD BARU UNTUK TOGGLE SIDEBAR TAMAT ---
+    
 </script>
 </body>
 </html>

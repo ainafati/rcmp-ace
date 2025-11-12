@@ -124,7 +124,7 @@
             }
             messageContainer.classList.remove('hidden');
 
-            // Sembunyikan selepas 8 saat
+            
             setTimeout(() => {
                 messageContainer.classList.add('hidden');
             }, 8000); 
@@ -133,7 +133,7 @@
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
 
-            // Setup button for loading status
+            
             submitButton.disabled = true;
             submitButton.innerHTML = `
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -159,7 +159,7 @@
                 if (res.ok && data.success) {
                     displayMessage(true, data.message);
                     
-                    // Redirect to OTP verification form after 2 seconds
+                    
                     setTimeout(() => {
                         window.location.href = `verify_otp_form.php?email=${encodeURIComponent(email)}`;
                     }, 2000);
@@ -173,7 +173,7 @@
                 console.error("Fetch Error:", error);
                 displayMessage(false, `Error: Server connection failed. Please check the network.`);
             } finally {
-                // Reset button to normal only if redirection hasn't happened
+                
                 if (submitButton.disabled && messageContainer.classList.contains('alert-error')) {
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;

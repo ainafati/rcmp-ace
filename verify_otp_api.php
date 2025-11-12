@@ -4,10 +4,8 @@
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
-
-ob_start();
 include 'config.php'; 
-ob_end_clean();
+
 
 header('Content-Type: application/json');
 

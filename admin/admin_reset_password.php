@@ -20,7 +20,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
     
-    // ✨ BLOK BARU: Pengesahan kata laluan yang lebih ketat ✨
     $uppercase = preg_match('@[A-Z]@', $newPassword);
     $lowercase = preg_match('@[a-z]@', $newPassword);
     $number    = preg_match('@[0-9]@', $newPassword);
@@ -32,10 +31,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
     
-    // Hash kata laluan baru
     $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
 
-    // Tentukan jadual dan lajur ID
     if ($role === 'User') {
         $tableName = 'user';
         $idColumn = 'user_id';

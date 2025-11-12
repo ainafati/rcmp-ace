@@ -48,7 +48,7 @@
         }
 
         th, td {
-            border: 1px solid #c0c0c0; /* Softer border lines */
+            border: 1px solid #c0c0c0; 
             padding: 12px 10px; 
             text-align: left;
             vertical-align: top;
@@ -56,7 +56,7 @@
         }
 
 thead tr {
-    /* Gunakan Kelabu Arang (Dark Charcoal Gray) */
+
     background-color: #343a40; 
 }
 th {
@@ -67,7 +67,7 @@ color: #ffffff;
     letter-spacing: 0.5px;
 	}
         tbody tr:nth-child(even) {
-            background-color: #f7f7f7; /* Soft gray striping */
+            background-color: #f7f7f7; 
         }
         
         /* Style for better item detail presentation */

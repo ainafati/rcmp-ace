@@ -1,10 +1,10 @@
 <?php
-// File: /technician/profile_tech.php
+
 session_start();
-// Pastikan laluan ke config.php betul
+
 include '../config.php'; 
 
-// --- Pengesahan (pastikan teknikal sudah log masuk) ---
+
 if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
@@ -12,7 +12,7 @@ if (!isset($_SESSION['tech_id'])) {
 
 $tech_id = (int) $_SESSION['tech_id'];
 
-// Ambil maklumat terkini dari database dan simpan ke dalam $tech
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM technician WHERE tech_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -28,7 +28,7 @@ if (!$tech) {
     header("Location: ../login.php"); 
     exit();
 }
-// Tutup connection di sini sahaja jika tiada proses database lain
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -251,7 +251,7 @@ $conn->close();
     const backdrop = document.getElementById('sidebar-backdrop');
     const body = document.body;
 
-    // Logik Edit/Cancel
+    
     editBtn.addEventListener('click', () => {
         viewMode.style.display = 'none';
         editMode.style.display = 'block';
@@ -262,14 +262,14 @@ $conn->close();
         viewMode.style.display = 'block';
     });
 
-    // Logik Mobile Sidebar Toggle
+    
     function toggleSidebar() {
         body.classList.toggle('offcanvas-open');
         
         if (body.classList.contains('offcanvas-open')) {
             backdrop.style.display = 'block';
         } else {
-            // Sembunyikan backdrop selepas transisi 300ms selesai
+            
             setTimeout(() => {
                 backdrop.style.display = 'none';
             }, 300); 

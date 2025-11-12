@@ -9,10 +9,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     $category = $_POST['edit_category'];
     $desc = $_POST['edit_desc'];
 
-    // Check if a new image is uploaded
     $image_url = $_POST['edit_image_url'] ?? ''; // If no new image, use the old one
     
-    // If a new image is uploaded, handle the file upload
+
     if (isset($_FILES['edit_image_url']) && $_FILES['edit_image_url']['error'] === 0) {
         $image = $_FILES['edit_image_url'];
         $image_name = $image['name'];
@@ -33,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
         }
     }
 
-    // Update the item record
     $stmt = $conn->prepare("UPDATE item SET item_name=?, category_id=?, description=?, image_url=? WHERE item_id=?");
     $stmt->bind_param("sissi", $name, $category, $desc, $image_url, $id);
     if ($stmt->execute()) {

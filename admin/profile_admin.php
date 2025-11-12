@@ -2,16 +2,13 @@
 session_start();
 include '../config.php'; 
 
-// 1. Pastikan admin sudah log masuk
 if (!isset($_SESSION['admin_id'])) {
     header("Location: ../login.php"); 
     exit();
 }
 
-// 2. Guna nama pembolehubah yang betul ($admin_id)
 $admin_id = (int) $_SESSION['admin_id'];
 
-// 3. Ambil maklumat terkini dari jadual 'admin' dan simpan ke dalam $admin
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM admin WHERE admin_id = ?");
 $stmt->bind_param("i", $admin_id);
 $stmt->execute();
@@ -20,7 +17,6 @@ $admin = $result->fetch_assoc();
 $stmt->close();
 
 if (!$admin) {
-    // Jika admin tidak wujud, paksa log keluar
     session_destroy();
     header("Location: ../login.php");
     exit();
@@ -102,16 +98,15 @@ if (!$admin) {
             /* Topbar - Diperkemas */
             .topbar { 
                 padding: 10px 15px; 
-                justify-content: space-between; /* Tukar balik ke space-between */
+                justify-content: space-between; 
             } 
             .topbar h3 { 
                 font-size: 18px; 
-                flex-grow: 1; /* Biar tajuk ambil ruang di tengah */
+                flex-grow: 1;
                 text-align: center;
-                margin-left: -35px; /* Adjust untuk center, menampung ikon toggle */
+                margin-left: -35px; 
             }
             .topbar .d-flex {
-                /* Untuk ikon profil di kanan */
                 margin-left: auto;
             }
             
@@ -145,7 +140,6 @@ if (!$admin) {
                 margin-top: 10px;
             }
             #editMode .btn-secondary {
-                /* Tukar margin-top asal dari 10px ke 0 untuk butang 'Cancel' */
                 margin-top: 0; 
             }
         }
@@ -251,7 +245,7 @@ if (!$admin) {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // --- JS UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -280,7 +274,7 @@ if (!$admin) {
         }
     });
 
-    // --- JS UNTUK TOGGLE VIEW/EDIT MODE ---
+
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');

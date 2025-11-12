@@ -2,32 +2,32 @@
 session_start();
 include '../config.php';
 
-// Ensure technician is logged in
+
 if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
 }
 $tech_id = (int)$_SESSION['tech_id'];
 
-// Get technician info
+
 $stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?");
 $stmt_tech->bind_param("i", $tech_id);
 $stmt_tech->execute();
-$result_tech = $stmt_tech->get_result(); // Guna get_result() untuk keserasian
+$result_tech = $stmt_tech->get_result(); 
 $tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
 $stmt_tech->close();
 
 
-// Get single date filter data from URL (GET)
+
 $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_GET['filter_date'] : null;
 
 
-// Fetch Data By Status
+
 function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $status_placeholders = implode(',', array_fill(0, count($statuses), '?'));
 
-    // Base SQL
-    // KOD INI BETUL: Menggunakan 'ri.reserve_id = r.reserve_id'
+    
+    
     $sql = "SELECT
                 ri.id AS reservation_item_id, ri.status, ri.quantity, ri.reserve_date, ri.return_date,
                 r.created_at AS apply_date, 
@@ -43,7 +43,7 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
 
-    // Add single date filter if it exists
+    
     if ($filter_date) {
         $sql .= " AND DATE(r.created_at) = ?";
         $bind_types .= 's';
@@ -54,7 +54,7 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
 
     $stmt = $conn->prepare($sql);
 
-    // Bind parameters
+    
     $bind_params = [];
     $bind_params[] = $bind_types;
     foreach ($bind_values as $key => $value) {
@@ -66,14 +66,14 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 
-// Pass the single date to the function
+
 $pending_requests = fetch_reservations_by_status($conn, ['Pending'], $filter_date);
 $approved_requests = fetch_reservations_by_status($conn, ['Approved'], $filter_date);
 $on_loan_requests = fetch_reservations_by_status($conn, ['Checked Out'], $filter_date);
 $completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected', 'Cancelled'], $filter_date);
 
 
-// Get other data for modals
+
 $assetSql = "
     SELECT asset_id, item_id, asset_code
     FROM assets
@@ -93,7 +93,7 @@ $availableAssets = [];
 while ($row = $assetResult->fetch_assoc()) { $availableAssets[$row['item_id']][] = $row; }
 $availableAssets_json = json_encode($availableAssets);
 
-// Function to generate the table HTML
+
 function create_request_table($requests) {
     if (empty($requests)) {
         echo '<div class="text-center text-muted py-5"><i class="fa-solid fa-inbox fa-2x mb-2"></i><br>No reservations found matching the criteria.</div>';
@@ -128,7 +128,7 @@ function create_request_table($requests) {
         echo "<td><span class='badge rounded-pill $badgeClass'>" . ucfirst(str_replace('_', ' ', $status)) . "</span></td>";
         echo "<td class='text-center'>";
 
-        // --- TAMBAH 'aria-label' UNTUK ACCESSIBILITY ---
+        
         if ($status === 'pending') {
             echo "<button class='btn btn-success btn-sm' title='Approve' aria-label='Approve Request' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
             echo "<button class='btn btn-danger btn-sm' title='Reject' aria-label='Reject Request' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
@@ -363,7 +363,7 @@ function create_request_table($requests) {
 <script>
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
-// --- Approve Logic ---
+
 function openApproveModal(id) {
     const row = document.getElementById('row-' + id);
     if (!row) return;
@@ -405,7 +405,7 @@ $('#confirmApproveBtn').on('click', function() {
     }
     const btn = $(this).prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Approving...');
     $.ajax({
-        url: 'checkout_action.php', // Pastikan fail ini wujud di folder yang sama
+        url: 'checkout_action.php', 
         method: 'POST',
         data: { action: 'approve', reservation_item_id, selectedAssets: selected },
         dataType: 'json',
@@ -414,7 +414,7 @@ $('#confirmApproveBtn').on('click', function() {
             .then(() => location.reload());
         },
         error: (xhr) => {
-            // DIKEMAS KINI: Tunjukkan ralat sebenar
+            
             let realErrorMessage = xhr.responseText;
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 realErrorMessage = xhr.responseJSON.message;
@@ -425,7 +425,7 @@ $('#confirmApproveBtn').on('click', function() {
     });
 });
 
-// --- Reject Logic ---
+
 function openRejectModal(id) {
     $('#reject_reservation_item_id').val(id);
     $('#reject_reason').val('');
@@ -445,7 +445,7 @@ $('#confirmRejectBtn').on('click', function() {
         Swal.fire({ title: 'Rejected!', text: data.message || 'Request rejected.', icon: 'success', timer: 1500, showConfirmButton: false })
         .then(() => location.reload());
     }, 'json').fail((xhr) => {
-        // DIKEMAS KINI: Tunjukkan ralat sebenar
+        
         let realErrorMessage = xhr.responseText;
         if (xhr.responseJSON && xhr.responseJSON.message) {
             realErrorMessage = xhr.responseJSON.message;
@@ -455,7 +455,7 @@ $('#confirmRejectBtn').on('click', function() {
     });
 });
 
-// --- Check-Out Logic ---
+
 function checkOutItem(id) {
     Swal.fire({
         title: 'Confirm Check-Out?', text: "Mark item as picked up by the user.", icon: 'question',
@@ -469,7 +469,7 @@ function checkOutItem(id) {
                 .then(() => location.reload());
             }, 'json').fail((xhr) => {
                 Swal.close();
-                // DIKEMAS KINI: Tunjukkan ralat sebenar
+                
                 let realErrorMessage = xhr.responseText;
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     realErrorMessage = xhr.responseJSON.message;
@@ -480,7 +480,7 @@ function checkOutItem(id) {
     });
 }
 
-// === FUNGSI checkInItem (Logik 'remarks' optional/required) ===
+
 function checkInItem(id) {
     const row = document.getElementById('row-' + id);
     if (!row) return;
@@ -544,7 +544,7 @@ function checkInItem(id) {
             $modalBody.find('input[type="radio"]:checked').trigger('change');
         },
         error: function(xhr) {
-            // DIKEMAS KINI: Tunjukkan ralat sebenar
+            
             let realErrorMessage = xhr.responseText;
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 realErrorMessage = xhr.responseJSON.message;
@@ -557,22 +557,22 @@ function checkInItem(id) {
 
 $(document).ready(function() {
     
-    // -----------------------------------------------------------------
-    // --- PEMBETULAN (Accessibility): Logik sidebar baru ---
-    // -----------------------------------------------------------------
+    
+    
+    
     const $sidebar = $('.sidebar');
     const $overlay = $('#sidebarOverlay');
     const $focusableElements = $sidebar.find('a, button');
 
     function setSidebarState(open) {
         if (open) {
-            $sidebar.addClass('toggled'); // 'toggled' ialah kelas 'open' anda
+            $sidebar.addClass('toggled'); 
             $overlay.addClass('active');
-            $focusableElements.attr('tabindex', '0'); // Boleh di-fokus
+            $focusableElements.attr('tabindex', '0'); 
         } else {
             $sidebar.removeClass('toggled');
             $overlay.removeClass('active');
-            $focusableElements.attr('tabindex', '-1'); // Tidak boleh di-fokus (betulkan ralat ARIA)
+            $focusableElements.attr('tabindex', '-1'); 
         }
     }
 
@@ -585,41 +585,41 @@ $(document).ready(function() {
         setSidebarState(false);
     });
 
-    // Tetapkan keadaan awal semasa muat halaman
+    
     $(window).on('load resize', function() {
         if ($(window).width() >= 992) {
-            // Jika desktop
-            $sidebar.removeClass('toggled'); // Sentiasa tunjuk
-            $overlay.removeClass('active');  // Tiada overlay
-            $focusableElements.attr('tabindex', '0'); // Boleh di-fokus
+            
+            $sidebar.removeClass('toggled'); 
+            $overlay.removeClass('active');  
+            $focusableElements.attr('tabindex', '0'); 
         } else {
-            // Jika mobile
-            // Pastikan ia bermula tertutup
+            
+            
             $sidebar.removeClass('toggled');
             $overlay.removeClass('active');
-            $focusableElements.attr('tabindex', '-1'); // Tidak boleh di-fokus
+            $focusableElements.attr('tabindex', '-1'); 
         }
     });
-    // --- TAMAT LOGIK SIDEBAR ---
     
     
-    // -----------------------------------------------------------------
-    // --- PEMBETULAN UNTUK RALAT FOKUS 'aria-hidden' PADA MODAL ---
-    // -----------------------------------------------------------------
-    // Apabila mana-mana modal selesai ditutup, alihkan fokus ke <body>
+    
+    
+    
+    
+    
     $('.modal').on('hidden.bs.modal', function () {
-        // Alihkan fokus kembali ke elemen <body> utama.
-        // Ini menghalang fokus daripada "terperangkap" pada butang 
-        // yang kini halimunan.
+        
+        
+        
         document.body.focus();
     });
-    // --- TAMAT PEMBETULAN ---
+    
 
 
-    // Initialize DataTables
+    
     $('.request-table').DataTable({
         "pageLength": 10,
-        "order": [], // Biar PHP yang tentukan susunan (priority)
+        "order": [], 
         "language": {
             "search": "Search in table:",
             "lengthMenu": "Show _MENU_ entries",
@@ -631,7 +631,7 @@ $(document).ready(function() {
         }
     });
 
-    // Adjust DataTables columns on tab change
+    
     $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
         var targetPane = $(e.target).attr('data-bs-target');
         if ($.fn.DataTable.isDataTable($(targetPane).find('.request-table'))) {
@@ -639,9 +639,9 @@ $(document).ready(function() {
         }
     });
 
-    // === LOGIK MODAL CHECK-IN BAHARU ===
+    
 
-    // Tunjukkan/sembunyikan 'remarks' berdasarkan pilihan
+    
     $('#checkInModalBody').on('change', 'input[type="radio"]', function() {
         const $card = $(this).closest('.checkin-asset-card');
         const $remarksContainer = $card.find('.remarks-container');
@@ -657,14 +657,14 @@ $(document).ready(function() {
     });
 
 
-    // Pengendali klik '#confirmCheckInBtn'
+    
     $('#confirmCheckInBtn').on('click', function() {
         const reservation_item_id = $('#checkin_reservation_item_id').val();
         let asset_conditions = [];
         let isValid = true;
         let firstErrorField = null;
 
-        // 1. Validasi
+        
         $('.checkin-asset-card').each(function() {
             const $card = $(this);
             const asset_id = $card.data('asset-id');
@@ -704,7 +704,7 @@ $(document).ready(function() {
 
         const $btn = $(this);
 
-        // 2. Popup Pengesahan
+        
         Swal.fire({
             title: 'Confirm Check-In?',
             text: `You are about to check in ${asset_conditions.length} asset(s). This action cannot be undone.`,
@@ -715,7 +715,7 @@ $(document).ready(function() {
             confirmButtonText: 'Yes, confirm check-in!'
         }).then((result) => {
             
-            // 3. Hantar (Submit) jika disahkan
+            
             if (result.isConfirmed) {
                 
                 $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Confirming...');
@@ -728,7 +728,7 @@ $(document).ready(function() {
                     Swal.fire({ title: 'Checked In!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false })
                     .then(() => location.reload());
                 }, 'json').fail(function(xhr) {
-                    // DIKEMAS KINI: Tunjukkan ralat sebenar
+                    
                     let realErrorMessage = xhr.responseText;
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         realErrorMessage = xhr.responseJSON.message;
@@ -739,7 +739,7 @@ $(document).ready(function() {
             }
         });
     });
-    // === TAMAT LOGIK MODAL CHECK-IN BAHARU ===
+    
 });
 </script>
 

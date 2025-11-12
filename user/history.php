@@ -1,18 +1,18 @@
 <?php
 session_start();
-// Ensure config path is correct relative to the 'user' folder
+
 include '../config.php';
 
-// Redirect if not logged in
+
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../login.php"); // Adjust path if login.php is elsewhere
+    header("Location: ../login.php"); 
     exit();
 }
 
 $user_id = (int) $_SESSION['user_id'];
 
-// Get user info
-$user = null; // Initialize user variable
+
+$user = null; 
 $stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
 if ($stmt_user) {
     $stmt_user->bind_param("i", $user_id);
@@ -21,19 +21,19 @@ if ($stmt_user) {
     $user = $result_user->fetch_assoc();
     $stmt_user->close();
 } else {
-    // Log error if prepare fails
+    
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
 
-// If user not found, destroy session and redirect
+
 if (!$user) {
     session_destroy();
-    header("Location: ../login.php"); // Adjust path if needed
+    header("Location: ../login.php"); 
     exit();
 }
 
-// --- Pagination & Sorting Settings ---
+
 $rowsPerPage = 10;
 $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($currentPage < 1) $currentPage = 1;
@@ -41,7 +41,7 @@ $offset = ($currentPage - 1) * $rowsPerPage;
 $totalRows = 0;
 $totalPages = 0;
 
-// Fetch total count for pagination (based only on user_id)
+
 $sql_count = "SELECT COUNT(ri.id)
               FROM reservations r
               JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
@@ -53,17 +53,17 @@ if ($stmt_count = $conn->prepare($sql_count)) {
     $stmt_count->fetch();
     $stmt_count->close();
     $totalPages = ceil($totalRows / $rowsPerPage);
-    // Correct currentPage if it exceeds total pages
+    
     if ($currentPage > $totalPages && $totalRows > 0) {
         $currentPage = $totalPages;
-        $offset = ($currentPage - 1) * $rowsPerPage; // Recalculate offset
+        $offset = ($currentPage - 1) * $rowsPerPage; 
     }
 } else {
     error_log("Failed to prepare count statement: " . $conn->error);
 }
 
 
-// Fetch borrowing history with LIMIT and OFFSET, ordered ASC (oldest first)
+
 $history = [];
 $sql = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.reason, ri.status, ri.quantity
         FROM reservations r
@@ -74,7 +74,7 @@ $sql = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.reason, ri.statu
         LIMIT ? OFFSET ?";
 
 if ($stmt = $conn->prepare($sql)) {
-    // Bind user_id, limit, offset
+    
     $stmt->bind_param("iii", $user_id, $rowsPerPage, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -86,12 +86,12 @@ if ($stmt = $conn->prepare($sql)) {
     error_log("Failed to prepare history statement: " . $conn->error);
 }
 
-// **********************************************
-// * STATUS COUNT LOGIC REMOVED AS REQUESTED      *
-// **********************************************
-$approved = $pending = $rejected = $returned = 0; // Keep variables initialized but unused in presentation
 
-// --- Fetch Upcoming Bookings (using the existing $conn) ---
+
+
+$approved = $pending = $rejected = $returned = 0; 
+
+
 $upcoming_bookings_all = [];
 $sql_upcoming = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
                  FROM reservations r
@@ -112,7 +112,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
     error_log("Failed to prepare upcoming bookings statement: " . $conn->error);
 }
 
-// Close the connection ONLY AFTER ALL queries are done
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -288,14 +288,7 @@ $conn->close();
                         </div>
                     </div>
 
-                    <div id="tableView">
-                        <div class="d-flex flex-wrap gap-2 mb-3 quick-filter-chips">
-                            <button type="button" class="btn btn-outline-primary btn-sm quick-filter-btn" data-filter-status="">All History</button>
-                            <button type="button" class="btn btn-outline-warning btn-sm quick-filter-btn" data-filter-status="pending"><i class="fa-solid fa-hourglass-half me-1"></i> Pending</button>
-                            <button type="button" class="btn btn-outline-success btn-sm quick-filter-btn" data-filter-status="approved,checked out"><i class="fa-solid fa-box-open me-1"></i> Active Loans</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm quick-filter-btn" data-filter-status="returned"><i class="fa-solid fa-check-double me-1"></i> Returned</button>
-                        </div>
-                        
+                    <div id="tableView">                        
                         <div class="d-flex align-items-center gap-2 mb-3">
                            <select id="statusFilter" class="form-select form-select-sm" style="width: auto; min-width: 150px;">
                                 <option value="">All Statuses (Dropdown)</option>
@@ -468,7 +461,7 @@ $conn->close();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // --- Mobile Sidebar Toggle Logic ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -477,19 +470,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
             if (sidebar.style.transform === 'translateX(0px)') {
-                // Close sidebar
+                
                 sidebar.style.transform = 'translateX(-100%)';
                 backdrop.style.display = 'none';
                 body.classList.remove('offcanvas-open');
             } else {
-                // Open sidebar
+                
                 sidebar.style.transform = 'translateX(0px)';
                 backdrop.style.display = 'block';
                 body.classList.add('offcanvas-open');
             }
         });
 
-        // Close sidebar when backdrop is clicked
+        
         backdrop.addEventListener('click', () => {
              sidebar.style.transform = 'translateX(-100%)';
              backdrop.style.display = 'none';
@@ -497,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- View Management (Table/Calendar) ---
+    
     const tableViewBtn = document.getElementById('tableViewBtn');
     const calendarViewBtn = document.getElementById('calendarViewBtn');
     const tableView = document.getElementById('tableView');
@@ -505,17 +498,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let calendar = null;
 
     function initializeCalendar() {
-        // Only initialize FullCalendar once
+        
         if (calendar) {
-            calendar.render(); // Ensure it renders if switching back to calendar view
+            calendar.render(); 
             return;
         } 
         
         calendar = new FullCalendar.Calendar(calendarView, {
             initialView: 'dayGridMonth',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
-            events: 'get_bookings.php', // Assuming this file exists and returns valid JSON
-            height: 'auto' // Adjust height automatically
+            events: 'get_bookings.php', 
+            height: 'auto' 
         });
         calendar.render();
     }
@@ -537,15 +530,15 @@ document.addEventListener('DOMContentLoaded', function() {
             calendarViewBtn.classList.remove('btn-outline-primary');
             tableViewBtn.classList.remove('active', 'btn-primary');
             tableViewBtn.classList.add('btn-outline-primary');
-            initializeCalendar(); // Initialize calendar only when viewed
+            initializeCalendar(); 
         });
     }
 
-    // --- Client-Side Filtering Logic (for current page rows) ---
+    
     const historyTable = document.getElementById('historyTable');
     if (historyTable) {
         const tableBody = historyTable.querySelector('tbody');
-        const currentRows = Array.from(tableBody.querySelectorAll('tr')); // Get rows displayed by PHP
+        const currentRows = Array.from(tableBody.querySelectorAll('tr')); 
         const searchInput = document.getElementById('searchInput');
         const statusFilter = document.getElementById('statusFilter');
         const noRecordRowHTML = tableBody.querySelector('td[colspan="6"]') ? tableBody.innerHTML : null;
@@ -558,13 +551,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             currentRows.forEach(row => {
                 if (row.querySelector('td[colspan="6"]')) {
-                    // Check if it's the PHP-generated "No history records found" row
+                    
                     hasDataRows = false;
                     return; 
                 }
                 hasDataRows = true;
 
-                // Index 0: Item Name, Index 5: Reason, Index 3: Status
+                
                 const item = row.cells[0].innerText.toLowerCase();
                 const reason = row.cells[5].innerText.toLowerCase();
                 const rowStatusBadge = row.cells[3].querySelector('.badge');
@@ -574,14 +567,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const matchesStatus = (status === '') || (rowStatus === status);
 
                 if (matchesSearch && matchesStatus) {
-                    row.style.display = ''; // Show row
+                    row.style.display = ''; 
                     visibleCount++;
                 } else {
-                    row.style.display = 'none'; // Hide row
+                    row.style.display = 'none'; 
                 }
             });
 
-            // Handle displaying messages
+            
             const existingNoMatchRow = tableBody.querySelector('.no-filter-match');
             if (existingNoMatchRow) existingNoMatchRow.remove();
 
@@ -591,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  tr.innerHTML = `<td colspan="6" class="text-center text-muted py-5"><i class="fa-solid fa-search fa-2x mb-2"></i><br>No matching records found for the current filters on this page.</td>`;
                  tableBody.appendChild(tr);
             } else if (hasDataRows && visibleCount > 0 && tableBody.querySelector('.no-filter-match')) {
-                 // Remove 'no match' row if results are found again
+                 
                  tableBody.querySelector('.no-filter-match').remove();
             }
         }

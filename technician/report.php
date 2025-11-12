@@ -1,16 +1,16 @@
 <?php
-// File: /technician/report.php
+
 session_start();
 include '../config.php';
 
-// --- Pengesahan (pastikan teknikal sudah log masuk) ---
+
 if (!isset($_SESSION['tech_id'])) {
     header("Location: ../login.php");
     exit();
 }
 $tech_id = (int)$_SESSION['tech_id'];
 
-// Dapatkan info teknikal
+
 $tech = ['name' => 'Technician'];
 if ($stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?")) {
     $stmt_tech->bind_param("i", $tech_id);
@@ -23,7 +23,7 @@ if ($stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?")
 }
 
 function get_reservation_item_count($conn, $status) {
-    // Hanya kira item yang berstatus 'Pending'
+    
     $sql = "SELECT COUNT(id) AS count 
             FROM reservation_items 
             WHERE status = ?";
@@ -42,28 +42,28 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
-// Dapatkan kiraan yang diperlukan untuk dashboard
+
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
 
-// Dapatkan senarai kategori untuk dropdown penapis
+
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
-// Dapatkan Data Berdasarkan Penapis ---
-// Default dates: first and last day of the current month
+
+
 $start_date = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-01');
 $end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-t');
 $category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0; 
 
-// Ambil bulan/tahun daripada $start_date (yang mungkin daripada POST atau lalai)
+
 $current_month = date('m', strtotime($start_date));
 $current_year = date('Y', strtotime($start_date));
 
 
-// --- LOGIK PAGINATION ---
-$limit = 10; // 10 rekod per halaman
+
+$limit = 10; 
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$start = ($page - 1) * $limit; // Hitung OFFSET
+$start = ($page - 1) * $limit; 
 
 $sql_base_select = "SELECT
                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
@@ -87,17 +87,17 @@ $sql_where_clauses = [
 $param_types = "ss";
 $param_values = [$start_date, $end_date];
 
-// Add category filter if selected
+
 if ($category_filter_id > 0) {
     $sql_where_clauses[] = "i.category_id = ?";
-    $param_types .= "i"; // 'i' for integer
+    $param_types .= "i"; 
     $param_values[] = $category_filter_id;
 }
 
 $sql_where = " WHERE " . implode(' AND ', $sql_where_clauses);
 
 
-// 1. Dapatkan JUMLAH KESELURUHAN rekod (untuk pagination)
+
 $sql_count = "SELECT COUNT(ri.id) AS total" . $sql_base_from . $sql_where;
 $stmt_count = $conn->prepare($sql_count);
 if ($stmt_count === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
@@ -115,7 +115,7 @@ $total_pages = ceil($total_records / $limit);
 $stmt_count->close();
 
 
-// 2. Dapatkan DATA UNTUK HALAMAN SEMASA
+
 $sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY ri.return_date DESC, a.asset_code ASC LIMIT ?, ?";
 $param_types .= "ii";
 $param_values[] = $start;
@@ -124,7 +124,7 @@ $param_values[] = $limit;
 $stmt = $conn->prepare($sql);
 if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
 
-// Re-bind parameters for the final query
+
 $bind_params = [];
 $bind_params[] = $param_types;
 for ($i = 0; $i < count($param_values); $i++) {
@@ -137,9 +137,9 @@ $result = $stmt->get_result();
 $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-$conn->close(); // Close connection after fetching data
+$conn->close(); 
 
-// URL Parameters for Pagination Links
+
 $pagination_params = http_build_query([
     'start_date' => $start_date, 
     'end_date' => $end_date, 
@@ -370,14 +370,14 @@ $pagination_params = http_build_query([
                                     
                                     <?php 
                                     $condition = htmlspecialchars($record['return_condition']);
-                                    // PENEKANAN VISUAL UNTUK DAMAGED
+                                    
                                     if ($condition === 'Damaged'): 
                                     ?>
                                         <span class="badge bg-danger mt-1">
                                             <i class="fa-solid fa-triangle-exclamation me-1"></i> DAMAGED
                                         </span>
                                     <?php 
-                                    // Tunjukkan status lain selain 'Good' dengan warna lain
+                                    
                                     elseif ($condition !== 'Good' && !empty($condition) && $condition !== 'N/A'):
                                     ?>
                                         <span class="badge bg-warning text-dark mt-1">
@@ -407,7 +407,7 @@ $pagination_params = http_build_query([
                         </li>
 
                         <?php 
-                        // Show a limited range of pages around the current page
+                        
                         $start_page = max(1, $page - 2);
                         $end_page = min($total_pages, $page + 2);
 
@@ -440,7 +440,7 @@ $pagination_params = http_build_query([
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // Inisialisasi date pickers
+    
     flatpickr("#start_date", { dateFormat: "Y-m-d" });
     flatpickr("#end_date", { dateFormat: "Y-m-d" });
 
@@ -451,7 +451,7 @@ $pagination_params = http_build_query([
     const endDateInput = document.getElementById('end_date');
     const categoryFilter = document.getElementById('category_filter');
 
-    // --- Logik Sidebar Mobile (Kekalkan) ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -475,46 +475,46 @@ $pagination_params = http_build_query([
     if (backdrop) {
         backdrop.addEventListener('click', toggleSidebar);
     }
-    // --- End Logik Sidebar Mobile ---
+    
 
 
-    // --- Logik Filter Bulan/Tahun & Kategori (DIPERBAIKI) ---
+    
     function updateDateInputs() {
         if (!yearFilter || !monthFilter || !startDateInput || !endDateInput) return; 
 
         const year = yearFilter.value;
         const month = monthFilter.value;
         
-        // Dapatkan hari terakhir bulan
+        
         const lastDay = new Date(year, month, 0).getDate(); 
         
         const startDate = `${year}-${('0' + month).slice(-2)}-01`;
         const endDate = `${year}-${('0' + month).slice(-2)}-${('0' + lastDay).slice(-2)}`;
 
-        // Kemas kini input tarikh
+        
         startDateInput.value = startDate;
         endDateInput.value = endDate;
     }
 
     function handleFilterChange(event) {
-        // 1. Pastikan input tarikh dikemas kini dahulu
+        
         updateDateInputs();
 
-        // 2. Jika perubahan datang dari Month, Year, atau Category, submit form
+        
         if (event.target === monthFilter || event.target === yearFilter || event.target === categoryFilter) {
-            // **Hantar borang secara automatik**
+            
             reportForm.submit();
         } 
         
-        // JANGAN submit jika datang dari butang 'Apply Filters' atau date pickers lain
+        
     }
     
-    // Listeners untuk perubahan
+    
     if (monthFilter) monthFilter.addEventListener('change', handleFilterChange);
     if (yearFilter) yearFilter.addEventListener('change', handleFilterChange);
     if (categoryFilter) categoryFilter.addEventListener('change', handleFilterChange);
     
-    // Pastikan input tarikh dikemas kini pada pemuatan halaman
+    
     updateDateInputs(); 
 </script>
 </body>

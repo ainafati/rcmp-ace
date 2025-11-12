@@ -1,15 +1,21 @@
+<?php
+$email = '';
+if (isset($_GET['email'])) {
+    $email = htmlspecialchars(urldecode($_GET['email']));
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Set New Password - UniKL A.C.E. RCMP</title>
-    <script src="https:
-    <link rel="stylesheet" href="https:
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         /* Define UniKL color palette as custom CSS variables */
-        @import url('https:
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         
         :root {
             --unikl-navy: #002147; /* Primary Dark Navy Blue */
@@ -46,6 +52,29 @@
         /* Message Alert Styles */
         .alert-success { background-color: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
         .alert-error { background-color: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
+        
+        /* 🚀 PEMBETULAN AGRESIF: Sembunyikan Ikon 'Reveal Password' Lalai Pelayar */
+        /* 1. Untuk Webkit (Chrome/Edge): Menyembunyikan ikon mata lalai */
+        input[type="password"]::-webkit-reveal,
+        input[type="password"]::-webkit-search-decoration {
+            display: none !important; 
+            -webkit-appearance: none;
+        }
+        
+        /* 2. Untuk IE/Edge (Sintaks lama) */
+        input[type="password"]::-ms-reveal {
+            display: none !important;
+            -ms-appearance: none;
+        }
+        
+        /* 3. Menangani ruang padding yang ditinggalkan oleh ikon yang dihilangkan (penting) */
+        /* Kita tambahkan padding semula jika input tidak mempunyai ikon toggle anda sendiri */
+        /* Walau bagaimanapun, kita akan kekalkan pr-10 pada kedua-dua input untuk memberi ruang kepada ikon buatan sendiri */
+
+        /* Custom style untuk menjarakkan ikon mata buatan sendiri dari input */
+        .password-toggle-btn {
+            right: 0.75rem; /* Melaraskan ikon mata sedikit ke kiri */
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -83,9 +112,9 @@
             <div class="mb-5">
                 <label for="new_password" class="block text-sm font-semibold text-gray-700 mb-2 text-left">New Password</label>
                 <div class="relative">
-                    <input type="password" name="new_password" id="new_password" required minlength="6"
+                    <input type="password" name="new_password" id="new_password" required minlength="8" 
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm pr-10">
-                    <button type="button" id="toggleNewPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent">
+                    <button type="button" id="toggleNewPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent password-toggle-btn">
                         <i id="newPasswordIcon" class="fa-solid fa-eye-slash"></i>
                     </button>
                 </div>
@@ -94,9 +123,9 @@
             <div class="mb-5">
                 <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Confirm Password</label>
                 <div class="relative">
-                    <input type="password" name="confirm_password" id="confirm_password" required minlength="6"
+                    <input type="password" name="confirm_password" id="confirm_password" required minlength="8"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm pr-10">
-                    <button type="button" id="toggleConfirmPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent">
+                    <button type="button" id="toggleConfirmPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent password-toggle-btn">
                         <i id="confirmPasswordIcon" class="fa-solid fa-eye-slash"></i>
                     </button>
                 </div>
@@ -134,7 +163,7 @@
         const newPasswordInput = document.getElementById('new_password');
         const confirmPasswordInput = document.getElementById('confirm_password');
 
-        
+        // Elemen toggle yang dikembalikan
         const toggleNewPasswordButton = document.getElementById('toggleNewPassword');
         const toggleConfirmPasswordButton = document.getElementById('toggleConfirmPassword');
         const newPasswordIcon = document.getElementById('newPasswordIcon');
@@ -144,6 +173,8 @@
         const VERIFY_API_URL = 'verify_otp_api.php'; 
 
         let cooldownSeconds = 0; 
+        let isRedirecting = false; 
+
         
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -163,9 +194,11 @@
             }
             messageContainer.classList.remove('hidden');
 
-            setTimeout(() => {
-                messageContainer.classList.add('hidden');
-            }, 8000); 
+            if (!isSuccess) {
+                setTimeout(() => {
+                    messageContainer.classList.add('hidden');
+                }, 8000); 
+            }
         }
         
         function startResendCooldown() {
@@ -233,7 +266,7 @@
             const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
             inputField.setAttribute('type', type);
             
-            
+            // Toggle the icon classes
             if (type === 'text') {
                 iconElement.classList.remove('fa-eye-slash');
                 iconElement.classList.add('fa-eye');
@@ -243,7 +276,7 @@
             }
         }
 
-        
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
             const params = getUrlParams();
             if (params.email) {
@@ -252,40 +285,47 @@
                 startResendCooldown(); 
             } else {
                 document.getElementById('instructionText').textContent = "Session invalid. Please go back to the forgot password page.";
-                displayMessage(false, "Session invalid. Email not detected.");
+                displayMessage(false, "Session invalid. Email not detected in URL.");
                 resendOtpButton.disabled = true; 
                 otpTimerText.classList.add('hidden');
             }
         });
-
         
-        toggleNewPasswordButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            togglePasswordVisibility(newPasswordInput, newPasswordIcon);
-        });
-
-        toggleConfirmPasswordButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            togglePasswordVisibility(confirmPasswordInput, confirmPasswordIcon);
-        });
-
+        // Event listener for New Password toggle (DIKEMBALIKAN)
+        if (toggleNewPasswordButton) {
+            toggleNewPasswordButton.addEventListener('click', (e) => {
+                e.preventDefault(); 
+                togglePasswordVisibility(newPasswordInput, newPasswordIcon);
+            });
+        }
         
+        // Event listener for Confirm Password toggle (DIKEKALKAN)
+        if (toggleConfirmPasswordButton) {
+            toggleConfirmPasswordButton.addEventListener('click', (e) => {
+                e.preventDefault(); 
+                togglePasswordVisibility(confirmPasswordInput, confirmPasswordIcon);
+            });
+        }
+
+
+        // Event listener for Resend Button
         resendOtpButton.addEventListener('click', resendOtp);
 
-        
+        // Form Submission (Reset Password)
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
 
             const newPassword = newPasswordInput.value;
             const confirmPassword = confirmPasswordInput.value;
             
-            
+            // Client-side validation
             if (newPassword !== confirmPassword) {
                 displayMessage(false, "New password and confirmation do not match.");
                 return;
             }
-            if (newPassword.length < 6) {
-                displayMessage(false, "Password must be at least 6 characters long.");
+            // Validasi minlength 8
+            if (newPassword.length < 8) { 
+                displayMessage(false, "Password must be at least 8 characters long (including upper/lower case, number, and symbol).");
                 return;
             }
             if (otpInput.value.length < 6) { 
@@ -293,27 +333,29 @@
                 return;
             }
 
-            
+            // Disable buttons during processing
             resetButton.disabled = true;
             resendOtpButton.disabled = true;
-            resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http:
+            resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...`;
             messageContainer.classList.add('hidden');
 
             const formData = new FormData(form);
-            
+            let data = null; 
+
             try {
                 const response = await fetch(VERIFY_API_URL, {
                     method: 'POST',
                     body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error('Network error while processing the request.');
+                if (response.headers.get('content-type')?.includes('application/json')) {
+                     data = await response.json();
+                } else {
+                    throw new Error('API did not return JSON. Check verify_otp_api.php for errors.');
                 }
 
-                const data = await response.json();
-
                 if (data.success) {
+                    isRedirecting = true; 
                     displayMessage(data.success, data.message + " Redirecting to Login...");
                     
                     setTimeout(() => {
@@ -325,14 +367,16 @@
                 }
 
             } catch (error) {
-                displayMessage(false, `System Error: Failed to connect to server. (${error.message})`);
-            }
-
-            
-            resetButton.disabled = false; 
-            resetButton.textContent = originalResetButtonText;
-            if (cooldownSeconds <= 0) {
-                resendOtpButton.disabled = false;
+                displayMessage(false, `System Error: Failed to connect to server/API. (${error.message})`);
+            } finally {
+                // Restore buttons HANYA jika TIDAK mengalih keluar
+                if (!isRedirecting) {
+                    resetButton.disabled = false; 
+                    resetButton.textContent = originalResetButtonText;
+                    if (cooldownSeconds <= 0) {
+                        resendOtpButton.disabled = false;
+                    }
+                }
             }
         });
     </script>

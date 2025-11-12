@@ -418,7 +418,7 @@
     </div>
 
 <script>
-    // MODAL LOGIC (Using SESSIONSTORAGE)
+    
     const modal = document.getElementById("disclaimerModal");
     
     window.closeModal = function() {
@@ -436,7 +436,7 @@
         setupScrollAnimation();
     };
 
-    // Scroll Animation Logic
+    
     function setupScrollAnimation() {
         const scrollElements = document.querySelectorAll(".animate-on-scroll");
         const observer = new IntersectionObserver((entries) => {

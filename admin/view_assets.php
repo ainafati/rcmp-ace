@@ -1,23 +1,23 @@
 <?php
-// Fail: view_assets.php (Admin)
+
 
 session_start();
-// Pastikan anda mempunyai fail config.php dan logger.php yang betul
+
 include '../config.php';
 include_once '../logger.php';
 
-// --- Authentication & Setup ---
+
 if (!isset($_SESSION['admin_id'])) {
     header("Location: login.php");
     exit();
 }
 
-// Logik untuk DELETE ASSET
+
 if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
     $delete_id = (int)$_GET['delete_asset_id'];
     $item_id_return = (int)$_GET['item_id_return'];
 
-    // Dapatkan info asset untuk log
+    
     $stmt_info = $conn->prepare("SELECT asset_code FROM assets WHERE asset_id = ?");
     $stmt_info->bind_param("i", $delete_id);
     $stmt_info->execute();
@@ -27,10 +27,10 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
 
     $conn->begin_transaction();
     try {
-        // 1. Padam rekod dari reservation_assets dahulu
+        
         $conn->query("DELETE FROM reservation_assets WHERE asset_id = $delete_id");
 
-        // 2. Padam aset dari jadual assets
+        
         $stmt_delete = $conn->prepare("DELETE FROM assets WHERE asset_id = ?");
         $stmt_delete->bind_param("i", $delete_id);
         $stmt_delete->execute();
@@ -38,12 +38,12 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
         
         $conn->commit();
         
-        // --- MULA REKOD LOG ---
+        
         $admin_id_session = (int)$_SESSION['admin_id'];
         $admin_name_session = "Admin";
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah memadam unit aset: '{$asset_code_to_delete}' (ID: {$delete_id}).";
         log_activity($conn, 'admin', $admin_id_session, 'DELETE_ASSET_UNIT', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Asset unit deleted successfully!'];
     } catch (Exception $e) {
@@ -55,7 +55,7 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
     exit();
 }
 
-// Logik untuk EDIT ASSET
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $asset_id = (int)$_POST['asset_id'];
     $brand = trim($_POST['brand']);
@@ -63,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $status = trim($_POST['status']);
     $item_id_return = (int)$_POST['item_id_return'];
 
-    // Dapatkan asset code lama untuk log
+    
     $stmt_old = $conn->prepare("SELECT asset_code, brand, model, status FROM assets WHERE asset_id = ?");
     $stmt_old->bind_param("i", $asset_id);
     $stmt_old->execute();
@@ -77,12 +77,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     
     if ($stmt->execute()) {
         
-        // --- MULA REKOD LOG ---
+        
         $admin_id_session = (int)$_SESSION['admin_id'];
         $admin_name_session = "Admin";
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah mengemas kini aset: '{$old_asset['asset_code']}' (ID: {$asset_id}). Perubahan: Status dari '{$old_asset['status']}' ke '{$status}', Brand: '{$old_asset['brand']}' ke '{$brand}'.";
         log_activity($conn, 'admin', $admin_id_session, 'EDIT_ASSET_UNIT', $log_details);
-        // --- TAMAT REKOD LOG ---
+        
 
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Asset unit updated successfully!'];
     } else {
@@ -101,7 +101,7 @@ if ($item_id_filter === 0) {
     exit();
 }
 
-// Data fetching
+
 $status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 $where_clauses = ["i.item_id = ?"];
 $param_types = "i";
@@ -122,7 +122,7 @@ if (!$stmt_item->fetch()) {
 }
 $stmt_item->close();
 
-// PERTANYAAN SQL BARU (DISERTAKAN DENGAN LOGIK BORROWER DARI assets_technician.php)
+
 $sql_assets = "
     SELECT
         a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name,
@@ -376,7 +376,7 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged', 'Retir
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// --- FUNGSI JAVASCRIPT UNTUK TOGGLE SIDEBAR (MOBILE ONLY) ---
+
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('admin-sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- TOAST NOTIFICATION ---
+    
     <?php
     if (isset($_SESSION['message'])) {
         $message = $_SESSION['message'];
@@ -424,7 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-// (SEMUA FUNGSI JAVASCRIPT ANDA KEKAL SAMA)
+
 function openEditAssetModal(asset) {
     document.getElementById('edit_asset_id').value = asset.asset_id;
     document.getElementById('asset_code_display').textContent = asset.asset_code;
