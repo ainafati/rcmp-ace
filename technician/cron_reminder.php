@@ -1,99 +1,205 @@
 <?php
+// =================================================================
+// 🚨 BAHAGIAN 1: KONFIGURASI DAN LALUAN MUTLAK (WAJIB UNTUK CRON JOB)
+// =================================================================
 
+// 1. TENTUKAN LALUAN ROOT MUTLAK. 
+// Menggunakan double backslash (\) untuk Windows
+define('ROOT_DIR', 'C:\\xampp\\htdocs\\UniKL ACE\\'); 
 
-$base_dir = __DIR__;
+// 2. Fail config.php (Kini berada di luar folder 'technician')
+// Laluan: C:\xampp\htdocs\UniKL ACE\config.php
+require ROOT_DIR . 'config.php'; 
 
+// Konfigurasi SMTP (config_email.php berada di dalam 'technician')
+require ROOT_DIR . 'technician/config_email.php'; 
 
+// Memasukkan fail PHPMailer (PHPMailer-master berada di root 'UniKL ACE')
+require ROOT_DIR . 'PHPMailer-master/src/Exception.php';
+require ROOT_DIR . 'PHPMailer-master/src/PHPMailer.php';
+require ROOT_DIR . 'PHPMailer-master/src/SMTP.php';
 
-include $base_dir . '/config.php'; 
-include $base_dir . '/config_email.php'; 
-require $base_dir . '/send_email.php';
+// ... (Sambungan kod yang lain)
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
 
-
-ini_set('display_errors', 0);
-error_reporting(E_NONE);
-
-function getReservationsForReminder($conn) {
-    
-    
-    $stmt = $conn->prepare("
-        SELECT 
-            ri.id AS reservation_item_id,
-            u.email AS user_email,
-            u.name AS user_name,
-            i.item_name,
-            ri.return_date,
-            GROUP_CONCAT(a.asset_code SEPARATOR ', ') AS asset_codes
-        FROM reservation_items ri
-        JOIN reservations r ON ri.reserve_id = r.reserve_id
-        JOIN person u ON r.person_id = u.person_id 
-        JOIN item i ON ri.item_id = i.item_id
-        JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
-        JOIN assets a ON ra.asset_id = a.asset_id
-        WHERE ri.status = 'Checked Out' 
-          AND (ri.return_date = CURDATE() OR ri.return_date = CURDATE() + INTERVAL 1 DAY)
-        GROUP BY ri.id
-    ");
-
-    if (!$stmt || !$stmt->execute()) {
-        error_log("Reminder SQL Error: " . $conn->error);
-        return [];
-    }
-
-    $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $result;
+// Semak sambungan DB (jika config.php gagal, skrip akan berhenti di sana)
+if ($conn->connect_error) {
+    error_log("CRON JOB FAILED: Database connection failed: " . $conn->connect_error);
+    echo "CRON JOB FAILED: Database connection error.\n";
+    exit();
 }
 
 
+// ----------------------------------------------------------------------------------
+// 2. FUNGSI PANGGILAN DATABASE
+// ----------------------------------------------------------------------------------
 
-
-
-$reminders = getReservationsForReminder($conn);
-
-if (empty($reminders)) {
+function get_return_items_due($conn, $days_offset) {
+    $target_date_sql = $days_offset == 0 ? "CURDATE()" : "DATE_ADD(CURDATE(), INTERVAL $days_offset DAY)";
     
-    exit('No reminders to send.');
+    $sql = "SELECT
+                ri.id, ri.reserve_date, ri.return_date, ri.quantity,
+                u.name AS user_name, u.email AS user_email, u.phoneNum AS user_phone,
+                i.item_name
+            FROM reservation_items ri
+            JOIN reservations r ON ri.reserve_id = r.reserve_id
+            JOIN person u ON r.person_id = u.person_id
+            JOIN item i ON ri.item_id = i.item_id
+            WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) = $target_date_sql";
+            
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-$sent_count = 0;
+function get_overdue_items($conn) {
+    $sql = "SELECT
+                ri.id, ri.reserve_date, ri.return_date, ri.quantity,
+                u.name AS user_name, u.email AS user_email, u.phoneNum AS user_phone,
+                i.item_name
+            FROM reservation_items ri
+            JOIN reservations r ON ri.reserve_id = r.reserve_id
+            JOIN person u ON r.person_id = u.person_id
+            JOIN item i ON ri.item_id = i.item_id
+            WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) < CURDATE()";
+            
+    $result = $conn->query($sql);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
 
-foreach ($reminders as $item) {
-    $current_date = new DateTime();
-    $return_date_dt = new DateTime($item['return_date']);
-    $diff = $current_date->diff($return_date_dt)->days;
-    
-    
-    if ($diff == 0 && $current_date->format('Y-m-d') == $return_date_dt->format('Y-m-d')) {
-        $subject = '🔴 [PERINGATAN AKHIR] Hari Terakhir Pemulangan Aset: ' . $item['item_name'];
-        $body_message = "Sila pulangkan aset-aset ini <strong>pada hari ini juga ({$item['return_date']})</strong> untuk mengelakkan penalti.";
-    } elseif ($diff == 1) {
-        $subject = '🟡 [PERINGATAN AWAL] Aset Dijangka Pulang Esok: ' . $item['item_name'];
-        $body_message = "Aset-aset ini dijangka akan dipulangkan <strong>esok ({$item['return_date']})</strong>. Sila buat persiapan untuk proses pemulangan.";
-    } else {
-        continue; 
-    }
 
-    
-    
-    $email_sent = sendReturnReminderEmail(
-        $item['user_email'],
-        $item['user_name'],
-        $item['item_name'],
-        $item['asset_codes'],
-        $item['return_date'],
-        $body_message, 
-        $subject,      
-        SMTP_USER,
-        SMTP_PASS
-    );
+// ----------------------------------------------------------------------------------
+// 3. FUNGSI HANTAR E-MEL
+// ----------------------------------------------------------------------------------
 
-    if ($email_sent) {
-        $sent_count++;
+function send_email_notification($recipient_email, $recipient_name, $items, $is_today, $is_overdue = false) {
+    $mail = new PHPMailer(true);
+    try {
+        
+        // --- KONFIGURASI SMTP DARI config_email.php ---
+        $mail->isSMTP();
+        $mail->Host      = SMTP_HOST;
+        $mail->SMTPAuth  = true;
+        
+        $mail->Username  = SMTP_USER;
+        $mail->Password  = SMTP_PASS;
+        
+        // Tetapan SMTP_SECURE dan SMTP_PORT
+        if (SMTP_SECURE == 'tls') {
+             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif (SMTP_SECURE == 'ssl') {
+             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        }
+        $mail->Port      = SMTP_PORT;
+        // ----------------------------------------------
+        
+        $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
+        $mail->addAddress($recipient_email, $recipient_name);
+        
+        
+        if ($is_overdue) {
+            $date_str = 'OVERDUE';
+            $subject = "URGENT: Inventory Item Return (OVERDUE)";
+        } else {
+            $date_str = $is_today ? 'TODAY' : 'TOMORROW';
+            $subject = "Inventory Item Return (Due " . strtoupper($date_str) . ")";
+        }
+
+        
+        $item_list_html = '<table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-family: Arial, sans-serif;">';
+        $item_list_html .= '<thead><tr style="background-color: #f2f2f2;"><th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Item Name</th><th style="border: 1px solid #ddd; padding: 10px; text-align: center;">Quantity</th><th style="border: 1px solid #ddd; padding: 10px; text-align: center;">Return Date</th></tr></thead>';
+        $item_list_html .= '<tbody>';
+        
+        foreach ($items as $item) {
+            $item_list_html .= '<tr>';
+            $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px;">' . htmlspecialchars($item['item_name']) . '</td>';
+            $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px; text-align: center;">' . htmlspecialchars($item['quantity']) . ' unit(s)</td>';
+            $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px; text-align: center;">' . date('d M Y', strtotime($item['return_date'])) . '</td>';
+            $item_list_html .= '</tr>';
+        }
+        $item_list_html .= '</tbody></table>';
+        
+        
+        $body = "
+            <p style='font-family: Arial, sans-serif;'>Dear <strong>" . htmlspecialchars($recipient_name) . "</strong>,</p>
+            <p style='font-family: Arial, sans-serif;'>This is an official and automated notice from the UniKL Inventory Management System regarding items currently in your possession. We wish to inform you that the item(s) listed below are <strong>due for return on $date_str</strong>.</p>
+            <h3 style='font-family: Arial, sans-serif; color: #004d99;'>Item Return Details:</h3>
+            " . $item_list_html . "
+            <p style='font-family: Arial, sans-serif; margin-top: 20px;'>We kindly request your cooperation in ensuring these items are returned to the UniKL Technical Department <strong>promptly</strong>.</p>
+            <p style='font-family: Arial, sans-serif;'>Sincerely,</p>
+            <p style='font-family: Arial, sans-serif;'><strong>The UniKL Inventory Management Department</strong></p>
+        ";
+
+
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body = $body;
+        $mail->send();
+        
+        return true;
+        
+    } catch (Exception $e) {
+        // Log ralat SMTP ke fail log PHP
+        error_log("Failed to send email to $recipient_email. Mailer Error: {$mail->ErrorInfo}");
+        return false;
     }
 }
 
-echo "Reminder script finished. Sent {$sent_count} emails.";
+
+// ----------------------------------------------------------------------------------
+// 4. LOGIK UTAMA SCRIPT (PENGHANTARAN)
+// ----------------------------------------------------------------------------------
+
+// 4.1. Item Due Today
+$today_items = get_return_items_due($conn, 0);
+if (!empty($today_items)) {
+    $users_due_today = [];
+    foreach ($today_items as $item) {
+        $users_due_today[$item['user_email']]['name'] = $item['user_name'];
+        $users_due_today[$item['user_email']]['items'][] = $item;
+    }
+    foreach ($users_due_today as $email => $user_data) {
+        send_email_notification($email, $user_data['name'], $user_data['items'], true, false);
+    }
+}
+
+
+// 4.2. Item Due Tomorrow
+$tomorrow_items = get_return_items_due($conn, 1);
+if (!empty($tomorrow_items)) {
+    $users_due_tomorrow = [];
+    foreach ($tomorrow_items as $item) {
+        $users_due_tomorrow[$item['user_email']]['name'] = $item['user_name'];
+        $users_due_tomorrow[$item['user_email']]['items'][] = $item;
+    }
+    foreach ($users_due_tomorrow as $email => $user_data) {
+        send_email_notification($email, $user_data['name'], $user_data['items'], false, false);
+    }
+}
+
+
+// 4.3. Item Overdue
+$overdue_items = get_overdue_items($conn);
+if (!empty($overdue_items)) {
+    $users_overdue = [];
+    foreach ($overdue_items as $item) {
+        $users_overdue[$item['user_email']]['name'] = $item['user_name'];
+        $users_overdue[$item['user_email']]['items'][] = $item;
+    }
+    foreach ($users_overdue as $email => $user_data) {
+        send_email_notification($email, $user_data['name'], $user_data['items'], false, true);
+    }
+}
+
+
+// Gantikan baris echo terakhir dengan ini:
+echo "Script Reminder Complete. Found " . count($today_items) . " item(s) due today, " . count($tomorrow_items) . " item(s) due tomorrow, and " . count($overdue_items) . " item(s) overdue.\n";
+
+// TAMBAH INI UNTUK DEBUGGING
+if (count($overdue_items) > 0) {
+    echo "ATTEMPTING TO SEND EMAIL TO: " . $overdue_items[0]['user_email'] . "\n";
+}
 
 $conn->close();
 ?>
