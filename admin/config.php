@@ -1,12 +1,17 @@
 <?php
-$servername = "localhost";
-$username = "nexcheck_dbuser";
-$password = "nexcheck_dbuser";
-$database = "inventory"; // nama database kamu
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-$conn = new mysqli($servername, $username, $password, $database);
+$host = "localhost";
+$user = "root";
+$pass = ""; 
+$db = "inventory";
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+$conn = new mysqli($host, $user, $pass, $db);
+
+if( !$db ) {
+    die("Gagal terhubung dengan database:" . mysqli_connect_error());
+
 }
+
 ?>

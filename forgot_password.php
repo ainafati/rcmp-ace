@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - UniKL A.C.E. RCMP</title>
+    <title>Forgot Password </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -76,7 +76,7 @@
         </div>
 
         <p class="text-gray-600 mb-6 text-center text-sm font-medium">
-            Enter your email address (Registered in RCMP's system) to receive a reset code (OTP).
+            Enter your email address (Registered in RCMP's system) to receive a verification code .
         </p>
 
         <form id="forgotForm">
@@ -89,7 +89,7 @@
             <button type="submit" id="submitButton"
                     class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-unikl-navy hover:bg-unikl-navy-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-unikl-orange transition duration-150 ease-in-out transform hover:scale-[1.01] active:scale-95"
                     style="font-size: 16px;">
-                Send Reset Code (OTP)
+                Send Verification Code
             </button>
         </form>
 

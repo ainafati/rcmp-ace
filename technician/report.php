@@ -3,30 +3,29 @@
 session_start();
 include '../config.php';
 
-
-if (!isset($_SESSION['tech_id'])) {
+// 1. Authentication and User Setup
+if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
-$tech_id = (int)$_SESSION['tech_id'];
+$person_id = (int)$_SESSION['person_id'];
 
+// Ambil nama technician (menggunakan jadual person)
+$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+$stmt_tech->bind_param("i", $person_id);
+$stmt_tech->execute();
+$result_tech = $stmt_tech->get_result();
+$tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
+$stmt_tech->close();
 
-$tech = ['name' => 'Technician'];
-if ($stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?")) {
-    $stmt_tech->bind_param("i", $tech_id);
-    $stmt_tech->execute();
-    $stmt_tech->bind_result($tname);
-    if ($stmt_tech->fetch()) {
-        $tech['name'] = $tname;
-    }
-    $stmt_tech->close();
-}
-
+/**
+ * Function to get the count of reservation items by status for the sidebar badge.
+ * @param mysqli $conn Database connection object.
+ * @param string $status The status to count.
+ * @return int Count of records.
+ */
 function get_reservation_item_count($conn, $status) {
-    
-    $sql = "SELECT COUNT(id) AS count 
-            FROM reservation_items 
-            WHERE status = ?";
+    $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
     
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -42,44 +41,48 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
+// Get pending count for the "Manage Requests" badge
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
 
-$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
-
-
+// Get all categories for the filter dropdown
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
 
-
+// 2. Filter & Pagination Setup
+// Set default dates to the current month if not submitted via POST
 $start_date = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-01');
 $end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-t');
-$category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0; 
+$category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
 
-
+// Set month/year dropdowns to match the currently filtered date range
 $current_month = date('m', strtotime($start_date));
 $current_year = date('Y', strtotime($start_date));
 
-
-
-$limit = 10; 
+$limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$start = ($page - 1) * $limit; 
+$start = ($page - 1) * $limit;
+
+
+// 3. SQL Query Construction (using Prepared Statements)
 
 $sql_base_select = "SELECT
                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
                 ri.reserve_date, ri.return_date, ri.return_condition,
-                COALESCE(tech.name, adm.name) AS technician_name";
+                approver.name AS technician_name"; // Alias for Approver/Technician Name
                 
 $sql_base_from = " FROM reservation_items ri
                 JOIN reservations r ON ri.reserve_id = r.reserve_id
-                JOIN user u ON r.user_id = u.user_id
+                JOIN person u ON r.person_id = u.person_id             /* Peminjam */
                 JOIN item i ON ri.item_id = i.item_id
                 JOIN categories c ON i.category_id = c.category_id
+                
+                LEFT JOIN person approver ON ri.approved_by = approver.person_id /* Pengesah/Technician */
+                
                 LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
-                LEFT JOIN assets a ON ra.asset_id = a.asset_id
-                LEFT JOIN technician tech ON ri.approved_by = tech.tech_id
-                LEFT JOIN admin adm ON ri.approved_by = adm.admin_id";
-
+                LEFT JOIN assets a ON ra.asset_id = a.asset_id";
+				
+// Mandatory WHERE clauses for Returned status and Date Range
 $sql_where_clauses = [
     "ri.status = 'Returned'",
     "ri.return_date BETWEEN ? AND ?"
@@ -87,27 +90,31 @@ $sql_where_clauses = [
 $param_types = "ss";
 $param_values = [$start_date, $end_date];
 
-
+// Add Category filter if selected
 if ($category_filter_id > 0) {
     $sql_where_clauses[] = "i.category_id = ?";
-    $param_types .= "i"; 
+    $param_types .= "i";
     $param_values[] = $category_filter_id;
 }
 
 $sql_where = " WHERE " . implode(' AND ', $sql_where_clauses);
 
 
+// 4. Count Total Records (for Pagination)
 
 $sql_count = "SELECT COUNT(ri.id) AS total" . $sql_base_from . $sql_where;
 $stmt_count = $conn->prepare($sql_count);
-if ($stmt_count === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
+if ($stmt_count === false) { die("SQL Error (Count): " . htmlspecialchars($conn->error)); }
 
+// Bind parameters dynamically for the count query
 $bind_params_count = [];
-$bind_params_count[] = $param_types;
+$bind_params_count[] = &$param_types;
 for ($i = 0; $i < count($param_values); $i++) {
     $bind_params_count[] = &$param_values[$i];
 }
+// Use call_user_func_array for dynamic bind_param calls
 call_user_func_array([$stmt_count, 'bind_param'], $bind_params_count);
+
 $stmt_count->execute();
 $count_result = $stmt_count->get_result();
 $total_records = $count_result->fetch_assoc()['total'];
@@ -115,6 +122,7 @@ $total_pages = ceil($total_records / $limit);
 $stmt_count->close();
 
 
+// 5. Fetch Paginated Records
 
 $sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY ri.return_date DESC, a.asset_code ASC LIMIT ?, ?";
 $param_types .= "ii";
@@ -122,11 +130,11 @@ $param_values[] = $start;
 $param_values[] = $limit;
 
 $stmt = $conn->prepare($sql);
-if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
+if ($stmt === false) { die("SQL Error (Fetch): " . htmlspecialchars($conn->error)); }
 
-
+// Bind parameters dynamically for the main query (including LIMIT/OFFSET)
 $bind_params = [];
-$bind_params[] = $param_types;
+$bind_params[] = &$param_types;
 for ($i = 0; $i < count($param_values); $i++) {
     $bind_params[] = &$param_values[$i];
 }
@@ -137,12 +145,12 @@ $result = $stmt->get_result();
 $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-$conn->close(); 
+$conn->close();
 
-
+// Prepare URL parameters for pagination links
 $pagination_params = http_build_query([
-    'start_date' => $start_date, 
-    'end_date' => $end_date, 
+    'start_date' => $start_date,
+    'end_date' => $end_date,
     'category_id' => $category_filter_id
 ]);
 
@@ -177,28 +185,28 @@ $pagination_params = http_build_query([
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
         .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
         
-		/* 5. SIDEBAR BADGE STYLE (Penambahan) */
-.sidebar a .badge {
-    margin-left: auto; /* Tolak badge ke kanan */
-    font-size: 0.75rem;
-    padding: 0.4em 0.6em;
-    font-weight: 700;
-    border-radius: 10px;
-    background-color: #ef4444; /* Merah untuk menarik perhatian */
-    color: white;
-}
+		/* 5. SIDEBAR BADGE STYLE */
+        .sidebar a .badge {
+            margin-left: auto; /* Push badge to the right */
+            font-size: 0.75rem;
+            padding: 0.4em 0.6em;
+            font-weight: 700;
+            border-radius: 10px;
+            background-color: #ef4444; 
+            color: white;
+        }
 
-/* Pastikan badge tidak hilang apabila item menu di-hover atau aktif */
-.sidebar a.active .badge, .sidebar a:hover .badge {
-    background-color: #ffffff;
-    color: #ef4444; /* Warna terbalik agar kontras */
-}
+        /* Badge color inversion on hover/active */
+        .sidebar a.active .badge, .sidebar a:hover .badge {
+            background-color: #ffffff;
+            color: #ef4444; 
+        }
 
         /* 3. MAIN LAYOUT & TOPBAR */
         .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
         .topbar { 
             background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; 
-            position: sticky; top: 0; z-index: 990; /* FIX Z-INDEX for Mobile */
+            position: sticky; top: 0; z-index: 990; 
         }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .topbar .technician-profile { display: flex; align-items: center; gap: 12px; }
@@ -214,7 +222,7 @@ $pagination_params = http_build_query([
         
         /* 5. MOBILE OPTIMIZATIONS */
         @media (max-width: 991.98px) {
-             /* Sidebar Off-Canvas Logic */
+            /* Sidebar Off-Canvas Logic */
             .sidebar { transform: translateX(-100%); }
             .offcanvas-open .sidebar { transform: translateX(0); }
             .main-content { margin-left: 0; padding-top: 80px; /* Space for fixed topbar */ }
@@ -227,7 +235,7 @@ $pagination_params = http_build_query([
             .table-responsive { border: 1px solid #e2e8f0; border-radius: 12px; }
             .table-responsive > .table { margin-bottom: 0; }
             
-             /* Backdrop for Off-Canvas effect */
+            /* Backdrop for Off-Canvas effect */
             .offcanvas-backdrop {
                 position: fixed; top: 0; left: 0; z-index: 1040; width: 100vw; height: 100vh;
                 background-color: #000; opacity: 0.5; transition: opacity 0.3s ease-in-out;
@@ -281,20 +289,25 @@ $pagination_params = http_build_query([
             <h5 class="mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Report Data</h5>
 
             <form method="POST" action="report.php" id="reportForm">
+                <!-- Hidden inputs for Start and End Date - these are the values that get submitted -->
+                <input type="hidden" id="start_date_hidden" name="start_date" value="<?= htmlspecialchars($start_date) ?>">
+                <input type="hidden" id="end_date_hidden" name="end_date" value="<?= htmlspecialchars($end_date) ?>">
+                
                 <div class="row g-3 mb-3">
                     <div class="col-md-3 col-6">
-                        <label for="month_filter" class="form-label fw-bold">Select Month</label>
-                        <select id="month_filter" class="form-select">
+                        <label for="month_select" class="form-label fw-bold">Select Month</label>
+                        <select id="month_select" class="form-select">
                             <?php for ($m = 1; $m <= 12; $m++) {
                                 $month_name = date('F', mktime(0, 0, 0, $m, 1));
                                 $selected = ($m == $current_month) ? 'selected' : '';
-                                echo "<option value='$m' $selected>$month_name</option>";
+                                // Use value with leading zero for month
+                                echo "<option value='" . str_pad($m, 2, '0', STR_PAD_LEFT) . "' $selected>$month_name</option>";
                             } ?>
                         </select>
                     </div>
                     <div class="col-md-3 col-6">
-                        <label for="year_filter" class="form-label fw-bold">Select Year</label>
-                        <select id="year_filter" class="form-select">
+                        <label for="year_select" class="form-label fw-bold">Select Year</label>
+                        <select id="year_select" class="form-select">
                             <?php $start_year = date('Y') - 5; $end_year = date('Y');
                             for ($y = $end_year; $y >= $start_year; $y--) {
                                 $selected = ($y == $current_year) ? 'selected' : '';
@@ -318,13 +331,14 @@ $pagination_params = http_build_query([
                 <hr>
 
                 <div class="row g-3 align-items-end">
+                    <!-- Visible Date Pickers - primarily for user input, values copied to hidden fields on change -->
                     <div class="col-md-4 col-12">
-                        <label for="start_date" class="form-label fw-bold">Start Date</label>
-                        <input type="text" id="start_date" name="start_date" class="form-control" value="<?= htmlspecialchars($start_date) ?>">
+                        <label for="start_date_display" class="form-label fw-bold">Start Date</label>
+                        <input type="text" id="start_date_display" class="form-control" value="<?= htmlspecialchars($start_date) ?>">
                     </div>
                     <div class="col-md-4 col-12">
-                        <label for="end_date" class="form-label fw-bold">End Date</label>
-                        <input type="text" id="end_date" name="end_date" class="form-control" value="<?= htmlspecialchars($end_date) ?>">
+                        <label for="end_date_display" class="form-label fw-bold">End Date</label>
+                        <input type="text" id="end_date_display" class="form-control" value="<?= htmlspecialchars($end_date) ?>">
                     </div>
                     <div class="col-md-4 col-12">
                         <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-arrows-rotate me-2"></i>Apply Filters</button>
@@ -340,7 +354,7 @@ $pagination_params = http_build_query([
                     <a href="generate_pdf.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>" target="_blank" class="btn btn-danger btn-sm flex-grow-1">
                         <i class="fa-solid fa-file-pdf me-2"></i>PDF
                     </a>
-                    <a href="export_excel_tech.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>" target="_blank" class="btn btn-success btn-sm ms-2 flex-grow-1"> 
+                    <a href="export_excel_tech.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>" target="_blank" class="btn btn-success btn-sm ms-2 flex-grow-1">
                         <i class="fa-solid fa-file-excel me-2"></i>Excel
                     </a>
                 </div>
@@ -408,6 +422,7 @@ $pagination_params = http_build_query([
 
                         <?php 
                         
+                        // Smart pagination link generation
                         $start_page = max(1, $page - 2);
                         $end_page = min($total_pages, $page + 2);
 
@@ -441,17 +456,32 @@ $pagination_params = http_build_query([
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
     
-    flatpickr("#start_date", { dateFormat: "Y-m-d" });
-    flatpickr("#end_date", { dateFormat: "Y-m-d" });
+    const startDateDisplay = document.getElementById('start_date_display');
+    const endDateDisplay = document.getElementById('end_date_display');
+    const startDateHidden = document.getElementById('start_date_hidden');
+    const endDateHidden = document.getElementById('end_date_hidden');
 
-    const monthFilter = document.getElementById('month_filter');
-    const yearFilter = document.getElementById('year_filter');
+    // Initialize Flatpickr for visual date inputs
+    flatpickr(startDateDisplay, { 
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr) {
+            startDateHidden.value = dateStr; // Keep hidden field in sync
+        }
+    });
+    
+    flatpickr(endDateDisplay, { 
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr) {
+            endDateHidden.value = dateStr; // Keep hidden field in sync
+        }
+    });
+
+    const monthSelect = document.getElementById('month_select');
+    const yearSelect = document.getElementById('year_select');
     const reportForm = document.getElementById('reportForm');
-    const startDateInput = document.getElementById('start_date');
-    const endDateInput = document.getElementById('end_date');
     const categoryFilter = document.getElementById('category_filter');
 
-    
+    // --- Sidebar Toggle Logic (Excellent implementation) ---
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -476,46 +506,47 @@ $pagination_params = http_build_query([
         backdrop.addEventListener('click', toggleSidebar);
     }
     
-
-
-    
+    // --- Date Synchronization Logic ---
     function updateDateInputs() {
-        if (!yearFilter || !monthFilter || !startDateInput || !endDateInput) return; 
+        if (!yearSelect || !monthSelect || !startDateHidden || !endDateHidden) return; 
 
-        const year = yearFilter.value;
-        const month = monthFilter.value;
+        const year = yearSelect.value;
+        const month = monthSelect.value;
         
-        
+        // Calculate the last day of the selected month
+        // '0' means the last day of the previous month, so month + 1 is used
         const lastDay = new Date(year, month, 0).getDate(); 
         
-        const startDate = `${year}-${('0' + month).slice(-2)}-01`;
-        const endDate = `${year}-${('0' + month).slice(-2)}-${('0' + lastDay).slice(-2)}`;
+        const startDate = `${year}-${month}-01`;
+        const endDate = `${year}-${month}-${lastDay}`;
 
+        // Update the visible date pickers and hidden fields
+        startDateDisplay._flatpickr.setDate(startDate, true); // Update Flatpickr instance
+        endDateDisplay._flatpickr.setDate(endDate, true);     // Update Flatpickr instance
         
-        startDateInput.value = startDate;
-        endDateInput.value = endDate;
+        // Ensure hidden fields are also updated by manually triggering the onChange logic
+        startDateHidden.value = startDate;
+        endDateHidden.value = endDate;
     }
 
     function handleFilterChange(event) {
         
-        updateDateInputs();
+        // If the change came from month or year dropdowns, update the date inputs first
+        if (event.target === monthSelect || event.target === yearSelect) {
+            updateDateInputs();
+        }
 
-        
-        if (event.target === monthFilter || event.target === yearFilter || event.target === categoryFilter) {
-            
+        // Auto-submit the form if month, year, or category is changed
+        if (event.target === monthSelect || event.target === yearSelect || event.target === categoryFilter) {
             reportForm.submit();
         } 
-        
-        
     }
     
     
-    if (monthFilter) monthFilter.addEventListener('change', handleFilterChange);
-    if (yearFilter) yearFilter.addEventListener('change', handleFilterChange);
+    if (monthSelect) monthSelect.addEventListener('change', handleFilterChange);
+    if (yearSelect) yearSelect.addEventListener('change', handleFilterChange);
     if (categoryFilter) categoryFilter.addEventListener('change', handleFilterChange);
     
-    
-    updateDateInputs(); 
 </script>
 </body>
 </html>

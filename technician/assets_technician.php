@@ -3,10 +3,20 @@ session_start();
 include '../config.php'; 
 
 
-if (!isset($_SESSION['tech_id'])) { 
+if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
+$person_id = (int)$_SESSION['person_id'];
+
+
+// Ambil nama technician (menggunakan jadual person)
+$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+$stmt_tech->bind_param("i", $person_id);
+$stmt_tech->execute();
+$result_tech = $stmt_tech->get_result(); 
+$tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
+$stmt_tech->close();
 
 $item_id_filter = isset($_GET['item_id']) ? (int)$_GET['item_id'] : 0;
 if (isset($_POST['item_id_return'])) { 
@@ -90,7 +100,7 @@ $sql_assets = "
     LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id 
             AND ri.status = 'Checked Out' 
     LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
-    LEFT JOIN user u ON r.user_id = u.user_id
+    LEFT JOIN person u ON r.person_id = u.person_id
     WHERE " . implode(' AND ', $where_clauses) . "
     ORDER BY a.asset_code ASC
 ";
@@ -194,7 +204,7 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
         <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
-        <a href="manageItems_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>

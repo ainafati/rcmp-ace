@@ -2,18 +2,30 @@
 session_start();
 include 'config.php';
 
+// SEMAKAN SESI DIBETULKAN: Menggunakan $_SESSION['person_id'] dan $_SESSION['logged_in_role']
 
-if (isset($_SESSION['user_id'])) { header("Location: user/dashboard_user.php"); exit(); }
-if (isset($_SESSION['tech_id'])) { header("Location: technician/dashboard_tech.php"); exit(); }
-if (isset($_SESSION['admin_id'])) { header("Location: admin/manageItem_admin.php"); exit(); }
+if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
+    $role = $_SESSION['logged_in_role'];
+    
+    // Alihkan berdasarkan peranan yang sedang digunakan
+    switch ($role) {
+        case 'Admin':
+            header("Location: admin/manageItem_admin.php");
+            exit();
+        case 'Technician':
+            header("Location: technician/dashboard_tech.php");
+            exit();
+        case 'User':
+            header("Location: user/dashboard_user.php");
+            exit();
+    }
+}
 
-
+// Logik untuk mengisi semula borang jika log masuk gagal
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
-
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
-
 
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';

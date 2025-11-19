@@ -1,23 +1,29 @@
 <?php
+// ====================================================================
+// BAHAGIAN 1: PHP INITIALIZATION DAN DATA FETCHING
+// ====================================================================
 session_start();
 include '../config.php'; 
-
 
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-
-if (!isset($_SESSION['user_id'])){
-    header("Location: login.php");
+// 1. Semak Sesi Pengguna
+if (!isset($_SESSION['person_id'])) {
+    header("Location: ../login.php"); 
     exit();
 }
 
-$user_id = (int) $_SESSION['user_id'];
+// Gunakan person_id untuk semua query
+$person_id = (int) $_SESSION['person_id'];
 
-
-$stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
-$stmt->bind_param("i", $user_id);
+// 2. Dapatkan Butiran Pengguna (Kekal sama)
+$stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+if ($stmt === false) {
+    die("Error preparing statement: " . $conn->error);
+}
+$stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
@@ -25,27 +31,27 @@ $stmt->close();
 
 if (!$user) {
     session_destroy();
-    header("Location: login.php");
+    header("Location: ../login.php"); 
     exit();
 }
 
-
+// 3. Dapatkan Kategori (Kekal sama)
 $categories = [];
 $res_cat = $conn->query("SELECT * FROM categories ORDER BY category_name");
 if ($res_cat) {
     while ($row = $res_cat->fetch_assoc()) {
         $categories[] = $row;
     }
+    $res_cat->free(); 
 }
 
-
+// 4. Dapatkan Semua Item untuk Dropdown (Kekal sama)
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
-        i.item_name, c.category_name
+        i.item_id, i.item_name, c.category_name, i.category_id
     FROM item i
     JOIN categories c ON i.category_id = c.category_id
-    GROUP BY i.item_name, c.category_name
     ORDER BY c.category_name, i.item_name ASC
 ";
 $res_items = $conn->query($sql_all_items);
@@ -53,15 +59,34 @@ if ($res_items) {
     while ($row = $res_items->fetch_assoc()) {
         $items_for_dropdown[] = $row;
     }
+    $res_items->free(); 
 }
 
+// 5. Dapatkan Peranan Pengguna (Kekal sama)
+$user_roles = [];
+$stmt_roles = $conn->prepare("
+    SELECT r.role_name
+    FROM person_roles pr
+    JOIN roles r ON pr.role_id = r.role_id
+    WHERE pr.person_id = ?
+");
+$stmt_roles->bind_param("i", $person_id);
+$stmt_roles->execute();
+$result_roles = $stmt_roles->get_result();
+while ($row = $result_roles->fetch_assoc()) {
+    $user_roles[] = $row['role_name'];
+}
+$stmt_roles->close();
+
+$_SESSION['user_roles'] = $user_roles;
 
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Item Availability — UniKL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Item Availability — UniKL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -70,17 +95,16 @@ if ($res_items) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* DEFINING TEAL COLOR AS PRIMARY & MODERN STYLING */
+        /* CSS STYLES (Kekal sama) */
         :root {
             --primary-color: #06b6d4; /* Cyan 600 */
             --primary-hover: #0891b2; /* Cyan 700 */
-            --bg-light-gray: #f8fafc; /* Latar belakang utama yang sangat lembut */
+            --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
             --text-dark: #1e293b;
             --text-muted: #64748b;
         }
 
-        /* CSS DEFAULT DESKTOP */
         body { 
             font-family: 'Inter', 'Segoe UI', sans-serif; 
             background-color: var(--bg-light-gray); 
@@ -106,7 +130,7 @@ if ($res_items) {
         .logo-icon { 
             width: 40px; 
             height: 40px; 
-            background-color: var(--primary-color); /* TEAL */
+            background-color: var(--primary-color);
             color: white; 
             border-radius: 8px; 
             display: flex; 
@@ -118,7 +142,7 @@ if ($res_items) {
         .logo-text span { font-size: 12px; color: var(--text-muted); }
         .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s; }
         .sidebar a.active, .sidebar a:hover { 
-            background: var(--primary-color); /* TEAL */
+            background: var(--primary-color);
             color: #fff; 
         }
         .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
@@ -149,14 +173,14 @@ if ($res_items) {
         }
         .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
         
-        .text-primary { color: var(--primary-color) !important; } /* TEAL */
+        .text-primary { color: var(--primary-color) !important; }
         .btn-primary { 
-            background-color: var(--primary-color); /* TEAL */
-            border-color: var(--primary-color); /* TEAL */
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
         }
         .btn-primary:hover { 
-            background-color: var(--primary-hover); /* Darker TEAL */
-            border-color: var(--primary-hover); /* Darker TEAL */
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
         }
 
         .form-label { font-weight: 500; color: #334155; }
@@ -173,10 +197,16 @@ if ($res_items) {
         .menu-toggle-btn { display: none; }
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
 
+        /* Tambahan untuk medan yang dikunci */
+        .form-control:disabled, .form-select:disabled, .form-control[readonly] {
+            background-color: #e9ecef !important; /* Warna kelabu yang lebih jelas */
+            opacity: 1; 
+        }
+
 
         /* MOBILE STYLES START */
         @media (max-width: 992px) {
-            /* Sidebar & Main Content Toggling */
+            /* ... (Kekal sama) ... */
             .sidebar { 
                 transform: translateX(-250px); 
                 left: 0;
@@ -202,7 +232,6 @@ if ($res_items) {
             }
             .topbar {
                 padding: 10px 15px;
-                /* Susun: Menu | Header | Profile */
                 display: grid;
                 grid-template-columns: auto 1fr auto;
                 align-items: center;
@@ -213,10 +242,9 @@ if ($res_items) {
                 text-align: center;
             }
             .topbar .user-name {
-                display: none; /* Sembunyikan nama di mobile */
+                display: none;
             }
 
-            /* Container & Card Padding */
             .container-fluid {
                 padding: 15px;
             }
@@ -224,18 +252,15 @@ if ($res_items) {
                 padding: 15px;
             }
             
-            /* Form & Request List (Susunan Menegak 100%) */
             .col-lg-7, .col-lg-5 {
                 flex: 0 0 100%;
                 max-width: 100%;
             }
             
-            /* Category Pills */
             .category-pills-container {
-                padding-bottom: 0; /* Kurangkan padding */
+                padding-bottom: 0;
             }
 
-            /* Buttons */
             .d-grid {
                 display: grid !important;
                 grid-template-columns: 1fr;
@@ -285,7 +310,7 @@ if ($res_items) {
                     <div class="list-group list-group-flush">
                         <?php foreach ($categories as $category): ?>
                             <div class="list-group-item d-flex align-items-center p-2">
-                                <img src="../<?= htmlspecialchars($category['image_url'] ?: 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
+                                <img src="../<?= htmlspecialchars(isset($category['image_url']) ? $category['image_url'] : 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
                                 <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
                             </div>
                         <?php endforeach; ?>
@@ -298,8 +323,8 @@ if ($res_items) {
                     <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> Request Form</h5>
                     <p class="text-muted small">Fill in the details to check item availability in real-time.</p>
                     <hr>
-                    <form id="reserveForm" method="POST" action="submit_reservation.php">
-                        <input type="hidden" name="user_id" value="<?= $user_id ?>">
+                    <form id="reserveForm">
+                        <input type="hidden" name="person_id" value="<?= isset($person_id) ? $person_id : '' ?>">
                         <input type="hidden" name="all_items" id="allItems">
 
                         <div class="mb-3">
@@ -319,84 +344,97 @@ if ($res_items) {
 
                         <div class="mb-3">
                             <label class="form-label">2. Select Item</label>
-                            <select id="item_select" class="form-select" style="width: 100%;"><option value="">-- Search and select an item --</option>
+                            <select id="item_select" class="form-select" style="width: 100%;">
+                                <option value="">-- Search and select an item --</option>
                                 <?php
                                 $current_category = null;
                                 foreach ($items_for_dropdown as $item) {
-                                    $item_category_name = trim($item['category_name']); 
-                                    if ($item_category_name !== $current_category) {
-                                        if ($current_category !== null) echo '</optgroup>';
-                                        $current_category = $item_category_name;
-                                        echo '<optgroup label="' . htmlspecialchars($current_category) . '">';
+                                    if ($item['category_name'] !== $current_category) {
+                                        if ($current_category !== null) {
+                                            echo '</optgroup>';
+                                        }
+                                        echo '<optgroup label="' . htmlspecialchars($item['category_name']) . '">';
+                                        $current_category = $item['category_name'];
                                     }
-                                    echo '<option value="' . htmlspecialchars($item['item_name']) . '">' . htmlspecialchars($item['item_name']) . '</option>';
+                                    echo '<option value="' . htmlspecialchars($item['item_name']) . '" data-category-id="' . htmlspecialchars($item['category_id']) . '">';
+                                    echo htmlspecialchars($item['item_name']);
+                                    echo '</option>';
                                 }
-                                if ($current_category !== null) echo '</optgroup>';
+                                if ($current_category !== null) {
+                                    echo '</optgroup>';
+                                }
                                 ?>
                             </select>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label" for="quantity">3. Quantity</label>
-                            <input type="number" id="quantity" class="form-control" min="1" value="1">
+                            <input type="number" id="quantity" class="form-control" name="quantity" min="1" value="1">
                         </div>
                         
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="reserveDate">4. Borrow Date</label>
-                                <input type="text" id="reserveDate" class="form-control" placeholder="Select a date...">
+                                <input type="text" id="reserveDate" class="form-control" name="reserve_date" placeholder="Select a date...">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="returnDate">5. Return Date</label>
-                                <input type="text" id="returnDate" class="form-control" placeholder="Select a date...">
+                                <input type="text" id="returnDate" class="form-control" name="return_date" placeholder="Select a date...">
                             </div>
                         </div>
-                                                
-<div class="mb-3">
-    <label class="form-label" for="program_type">6. Program Type / Purpose</label>
-    
-    <div class="form-text text-muted mb-2">
-		Please select <strong>a</strong> category that represents the main purpose of this booking, even if you are booking multiple items.
-    </div>
-    
-    <select name="program_type" id="program_type" class="form-select" required>
-        <option value="3" selected>Academic Project/Class</option>
-        <option value="2">Club/Association Program</option>
-        <option value="1">Official University Ceremony</option>
-    </select>
-</div>  
+                                        
+                        <div class="mb-3">
+                            <label class="form-label" for="program_type">6. Program Type / Priority</label>
+                            
+                            <div class="form-text text-muted mb-2">
+                                Please select <strong>a</strong> category that represents the main purpose of this booking, even if you are booking multiple items.
+                            </div>
+                            
+                            <select name="program_type" id="program_type" class="form-select" required>
+                                <option value="3" selected>Academic Project/Class</option>
+                                <option value="2">Club/Association Program</option>
+                                <option value="1">Official University Ceremony</option>
+                            </select>
+                        </div> 
+                        
                         <div class="mb-3">
                             <label class="form-label" for="reason">7. Purpose of Loan</label>
                             <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
                         </div>
 
-                      <div id="availability-status" class="mt-3"></div>
+                        <div id="availability-status" class="mt-3"></div>
                         
-                        <div class="form-check mt-4">
-                            <input class="form-check-input" type="checkbox" value="" id="agreeTerms">
-                            <label class="form-check-label" for="agreeTerms">
-                                I have read and agree to the 
-                                <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary">Terms and Conditions</a>.
-                            </label>
-                        </div>
-
                         <div class="d-grid d-md-flex gap-2 mt-4">
-                             <button type="button" class="btn btn-light border flex-grow-1" id="addMoreBtn"><i class="fa-solid fa-plus me-2"></i> Add to List</button>
-                             <button type="submit" class="btn btn-primary flex-grow-1"><i class="fa-solid fa-paper-plane me-2"></i> Submit Request</button>
+                            <button type="button" class="btn btn-light border flex-grow-1" id="addMoreBtn" disabled><i class="fa-solid fa-plus me-2"></i> Add to List</button>
                         </div>
                     </form>
                 </div>
+                
                 <div class="card">
                     <h5><i class="fa-solid fa-clipboard-list me-2 text-primary"></i> Your Request List</h5>
                     <div id="itemsList">
                         <div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p class="mb-0">Your request list is currently empty.</p></div>
                     </div>
+                    
+                    <hr>
+                    
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" value="" id="agreeTerms" disabled>
+                        <label class="form-check-label" for="agreeTerms">
+                            I have read and agree to the 
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary **fw-bold**">Terms and Conditions</a>.
+                        </label>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                           <button type="button" class="btn btn-primary" id="finalSubmitBtn" disabled><i class="fa-solid fa-paper-plane me-2"></i> Submit Request</button>
+                    </div>
+                    </div>
                 </div>
-            </div>
             
         </div>
     </div>
-    </div>
+</div>
 <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -405,16 +443,16 @@ if ($res_items) {
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 <div class="modal-body">
-    <p>Please read the following terms carefully before submitting your <strong>reservation</strong> request:</p>
+    <p>Please read the following terms carefully before submitting your **reservation** request:</p>
     <ol>
         <li>
-            <strong>Eligibility:</strong> All equipment is available for <strong>reservation</strong> only to registered students and staff of UniKL with a valid ID.
+            <strong>Eligibility:</strong> All equipment is available for **reservation** only to registered students and staff of UniKL with a valid ID.
         </li>
         <li>
-            <strong>Reservation Duration:</strong> The <strong>duration</strong> of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
+            <strong>Reservation Duration:</strong> The **duration** of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
         </li>
         <li>
-            <strong>Responsibility:</strong> The party making the reservation is fully responsible for the <strong>reserved equipment</strong> from the moment of collection until they are returned and checked in by a technician.
+            <strong>Responsibility:</strong> The party making the reservation is fully responsible for the **reserved equipment** from the moment of collection until they are returned and checked in by a technician.
         </li>
         <li>
             <strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
@@ -434,7 +472,7 @@ if ($res_items) {
     </ol>
     <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
 </div>        <div class="modal-footer">
-            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
+            <button type="button" class="btn btn-primary" id="agreeTermsBtn" data-bs-dismiss="modal">I Understand</button>
         </div>
         </div>
     </div>
@@ -447,15 +485,25 @@ if ($res_items) {
 
 <script>
 $(document).ready(function() {
-    
+    // 1. Konsistensi Pembolehubah PHP
+    const phpData = {
+        user_id: '<?= isset($person_id) ? $person_id : '' ?>',
+    };
+
+    // 2. Select2 Initialization (Kekal sama)
     $('#item_select').select2({
         placeholder: "-- Search and select an item --",
         allowClear: true
     });
 
-    
     let allOptgroups = $('#item_select optgroup').clone();
+    
+    if (allOptgroups.length === 0 && $('#item_select option').length > 1) {
+        allOptgroups = $('#item_select optgroup').clone(); 
+    }
 
+
+    // 3. Category Filtering Logic (Kekal sama)
     $(document).on('click', '.category-pill-filter', function(e) {
         e.preventDefault();
         const categoryName = $(this).data('category').toString().trim();
@@ -469,10 +517,8 @@ $(document).ready(function() {
         $select.empty().append('<option value="">-- Search and select an item --</option>');
 
         if (categoryName === "") {
-            
             $select.append(allOptgroups.clone());
         } else {
-            
             allOptgroups.each(function() {
                 const optgroupLabel = $(this).attr('label').trim();
                 if (optgroupLabel === categoryName) {
@@ -483,10 +529,9 @@ $(document).ready(function() {
 
         
         $select.val(null).trigger('change');
-        $select.select2('open');
     });
     
-    
+    // 4. Mobile Sidebar Toggling Logic (Kekal sama)
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('overlay');
     const menuToggle = document.getElementById('menuToggle');
@@ -507,7 +552,7 @@ $(document).ready(function() {
     if (overlay) { 
         overlay.addEventListener('click', function() {
             sidebar.classList.remove('active');
-            overlay.style.display = 'none';
+            overlay.style.display = 'none'; 
         }); 
     }
     
@@ -520,6 +565,7 @@ $(document).ready(function() {
     });
     
     
+    // 5. Availability Check Logic (Kekal sama)
     let debounceTimer;
 
     function checkAvailability() {
@@ -532,7 +578,10 @@ $(document).ready(function() {
             const statusDiv = $('#availability-status');
             const addBtn = $('#addMoreBtn');
 
-            if (itemName && quantity > 0 && reserve && ret) {
+            const reason = $('#reason').val(); 
+            const program_type = $('#program_type').val(); 
+
+            if (itemName && quantity > 0 && reserve && ret && reason && program_type) {
                 statusDiv.html('<div class="text-muted"><span class="spinner-border spinner-border-sm"></span> Checking availability...</div>');
                 addBtn.prop('disabled', true);
 
@@ -560,7 +609,7 @@ $(document).ready(function() {
                                     </button>
                                 </div>`;
                             statusDiv.html(suggestionHTML);
-                            addBtn.prop('disabled', true); 
+                            addBtn.prop('disabled', response.available_count <= 0); 
 
                         } else { 
                             statusDiv.html(`<div class="alert alert-danger py-2">❌ <strong>Not Available:</strong> ${response.message}</div>`);
@@ -574,7 +623,7 @@ $(document).ready(function() {
                 });
             } else {
                 statusDiv.html('');
-                addBtn.prop('disabled', false); 
+                addBtn.prop('disabled', true); 
             }
         }, 500); 
     }
@@ -589,8 +638,11 @@ $(document).ready(function() {
     
     $('#item_select').on('change', checkAvailability);
     $('#quantity').on('input', checkAvailability); 
+    $('#reason').on('input change', checkAvailability);
+    $('#program_type').on('change', checkAvailability); 
 
     
+    // Flatpickr Date initialization (Kekal sama)
     const returnDatepicker = flatpickr("#returnDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
@@ -609,26 +661,47 @@ $(document).ready(function() {
         onClose: checkAvailability 
     });
 
+    // 6. Reservation Item List Management
     let reservationItems = []; 
     
-    
+    // Fungsi untuk menguruskan status input Reason/Priority (DIKEMAS KINI)
+    function updateReasonAndPriorityStatus() {
+        const reasonField = $('#reason');
+        const programTypeField = $('#program_type');
+        
+        if (reservationItems.length > 0) {
+            // Jika sudah ada item, kunci medan
+            reasonField.prop('disabled', true).addClass('bg-light');
+            programTypeField.prop('disabled', true).addClass('bg-light');
+        } else {
+            // Jika senarai kosong, buka semula medan
+            reasonField.prop('disabled', false).removeClass('bg-light');
+            programTypeField.prop('disabled', false).removeClass('bg-light');
+        }
+        checkAvailability(); 
+    }
+
+
     $('#addMoreBtn').on('click', () => {
         const itemName = $('#item_select').val();
         const quantity = $('#quantity').val();
         const reserve = $('#reserveDate').val();
         const ret = $('#returnDate').val();
+        
+        // Ambil reason dan program_type
         const reason = $('#reason').val(); 
+        const program_type = $('#program_type').val(); 
 
         
-        if (!itemName || !quantity || !reserve || !ret || !reason.trim()) {
-            Swal.fire("Incomplete Form", "Please fill in all request details, including a reason.", "warning");
+        if (!itemName || !quantity || !reserve || !ret || !reason.trim() || !program_type) {
+            Swal.fire("Incomplete Form", "Please fill in all request details, including a reason and program type.", "warning");
             return;
         }
         
         
-        if ($('#availability-status').find('.alert-success').length === 0) {
-            Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
-            return;
+        if ($('#availability-status').find('.alert-success').length === 0 || $('#addMoreBtn').prop('disabled')) {
+             Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
+             return;
         }
 
         
@@ -644,12 +717,13 @@ $(document).ready(function() {
             reserve_date: reserve, 
             return_date: ret, 
             
-            reason: reason,
-            program_type: $('#program_type').val()
+            reason: reason, 
+            program_type: program_type
         };
         
         reservationItems.push(newItem);
         renderItemsList(); 
+        updateReasonAndPriorityStatus();
 
         
         const Toast = Swal.mixin({
@@ -658,6 +732,7 @@ $(document).ready(function() {
         Toast.fire({ icon: 'success', title: 'Added to list!' });
 
         
+        // Reset form fields (kecuali reason dan program_type)
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         reserveDatepicker.clear();
@@ -669,29 +744,42 @@ $(document).ready(function() {
     
     function renderItemsList() {
         const listDiv = $('#itemsList');
+        const submitBtn = $('#finalSubmitBtn');
+        const agreeTermsCheckbox = $('#agreeTerms');
+
         if (reservationItems.length > 0) {
-            let itemsHtml = reservationItems.map((it, i) => `
+            let itemsHtml = reservationItems.map((it, i) => {
+                let programTypeText = 'Unknown';
+                if (it.program_type === '3') programTypeText = 'Academic Project/Class';
+                if (it.program_type === '2') programTypeText = 'Club/Association Program';
+                if (it.program_type === '1') programTypeText = 'Official University Ceremony';
+                
+                return `
                 <div class="d-flex justify-content-between align-items-start bg-light p-3 rounded mb-2 border">
                     <div>
                         <b>${it.item_name}</b> (Qty: ${it.quantity})<br>
                         <small class="text-muted">
                             <b>Date:</b> ${it.reserve_date} to ${it.return_date}<br>
-                            <b>Purpose:</b> ${it.reason}
+                            <b>Purpose:</b> ${it.reason}<br>
+                            <b>Type:</b> ${programTypeText}
                         </small>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-item-btn" data-index="${i}"><i class="fa fa-trash-alt"></i></button>
                 </div>
-            `).join('');
+                `;
+            }).join('');
             listDiv.html(`<div class="p-2">${itemsHtml}</div>`);
+            
+            submitBtn.prop('disabled', !agreeTermsCheckbox.is(':checked'));
         } else {
             listDiv.html(`<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p>Your request list is empty.</p></div>`);
+            submitBtn.prop('disabled', true);
         }
         
+        updateReasonAndPriorityStatus(); 
+
         
         $('#allItems').val(JSON.stringify(reservationItems));
-        
-        
-        $('#reserveForm').find('button[type="submit"]').prop('disabled', reservationItems.length === 0);
     }
 
     
@@ -699,14 +787,32 @@ $(document).ready(function() {
         const index = $(this).data('index');
         reservationItems.splice(index, 1); 
         renderItemsList(); 
+        updateReasonAndPriorityStatus();
     });
     
+    // 7. Terms & Conditions and Submission Logic
     
-    $('#reserveForm').find('button[type="submit"]').prop('disabled', true);
+    // TOGGLE SUBMIT BUTTON BASED ON TERMS CHECKBOX AND ITEM LIST
+    $('#agreeTerms').on('change', function() {
+        const submitBtn = $('#finalSubmitBtn');
+        if ($(this).is(':checked') && reservationItems.length > 0) {
+            submitBtn.prop('disabled', false);
+        } else {
+            submitBtn.prop('disabled', true);
+        }
+    });
 
-    
-    $('#reserveForm').on('submit', function (e) {
+    // AUTO-CHECK TERMS ON MODAL CLOSE (I UNDERSTAND)
+    $('#agreeTermsBtn').on('click', function() {
+        // Enable, check, and trigger change event
+        $('#agreeTerms').prop('disabled', false);
+        $('#agreeTerms').prop('checked', true).trigger('change');
+    });
+
+    // FINAL SUBMIT LOGIC 
+    $('#finalSubmitBtn').on('click', function (e) {
         e.preventDefault();
+        const submitBtn = $(this);
         
         if (reservationItems.length === 0) {
             Swal.fire("Empty List", "Please add at least one item before submitting.", "error");
@@ -719,20 +825,27 @@ $(document).ready(function() {
             return; 
         }
         
+        const reasonValue = reservationItems.length > 0 ? reservationItems[0].reason : $('#reason').val().trim();
+        const programTypeValue = reservationItems.length > 0 ? reservationItems[0].program_type : $('#program_type').val();
         
-        if (!$('#reason').val().trim()) {
+        if (!reasonValue) {
             Swal.fire("Incomplete Form", "Please ensure the Purpose of Loan is filled in.", "warning");
             return;
         }
-
-        const submitBtn = $(this).find('button[type="submit"]');
+        
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
         
+        const submissionData = {
+            user_id: phpData.user_id,
+            all_items: JSON.stringify(reservationItems),
+            program_type: programTypeValue, 
+            reason: reasonValue 
+        };
         
         $.ajax({
             type: 'POST',
-            url: 'submit_reservation.php',
-            data: $(this).serialize(), 
+            url: 'submit_reservation.php', // Pastikan nama fail betul
+            data: submissionData, 
             dataType: 'json',
             success: function(response) {
                 if(response.status === 'success') {
@@ -747,15 +860,18 @@ $(document).ready(function() {
                         window.location.href = 'history.php'; 
                     });
                 } else {
+                    // Ini akan menangkap ralat yang dikeluarkan oleh submit_reservation.php
                     Swal.fire("Submission Failed", response.message, "error");
                 }
             },
             error: function() {
-                Swal.fire("Submission Failed", "A server error occurred. Please try again.", "error");
+                // Ini akan menangkap kegagalan AJAX (cth: 404 Not Found, Server Error 500)
+                Swal.fire("Submission Failed", "A server error occurred or file not found. Please try again.", "error");
             },
             complete: function() {
                 
-                submitBtn.prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-2"></i> Submit Request');
+                const shouldBeEnabled = reservationItems.length > 0 && $('#agreeTerms').is(':checked');
+                submitBtn.prop('disabled', !shouldBeEnabled).html('<i class="fa-solid fa-paper-plane me-2"></i> Submit Request');
             }
         });
     });

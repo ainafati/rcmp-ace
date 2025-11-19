@@ -1,15 +1,15 @@
 <?php
 session_start();
-include 'config.php';
+include '../config.php';
 
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['person_id'])) {
     http_response_code(403); 
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
 
-$user_id = (int)$_SESSION['user_id'];
+$user_id = (int)$_SESSION['person_id'];
 $events = [];
 
 
@@ -17,7 +17,7 @@ $sql = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
         FROM reservations r
         JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
         JOIN item i ON ri.item_id = i.item_id
-        WHERE r.user_id = ? AND ri.status IN ('approved', 'pending')"; 
+        WHERE r.person_id = ? AND ri.status IN ('approved', 'pending')"; 
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $user_id);

@@ -26,7 +26,7 @@ function getReservationsForReminder($conn) {
             GROUP_CONCAT(a.asset_code SEPARATOR ', ') AS asset_codes
         FROM reservation_items ri
         JOIN reservations r ON ri.reserve_id = r.reserve_id
-        JOIN user u ON r.user_id = u.user_id 
+        JOIN person u ON r.person_id = u.person_id 
         JOIN item i ON ri.item_id = i.item_id
         JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
         JOIN assets a ON ra.asset_id = a.asset_id

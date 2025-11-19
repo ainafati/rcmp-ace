@@ -1,25 +1,29 @@
 <?php
 session_start();
-include 'config.php';
+// Pastikan path ke config.php betul (include 'config.php' atau include '../config.php')
+include '../config.php'; 
 
-
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['person_id'])) {
     header("Location: login.php");
     exit();
 }
 
-$user_id = (int) $_SESSION['user_id'];
+// Ambil ID pengguna daripada sesi
+$user_id = (int) $_SESSION['person_id'];
 
 
-$stmt = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
-$stmt->bind_param("i", $user_id);
+// Gunakan $user_id dalam query dan binding
+$stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+
+// GANTIKAN $person_id dengan $user_id
+$stmt->bind_param("i", $user_id); 
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
 
 if (!$user) {
-    
+    // Jika tiada pengguna ditemui dalam DB, musnahkan sesi
     session_destroy();
     header("Location: login.php");
     exit();

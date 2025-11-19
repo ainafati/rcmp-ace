@@ -1,28 +1,31 @@
 <?php
 
 session_start();
+include '../config.php';
 
-include '../config.php'; 
-
-
-if (!isset($_SESSION['tech_id'])) {
+// 1. SEMAK AUTENTIKASI
+if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
-$tech_id = (int) $_SESSION['tech_id'];
+// Ambil person_id dari sesi.
+$person_id = (int)$_SESSION['person_id'];
+$tech_id = $person_id;
 
-
-$stmt = $conn->prepare("SELECT name, email, phoneNum FROM technician WHERE tech_id = ?");
+// 2. AMBIL DATA TEKNISI DARI DB
+$stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
 }
-$stmt->bind_param("i", $tech_id);
+
+$stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $tech = $result->fetch_assoc();
 $stmt->close();
 
+// 3. SEMAK KEWUJUDAN DATA
 if (!$tech) {
     session_destroy();
     header("Location: ../login.php"); 
@@ -54,7 +57,7 @@ $conn->close();
             background: #ffffff; 
             padding: 20px; 
             border-right: 1px solid #e5e7eb; 
-            z-index: 1050; /* Ditingkatkan untuk memastikan ia di atas backdrop */
+            z-index: 1050; 
             display: flex; 
             flex-direction: column; 
             justify-content: space-between; 
@@ -78,10 +81,9 @@ $conn->close();
             justify-content: flex-start; 
             align-items: center; 
             border-bottom: 1px solid #e5e7eb; 
-            /* FIX: Tambah sticky/fixed untuk Z-index berfungsi */
             position: sticky; 
             top: 0;
-            z-index: 990; /* Diletakkan di bawah sidebar */
+            z-index: 990; 
         }
         .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
         .container-fluid { padding: 30px; }
@@ -107,12 +109,12 @@ $conn->close();
             
             .main-content {
                 margin-left: 0; 
-                padding-top: 80px; /* FIX: Tambah padding agar tidak terlindung di bawah fixed topbar */
+                padding-top: 80px; 
             }
 
             .topbar { 
                 padding: 15px; 
-                position: fixed; /* FIX: Jadikan fixed di mobile */
+                position: fixed; 
                 width: 100%;
                 left: 0;
             }
@@ -125,7 +127,7 @@ $conn->close();
         .offcanvas-backdrop {
             position: fixed;
             top: 0; left: 0;
-            z-index: 1040; /* FIX: Diletakkan di bawah Sidebar (1050) */
+            z-index: 1040; 
             width: 100vw; height: 100vh;
             background-color: #000;
             opacity: 0.5;
@@ -178,19 +180,19 @@ $conn->close();
 
             <div class="col-lg-8">
                 <div class="card">
+                    <!-- PHP Message/Error Display -->
                     <?php if (isset($_SESSION['message'])): ?>
                         <div class="alert alert-success alert-dismissible fade show" role="alert">
                             <i class="fa-solid fa-check-circle me-2"></i><?= $_SESSION['message']; unset($_SESSION['message']); ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     <?php endif; ?>
                     <?php if (isset($_SESSION['error'])): ?>
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
                             <i class="fa-solid fa-exclamation-triangle me-2"></i><?= $_SESSION['error']; unset($_SESSION['error']); ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     <?php endif; ?>
 
+                    <!-- View Mode -->
                     <div id="viewMode">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5><i class="fa-solid fa-id-card me-2 text-primary"></i> Personal Information</h5>
@@ -202,10 +204,13 @@ $conn->close();
                         <p class="mb-0"><strong>Phone Number:</strong> <?= htmlspecialchars($tech['phoneNum']) ?></p>
                     </div>
 
+                    <!-- Edit Mode -->
                     <div id="editMode" style="display: none;">
                         <h5><i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Edit Your Information</h5>
                         <hr>
                         <form action="update_profile_tech.php" method="POST">
+                            <!-- Hidden input for person_id is a good practice for update scripts -->
+                            <input type="hidden" name="person_id" value="<?= $tech_id ?>">
                             <div class="mb-3">
                                 <label for="name" class="form-label">Full Name</label>
                                 <input type="text" class="form-control" id="name" name="name" value="<?= htmlspecialchars($tech['name']) ?>" required>

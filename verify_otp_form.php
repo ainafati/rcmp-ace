@@ -9,7 +9,7 @@ if (isset($_GET['email'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Set New Password - UniKL A.C.E. RCMP</title>
+    <title>Set New Password </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -96,7 +96,7 @@ if (isset($_GET['email'])) {
             <input type="hidden" name="email" id="hiddenEmail" value="<?= $email ?>">
             
             <div class="mb-5">
-                <label for="otp" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Verification Code (OTP)</label>
+                <label for="otp" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Verification Code</label>
                 <input type="text" name="token" id="otp" placeholder="Enter 6-digit code" required maxlength="6"
                         class="w-full text-center text-xl font-bold tracking-widest px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm">
             </div>

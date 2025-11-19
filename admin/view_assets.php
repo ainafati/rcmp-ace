@@ -1,18 +1,29 @@
 <?php
 
-
 session_start();
 
 include '../config.php';
 include_once '../logger.php';
 
+// ******************************************************
+// PEMBETULAN SESI ADMIN
+// ******************************************************
+$allowed_role = 'Admin';
 
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+// Menggunakan person_id dan logged_in_role yang baru
+if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
+    header("Location: ../login.php");
     exit();
 }
 
+// Pembolehubah sesi yang betul untuk Logging
+$admin_id_session = (int)$_SESSION['person_id'];
+// Dibetulkan untuk keserasian PHP lama
+$admin_name_session = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : "Admin");
 
+// ******************************************************
+// LOGIK DELETE ASSET UNIT
+// ******************************************************
 if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
     $delete_id = (int)$_GET['delete_asset_id'];
     $item_id_return = (int)$_GET['item_id_return'];
@@ -28,6 +39,7 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
     $conn->begin_transaction();
     try {
         
+        // Hapus daripada reservation_assets terlebih dahulu kerana kekangan FK
         $conn->query("DELETE FROM reservation_assets WHERE asset_id = $delete_id");
 
         
@@ -39,8 +51,7 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
         $conn->commit();
         
         
-        $admin_id_session = (int)$_SESSION['admin_id'];
-        $admin_name_session = "Admin";
+        // Logging
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah memadam unit aset: '{$asset_code_to_delete}' (ID: {$delete_id}).";
         log_activity($conn, 'admin', $admin_id_session, 'DELETE_ASSET_UNIT', $log_details);
         
@@ -55,7 +66,9 @@ if (isset($_GET['delete_asset_id']) && isset($_GET['item_id_return'])) {
     exit();
 }
 
-
+// ******************************************************
+// LOGIK EDIT ASSET UNIT
+// ******************************************************
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $asset_id = (int)$_POST['asset_id'];
     $brand = trim($_POST['brand']);
@@ -77,9 +90,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     
     if ($stmt->execute()) {
         
-        
-        $admin_id_session = (int)$_SESSION['admin_id'];
-        $admin_name_session = "Admin";
+        // Logging
         $log_details = "Admin '{$admin_name_session}' (ID: {$admin_id_session}) telah mengemas kini aset: '{$old_asset['asset_code']}' (ID: {$asset_id}). Perubahan: Status dari '{$old_asset['status']}' ke '{$status}', Brand: '{$old_asset['brand']}' ke '{$brand}'.";
         log_activity($conn, 'admin', $admin_id_session, 'EDIT_ASSET_UNIT', $log_details);
         
@@ -94,6 +105,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     exit();
 }
 
+// ******************************************************
+// PERSEDIAAN DATA (FETCHING DATA)
+// ******************************************************
 
 $item_id_filter = isset($_GET['item_id']) ? (int)$_GET['item_id'] : 0;
 if ($item_id_filter === 0) {
@@ -113,6 +127,7 @@ if (!empty($status_filter) && $status_filter != 'All') {
     $param_values[] = $status_filter;
 }
 
+// 1. Ambil Butiran Item
 $stmt_item = $conn->prepare("SELECT item_name, description FROM item WHERE item_id = ?");
 $stmt_item->bind_param("i", $item_id_filter);
 $stmt_item->execute();
@@ -123,11 +138,12 @@ if (!$stmt_item->fetch()) {
 $stmt_item->close();
 
 
+// 2. Ambil Butiran Aset dan Nama Peminjam
 $sql_assets = "
     SELECT
         a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name,
         CASE
-            WHEN a.status IN ('Borrowed', 'Checked Out') THEN u.name
+            WHEN a.status IN ('Borrowed', 'Checked Out') THEN p.name
             ELSE NULL
         END AS borrower_name
     FROM assets a
@@ -136,18 +152,49 @@ $sql_assets = "
     LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id
              AND ri.status = 'Checked Out'
     LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
-    LEFT JOIN user u ON r.user_id = u.user_id
+    LEFT JOIN person p ON r.person_id = p.person_id 
     WHERE " . implode(' AND ', $where_clauses) . "
     ORDER BY a.asset_code ASC
 ";
 
 $stmt_assets = $conn->prepare($sql_assets);
-$stmt_assets->bind_param($param_types, ...$param_values);
-$stmt_assets->execute();
-$all_assets = $stmt_assets->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// ******************************************************
+// PEMBETULAN: Pengikatan Parameter Dinamik dengan Rujukan
+// ******************************************************
+if ($stmt_assets === false) {
+    die('Error preparing statement for assets: ' . $conn->error . '. SQL: ' . $sql_assets);
+}
+
+// Sediakan array argumen untuk bind_param
+$bind_params = [];
+$bind_params[] = $param_types; 
+
+// Tambah rujukan untuk setiap nilai dalam $param_values
+foreach ($param_values as $key => $value) {
+    $bind_params[] = &$param_values[$key]; 
+}
+
+// Panggil bind_param menggunakan call_user_func_array
+call_user_func_array([$stmt_assets, 'bind_param'], $bind_params);
+
+// Laksanakan dan semak ralat
+$execute_success = $stmt_assets->execute();
+
+if (!$execute_success) {
+    die('Execute failed: ' . $stmt_assets->error);
+}
+
+$result = $stmt_assets->get_result();
+
+if ($result === false) {
+    die('Get result failed: ' . $stmt_assets->error);
+}
+
+$all_assets = $result->fetch_all(MYSQLI_ASSOC);
 $stmt_assets->close();
 
-$available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged', 'Retired'];
+$available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
 
 ?>
 <!DOCTYPE html>
@@ -324,7 +371,6 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged', 'Retir
                             if ($status == 'available') $badge_class = 'text-bg-success';
                             if (in_array($status, ['borrowed', 'checked out'])) $badge_class = 'text-bg-warning';
                             if (in_array($status, ['damaged', 'maintenance'])) $badge_class = 'text-bg-danger';
-                            if ($status == 'retired') $badge_class = 'text-bg-dark';
                         ?>
                         <tr>
                             <td><span class="badge rounded-pill text-bg-secondary"><?= htmlspecialchars($asset['asset_code']) ?></span></td>

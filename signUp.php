@@ -1,5 +1,6 @@
 <?php
 session_start();
+// Pastikan laluan config.php adalah betul
 include 'config.php'; 
 
 if (!$conn) {
@@ -7,112 +8,172 @@ if (!$conn) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $ic_num = $_POST['ic_num'];
+    // ----------------------------------------------------
+    // 1. Ambil dan Bersihkan Input (MENGGUNAKAN MEDAN 'ID')
+    // ----------------------------------------------------
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password']; 
-    $phoneNum = $_POST['phoneNum'];
-    $status = 'active';
+    $phoneNum = trim($_POST['phoneNum']);
+    
+    // Ambil ID tunggal
+    $personId = empty(trim($_POST['person_id'])) ? NULL : trim($_POST['person_id']);
+    
+    $user_role_id = 1; // ID untuk 'User'
+    $status = 'Active'; 
 
-    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my'];
-    $is_valid_domain = false;
+    // ----------------------------------------------------
+    // 2. Pengesahan ID (ID tunggal adalah wajib)
+    // ----------------------------------------------------
+    if (empty($personId)) {
+        $_SESSION['error'] = "You must provide a <strong>Student ID</strong> or <strong>Staff ID</strong> to register.";
+        header("Location: signUp.php");
+        exit();
+    }
+    
+    // ----------------------------------------------------
+    // 3. Pengesahan E-mel & Kata Laluan (Dikekalkan)
+    // ----------------------------------------------------
+	
+	// !!! PERLU TAMBAHKAN KOD INI SEMULA DI SINI !!!
+    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@gmail.com'];
     $lower_email = strtolower($email);
-
+    $is_valid_domain = false;
+	
+// Baris 42: Gantikan str_ends_with() dengan substr()
     foreach ($allowed_domains as $domain) {
-        if (substr($lower_email, -strlen($domain)) === $domain) {
+        // Logik penggantian str_ends_with(): 
+        // Bandingkan substring dari hujung $lower_email yang panjangnya sama dengan $domain
+        $domain_length = strlen($domain);
+        if (substr($lower_email, -$domain_length) === $domain) {
              $is_valid_domain = true;
              break;
         }
     }
-
     if (!$is_valid_domain) { 
-        $_SESSION['error'] = "Only **UniKL official email** (@unikl.edu.my or @t.unikl.edu.my) addresses are allowed for sign up.";
+        $_SESSION['error'] = "Only <strong>UniKL official email</strong> (@unikl.edu.my or @t.unikl.edu.my) addresses are allowed for sign up.";
         header("Location: signUp.php");
         exit();
     }
-
     if ($password !== $confirm_password) {
         $_SESSION['error'] = "Passwords do not match!";
         header("Location: signUp.php");
         exit();
     }
-
+    // ... (Pengesahan kerumitan kata laluan dikekalkan) ...
     $uppercase = preg_match('@[A-Z]@', $password);
     $lowercase = preg_match('@[a-z]@', $password);
     $number    = preg_match('@[0-9]@', $password);
-    $specialChars = preg_match('@[\W_]@', $password);
-
+    $specialChars = preg_match('@[\W_]@', $password); 
     if (!$uppercase || !$lowercase || !$number || !$specialChars || strlen($password) < 8) {
-        $_SESSION['error'] = 'Password does not meet the requirements. Please ensure it has 8+ characters, uppercase, lowercase, number, and a special character.';
+        $_SESSION['error'] = 'Password does not meet the requirements.';
         header("Location: signUp.php");
         exit();
     }
 
+    // ----------------------------------------------------
+    // 4. Semak Duplikasi E-mel & ID (Dikemas kini)
+    // ----------------------------------------------------
     $sql_check = "
-        (SELECT 'user' AS role, email, ic_num FROM user WHERE email = ? OR ic_num = ?)
-        UNION ALL
-        (SELECT 'admin' AS role, email, ic_num FROM admin WHERE email = ? OR ic_num = ?)
-        UNION ALL
-        (SELECT 'technician' AS role, email, ic_num FROM technician WHERE email = ? OR ic_num = ?)
+        SELECT p.id, p.email, r.role_name
+        FROM person p
+        LEFT JOIN person_roles pr ON p.person_id = pr.person_id
+        LEFT JOIN roles r ON pr.role_id = r.role_id
+        WHERE p.email = ? OR p.id = ?
+        LIMIT 1
     ";
-
+    
     $stmt = $conn->prepare($sql_check);
     
     if (!$stmt) {
-        $_SESSION['error'] = "Database error (Prepare failed: " . $conn->error . ")";
+        $_SESSION['error'] = "Database error (Prepare check failed: " . $conn->error . ")";
         header("Location: signUp.php");
         exit();
     }
     
-    $stmt->bind_param("ssssss", $email, $ic_num, $email, $ic_num, $email, $ic_num);
+    // Ikat E-mel dan ID
+    $stmt->bind_param("ss", $email, $personId);
     $stmt->execute();
     $result = $stmt->get_result();
-
+    
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         
-        $role_found = strtoupper($row['role']);
-        
-        if ($row['email'] === $email) {
-            $_SESSION['error'] = "Email is already registered as **" . $role_found . "**.";
-        } else if ($row['ic_num'] === $ic_num) {
-            $_SESSION['error'] = "IC Number is already registered as **" . $role_found . "**.";
+        $error_msg = "";
+        if (strtolower($row['email']) === $lower_email) {
+            $role_found = $row['role_name'] ? strtoupper($row['role_name']) : 'User';
+            $error_msg = "Email is already registered as **" . $role_found . "**.";
+        } elseif ($row['id'] === $personId) {
+            $role_found = $row['role_name'] ? strtoupper($row['role_name']) : 'User';
+            $error_msg = "ID is already registered as **" . $role_found . "**.";
         }
         
+        $_SESSION['error'] = $error_msg;
         $stmt->close();
         header("Location: signUp.php");
         exit();
     }
     $stmt->close();
-
+    
+    // ----------------------------------------------------
+    // 5. DAFTAR PENGGUNA BAHARU (TRANSACTION)
+    // ----------------------------------------------------
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     
-    $sql = "INSERT INTO user (name, email, ic_num, password, phoneNum, status) VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    
-    if (!$stmt) {
-        $_SESSION['error'] = "Database error (Prepare failed: " . $conn->error . ")";
-        header("Location: signUp.php");
-        exit();
-    }
-    
-    $stmt->bind_param("ssssss", $name, $email, $ic_num, $hashed_password, $phoneNum, $status);
+    $conn->begin_transaction(); 
 
-    if ($stmt->execute()) {
-        $_SESSION['success'] = "Account created successfully. Please log in.";
+    try {
+        // A. INSERT ke dalam inventory_person (DENGAN MEDAN 'id' tunggal)
+        $sql_person = "INSERT INTO person (name, email, password, phoneNum, status, id) VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt_person = $conn->prepare($sql_person);
         
-        $_SESSION['login_attempt_role'] = 'user'; 
+        if (!$stmt_person) {
+            throw new Exception("Prepare INSERT Person failed: " . $conn->error);
+        }
+        
+        // name, email, hashed_password, phoneNum, status, personId
+        $stmt_person->bind_param("ssssss", $name, $email, $hashed_password, $phoneNum, $status, $personId);
+
+        if (!$stmt_person->execute()) {
+            throw new Exception("Execute INSERT Person failed: " . $stmt_person->error);
+        }
+        
+        $new_person_id = $conn->insert_id;
+        $stmt_person->close();
+        
+        // B. INSERT ke dalam inventory_person_roles (Peranan 'User' = 1)
+        $sql_role = "INSERT INTO person_roles (person_id, role_id) VALUES (?, ?)";
+        $stmt_role = $conn->prepare($sql_role);
+        
+        if (!$stmt_role) {
+            throw new Exception("Prepare INSERT Roles failed: " . $conn->error);
+        }
+        
+        $stmt_role->bind_param("ii", $new_person_id, $user_role_id); 
+
+        if (!$stmt_role->execute()) {
+            throw new Exception("Execute INSERT Roles failed: " . $stmt_role->error);
+        }
+        $stmt_role->close();
+
+        // Commit transaksi
+        $conn->commit();
+
+        $_SESSION['success'] = "Account created successfully. Please log in.";
         $_SESSION['login_attempt_email'] = $email; 
         header("Location: login.php");
         exit();
-    } else {
-        $_SESSION['error'] = "Something went wrong. Please try again. Database error: " . $conn->error;
+
+    } catch (Exception $e) {
+        $conn->rollback(); 
+        $_SESSION['error'] = "Something went wrong. Please try again. Database error: " . $e->getMessage();
         header("Location: signUp.php");
         exit();
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -123,13 +184,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* -------------------------------------------------------------------------- */
-        /* GLOBAL & STRUCTURE - Fokus pada reka bentuk pusat (Single Panel) */
-        /* -------------------------------------------------------------------------- */
+        /* (CSS dikekalkan) */
         :root {
-            --primary-color: #00285a; /* Dark Navy Blue (UniKL) */
-            --secondary-color: #005a9c; /* Lighter Blue */
-            --light-bg: #f0f4f8; /* Very light blue/gray background */
+            --primary-color: #00285a; 
+            --secondary-color: #005a9c; 
+            --light-bg: #f0f4f8; 
             --border-color: #cbd5e1;
             --success-color: #22c55e;
             --error-color: #ef4444;
@@ -142,23 +201,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             height: 100%; 
             background-color: var(--light-bg); 
             display: flex;
-            align-items: center; /* Pusat menegak */
-            justify-content: center; /* Pusat mendatar */
-            min-height: 100vh; /* Pastikan ia meliputi seluruh viewport */
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
         }
         
-        /* CONTAINER UTAMA (MODEN, SATU PANEL) - MENGGANTIKAN .container DAN .form-panel */
         .auth-container { 
             width: 100%; 
-            max-width: 480px; /* Lebar maksimum untuk borang */
+            max-width: 480px; 
             padding: 40px;
             margin: 20px auto;
             background: #fff; 
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 40, 90, 0.15); /* Soft, professional shadow */
+            box-shadow: 0 10px 25px rgba(0, 40, 90, 0.15); 
         }
 
-        /* HEADER */
         .auth-header {
             text-align: center;
             margin-bottom: 30px;
@@ -175,7 +232,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: #64748b;
         }
         
-        /* FORM ELEMENTS */
         .input-group { margin-bottom: 20px; text-align: left; position: relative; }
         .input-group label { 
             font-weight: 600; 
@@ -199,7 +255,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             outline: none;
         }
         
-        /* BUTTON */
         .submit-btn { 
             background: var(--primary-color); 
             color: white; 
@@ -220,12 +275,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             cursor: not-allowed; 
         }
         
-        /* FOOTER & ALERTS */
         .auth-footer { margin-top: 25px; font-size: 15px; text-align: center; }
         .auth-footer a { color: var(--secondary-color); text-decoration: none; font-weight: 600; }
         .auth-footer a:hover { text-decoration: underline; }
         .alert-danger { 
-            background-color: #fef2f2; /* Light Red */
+            background-color: #fef2f2; 
             color: var(--error-color); 
             padding: 12px; 
             border: 1px solid var(--error-color); 
@@ -234,30 +288,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 15px;
             font-weight: 500;
         }
-        
-.form-row {
-    display: flex; /* Aktifkan Flexbox */
-    gap: 20px; /* Jarak antara kolum */
-    margin-bottom: 0; /* Alihkan margin-bottom ke .input-group di dalam .form-row */
-}
+        .alert-success { 
+            background-color: #f0fdf4; 
+            color: var(--success-color); 
+            padding: 12px; 
+            border: 1px solid var(--success-color); 
+            border-radius: 8px; 
+            margin-bottom: 20px;
+            font-size: 15px;
+            font-weight: 500;
+        }
 
-.form-row .input-group {
-    flex: 1; /* Pastikan setiap input-group mengambil ruang yang sama */
-    margin-bottom: 20px; /* Kembalikan margin-bottom di sini */
-}
+        .form-row {
+            display: flex; 
+            gap: 20px; 
+            margin-bottom: 0; 
+        }
 
-/* Ubah susunan Password Requirements (agar ia menjadi satu kolum di bawah) */
-#password-requirements { 
+        .form-row .input-group {
+            flex: 1; 
+            margin-bottom: 20px; 
+        }
+
+        #password-requirements { 
             list-style-type: none; 
             padding: 0; 
             font-size: 13px; 
             color: #64748b; 
             margin-top: -10px; 
             margin-bottom: 25px; 
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* TETAPKAN KEPADA DUA KOLUM UNTUK DESKTOP */
-    gap: 5px 15px; /* Tambah jarak mendatar */
-}
+            display: grid;
+            grid-template-columns: 1fr 1fr; 
+            gap: 5px 15px; 
+        }
         #password-requirements li { 
             margin-bottom: 0; 
             transition: color 0.3s;
@@ -282,26 +345,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-weight: 500;
         }
 
-        /* -------------------------------------------------------------------------- */
-        /* RESPONSIVE DESIGN (MOBILE) */
-        /* -------------------------------------------------------------------------- */
         @media (max-width: 600px) {
             body {
-                align-items: flex-start; /* Alihkan ke atas pada mobile */
+                align-items: flex-start; 
                 padding: 20px;
             }
             .auth-container {
-                box-shadow: none; /* Buang shadow pada mobile */
+                box-shadow: none; 
                 border-radius: 0;
                 padding: 0;
                 margin: 0 auto;
-                background: var(--light-bg); /* Jadikan background borang sama dengan body pada mobile */
+                background: var(--light-bg); 
             }
             .auth-header h2 {
                 font-size: 28px;
             }
+            .form-row {
+                flex-direction: column; 
+                gap: 0;
+            }
             #password-requirements {
-                grid-template-columns: 1fr; /* 1 kolum pada mobile */
+                grid-template-columns: 1fr; 
             }
         }
     </style>
@@ -319,29 +383,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
         </div>
     <?php endif; ?>
-    <?php if (!empty($_SESSION['success']) && basename($_SERVER['PHP_SELF']) == 'signUp.php'): ?>
+    <?php if (!empty($_SESSION['success'])): ?>
         <div class="alert alert-success">
             <?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?>
         </div>
     <?php endif; ?>
 
 
-<form method="POST" action="signUp.php" id="signupForm">
-    <div class="form-row">
-        <div class="input-group">
-            <label for="name">Full Name</label>
-            <input type="text" name="name" id="name" required 
-                   value="<?= htmlspecialchars(isset($_POST['name']) ? $_POST['name'] : '') ?>">
-        </div>
-        
-        <div class="input-group">
-            <label for="ic_num">IC Number (12 Digits)</label>
-            <input type="text" name="ic_num" id="ic_num" required 
-                    pattern="[0-9]{12}" 
-                    title="IC Number must be 12 digits (e.g., 900101015001)"
-                    value="<?= htmlspecialchars(isset($_POST['ic_num']) ? $_POST['ic_num'] : '') ?>"> 
-        </div>
+<form method="POST" action="signUp.php" id="signupForm" novalidate>
+    <div class="input-group">
+        <label for="name">Full Name</label>
+        <input type="text" name="name" id="name" required 
+                value="<?= htmlspecialchars(isset($_POST['name']) ? $_POST['name'] : '') ?>">
     </div>
+    
+    <div class="input-group">
+        <label for="person_id">Student ID / Staff ID</label>
+        <input type="text" name="person_id" id="person_id" required
+               value="<?= htmlspecialchars(isset($_POST['person_id']) ? $_POST['person_id'] : '') ?>"
+               placeholder="Enter Student ID (e.g., 6221XXXXX) or Staff ID (e.g., U0001)">
+    </div>
+    
     <div class="form-row">
         <div class="input-group">
             <label for="email">UniKL Email</label>
@@ -354,6 +416,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     value="<?= htmlspecialchars(isset($_POST['phoneNum']) ? $_POST['phoneNum'] : '') ?>">
         </div>
     </div>
+    
     <div class="input-group">
         <label for="password">Password</label>
         <input type="password" name="password" id="password" required>
@@ -387,7 +450,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     const submitBtn = document.getElementById('submitBtn');
     const matchError = document.getElementById('password-match-error');
     
+    const personIdInput = document.getElementById('person_id');
     
+    // ... (Password requirements dikekalkan) ...
     const reqs = {
         length: { el: document.getElementById('length'), valid: false, regex: /.{8,}/ },
         lowercase: { el: document.getElementById('lowercase'), valid: false, regex: /[a-z]/ },
@@ -434,10 +499,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const isPasswordStrong = validatePassword();
         const doPasswordsMatch = validateConfirmPassword();
         
-        
         const form = document.getElementById('signupForm');
         
-        
+        // Cek semua 'required' fields yang lain
         const isFormFilled = form.checkValidity();
 
         if (isPasswordStrong && doPasswordsMatch && isFormFilled) {
@@ -451,9 +515,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     passwordInput.addEventListener('input', checkFormValidity);
     confirmPasswordInput.addEventListener('input', checkFormValidity);
     document.getElementById('name').addEventListener('input', checkFormValidity);
-    document.getElementById('ic_num').addEventListener('input', checkFormValidity);
     document.getElementById('email').addEventListener('input', checkFormValidity);
     document.getElementById('phoneNum').addEventListener('input', checkFormValidity);
+    personIdInput.addEventListener('input', checkFormValidity); // Listener untuk medan ID tunggal
     
     
     document.addEventListener('DOMContentLoaded', checkFormValidity);

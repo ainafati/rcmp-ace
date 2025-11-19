@@ -1,28 +1,44 @@
 <?php
 session_start();
 
-include '../config.php'; 
-include_once '../logger.php'; 
+include '../config.php';
+include_once '../logger.php';
 
+// ----------------------------------------------------------------------
+// 1. ACCESS CONTROL & SESSION CHECK
+// ----------------------------------------------------------------------
 
-if (!isset($_SESSION['tech_id'])) {
+if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
+    // Penggunaan 'logged_in_role' adalah lebih baik jika anda mengikut struktur dari dashboard_tech.php
+    session_unset();
+    session_destroy();
     header("Location: ../login.php");
     exit();
 }
-$tech_id = (int)$_SESSION['tech_id'];
-$tech = ['name' => 'Technician'];
-$stmt_tech = $conn->prepare("SELECT name FROM technician WHERE tech_id = ?");
-$stmt_tech->bind_param("i", $tech_id);
+
+// Pastikan person_id diisytiharkan dan digunakan sebagai ID pengguna
+$person_id = (int)$_SESSION['person_id'];
+
+
+// Ambil nama technician (menggunakan jadual person)
+$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+$stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
 $result_tech = $stmt_tech->get_result();
-if ($tech_data = $result_tech->fetch_assoc()) {
-    $tech = $tech_data;
-}
+$tech_data = $result_tech->fetch_assoc();
 $stmt_tech->close();
 
+// Set nama untuk logging dan paparan
+if ($tech_data) {
+    $tech_name = $tech_data['name'];
+} else {
+    $tech_name = 'Technician Unknown'; // Fallback name
+}
 
-$tech_id_session = (int)$_SESSION['tech_id'];
-$tech_name_session = $tech['name'];
+
+// ----------------------------------------------------------------------
+// 2. HELPER FUNCTIONS
+// ----------------------------------------------------------------------
 
 function safe_unlink($filepath) {
     if ($filepath && file_exists($filepath) && is_file($filepath)) {
@@ -31,9 +47,8 @@ function safe_unlink($filepath) {
 }
 
 function get_reservation_item_count($conn, $status) {
-    
-    $sql = "SELECT COUNT(id) AS count 
-            FROM reservation_items 
+    $sql = "SELECT COUNT(id) AS count
+            FROM reservation_items
             WHERE status = ?";
     
     $stmt = $conn->prepare($sql);
@@ -50,11 +65,12 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
-
-$pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
-
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
 
 
+// ----------------------------------------------------------------------
+// 3. LOGIC FOR CATEGORIES
+// ----------------------------------------------------------------------
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
@@ -73,11 +89,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     if ($stmt->execute()) {
         $new_cat_id = $stmt->insert_id;
         
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
+        log_activity($conn, 'tech', $person_id, 'TECH_ADD_CATEGORY', $log_details);
         
-        $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
-        log_activity($conn, 'tech', $tech_id_session, 'TECH_ADD_CATEGORY', $log_details);
-        
-
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
     }
     $stmt->close();
@@ -88,6 +103,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $category_id = (int)$_POST['edit_category_id'];
     $category_name = trim($_POST['edit_category_name']);
+    
+    $update_executed = false;
+    
     if (isset($_FILES['edit_category_image']) && $_FILES['edit_category_image']['error'] === 0) {
         $stmt_old = $conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
         $stmt_old->bind_param("i", $category_id);
@@ -97,29 +115,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
             safe_unlink('../' . $old_image_url);
         }
         $stmt_old->close();
+        
         $image = $_FILES['edit_category_image'];
         $image_name = uniqid('cat_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
         $db_path = 'uploads/' . $image_name;
         $server_path = '../' . $db_path;
+        
         if (move_uploaded_file($image['tmp_name'], $server_path)) {
             $stmt = $conn->prepare("UPDATE categories SET category_name = ?, image_url = ? WHERE category_id = ?");
             $stmt->bind_param("ssi", $category_name, $db_path, $category_id);
+            if ($stmt->execute()) {
+                 $update_executed = true;
+            }
+            $stmt->close();
         }
     } else {
         $stmt = $conn->prepare("UPDATE categories SET category_name = ? WHERE category_id = ?");
         $stmt->bind_param("si", $category_name, $category_id);
-    }
-    if (isset($stmt)) {
         if ($stmt->execute()) {
-            
-            
-            $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
-            log_activity($conn, 'tech', $tech_id_session, 'TECH_EDIT_CATEGORY', $log_details);
-            
-            
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
+            $update_executed = true;
         }
         $stmt->close();
+    }
+    
+    if ($update_executed) {
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
+        log_activity($conn, 'tech', $person_id, 'TECH_EDIT_CATEGORY', $log_details);
+        
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
     } else {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Category update failed.'];
     }
@@ -147,9 +171,9 @@ if (isset($_GET['delete_category_id'])) {
     $stmt->bind_param("i", $delete_id);
     if ($stmt->execute()) {
         
-        
-        $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
-        log_activity($conn, 'tech', $tech_id_session, 'TECH_DELETE_CATEGORY', $log_details);
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
+        log_activity($conn, 'tech', $person_id, 'TECH_DELETE_CATEGORY', $log_details);
         
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
@@ -161,6 +185,9 @@ if (isset($_GET['delete_category_id'])) {
 }
 
 
+// ----------------------------------------------------------------------
+// 4. LOGIC FOR ITEM TYPES AND UNITS
+// ----------------------------------------------------------------------
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     $item_name = trim($_POST['item_name']);
@@ -185,18 +212,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
             $stmt_cat->bind_result($category_name);
             $stmt_cat->fetch();
             $stmt_cat->close();
+            
+            // Generate Asset Code Prefix (e.g., KOM-0001)
             $prefix = strtoupper(substr($category_name, 0, 3));
             $like_prefix = $prefix . '-%';
+            
+            // Find the last code used for this prefix
             $stmt_last = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code LIKE ? ORDER BY CAST(SUBSTRING(asset_code, 5) AS UNSIGNED) DESC LIMIT 1");
             $stmt_last->bind_param("s", $like_prefix);
             $stmt_last->execute();
             $stmt_last->bind_result($last_code);
             $stmt_last->fetch();
             $stmt_last->close();
+            
             $last_num = $last_code ? (int)substr($last_code, -4) : 0;
+            
             for ($i = 0; $i < $quantity; $i++) {
                 $next_num = $last_num + 1 + $i;
                 $new_asset_code = $prefix . '-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
+                
                 $stmt_insert = $conn->prepare("INSERT INTO assets (item_id, asset_code, status, brand, model) VALUES (?, ?, 'Available', ?, ?)");
                 $stmt_insert->bind_param("isss", $new_item_id, $new_asset_code, $batch_brand, $batch_model);
                 $stmt_insert->execute();
@@ -206,8 +240,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         $conn->commit();
         
         
-        $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
-        log_activity($conn, 'tech', $tech_id_session, 'TECH_ADD_ITEM_UNITS', $log_details);
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
+        log_activity($conn, 'tech', $person_id, 'TECH_ADD_ITEM_UNITS', $log_details);
         
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Successfully created ' . htmlspecialchars($item_name) . ' with ' . $quantity . ' units.'];
@@ -272,8 +307,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
         $conn->commit();
         
         
-        $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
-        log_activity($conn, 'tech', $tech_id_session, 'TECH_EDIT_ITEM_UNITS', $log_details);
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
+        log_activity($conn, 'tech', $person_id, 'TECH_EDIT_ITEM_UNITS', $log_details);
         
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item updated successfully' . $message_part_2 . '!'];
@@ -298,14 +334,18 @@ if (isset($_GET['delete_item_id'])) {
     
     $conn->begin_transaction();
     try {
+        // Delete related records in reservation_assets first
         $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
         $asset_ids = [];
         while ($row = $assets_to_delete_res->fetch_assoc()) { $asset_ids[] = $row['asset_id']; }
         if (!empty($asset_ids)) {
             $asset_id_list = implode(',', $asset_ids);
+            // This assumes reservation_assets links assets to reservations, which must be deleted first
             $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
         }
+        // Then delete the assets
         $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
+        // Finally, delete the item type
         $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
         $stmt->bind_param("i", $delete_id);
         $stmt->execute();
@@ -313,8 +353,9 @@ if (isset($_GET['delete_item_id'])) {
         $conn->commit();
         
         
-        $log_details = "Technician '{$tech_name_session}' (ID: {$tech_id_session}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
-        log_activity($conn, 'tech', $tech_id_session, 'TECH_DELETE_ITEM_TYPE', $log_details);
+        // Logging: Menggunakan $tech_name dan $person_id
+        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
+        log_activity($conn, 'tech', $person_id, 'TECH_DELETE_ITEM_TYPE', $log_details);
         
         
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Item type and all its units have been deleted.'];
@@ -326,10 +367,14 @@ if (isset($_GET['delete_item_id'])) {
 }
 
 
+// ----------------------------------------------------------------------
+// 5. DATA FETCHING FOR DISPLAY
+// ----------------------------------------------------------------------
+
 $categories = $conn->query("SELECT * FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
 $item_details = $conn->query("
-    SELECT 
-        i.item_id, i.item_name, i.category_id, i.description, c.category_name, 
+    SELECT
+        i.item_id, i.item_name, i.category_id, i.description, c.category_name,
         COUNT(a.asset_id) AS total_units,
         SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) AS available_units
     FROM item i
@@ -339,6 +384,7 @@ $item_details = $conn->query("
     ORDER BY i.item_name ASC
 ")->fetch_all(MYSQLI_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -507,7 +553,7 @@ $item_details = $conn->query("
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
             <div class="user-profile">
-                <span class="user-name d-none d-sm-inline"><?= htmlspecialchars($tech['name']) ?></span> 
+                <span class="user-name d-none d-sm-inline"><?= htmlspecialchars($tech_name) ?></span> 
                 <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                     <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
@@ -721,8 +767,8 @@ $item_details = $conn->query("
     </div>
 </div>
 
-<script src="https:
-<script src="https:
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     <?php
     if (isset($_SESSION['message'])) {

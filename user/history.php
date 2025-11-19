@@ -4,21 +4,22 @@ session_start();
 include '../config.php';
 
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php"); 
     exit();
 }
 
-$user_id = (int) $_SESSION['user_id'];
+$person_id = (int) $_SESSION['person_id'];
 
 
-$user = null; 
-$stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM user WHERE user_id = ?");
+$user = null; // DIBETULKAN: Tukar $person kepada $user 
+$stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+
 if ($stmt_user) {
-    $stmt_user->bind_param("i", $user_id);
+    $stmt_user->bind_param("i", $person_id);
     $stmt_user->execute();
     $result_user = $stmt_user->get_result();
-    $user = $result_user->fetch_assoc();
+    $user = $result_user->fetch_assoc(); // Data disimpan ke $user
     $stmt_user->close();
 } else {
     
@@ -26,8 +27,8 @@ if ($stmt_user) {
 }
 
 
-
-if (!$user) {
+// DIBETULKAN: Semak pemboleh ubah $user (bukan $person)
+if (!$user) { 
     session_destroy();
     header("Location: ../login.php"); 
     exit();
@@ -42,12 +43,13 @@ $totalRows = 0;
 $totalPages = 0;
 
 
+// SQL COUNT (PAGINATION)
 $sql_count = "SELECT COUNT(ri.id)
               FROM reservations r
               JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
-              WHERE r.user_id = ?";
+              WHERE r.person_id = ?";
 if ($stmt_count = $conn->prepare($sql_count)) {
-    $stmt_count->bind_param("i", $user_id);
+    $stmt_count->bind_param("i", $person_id);
     $stmt_count->execute();
     $stmt_count->bind_result($totalRows);
     $stmt_count->fetch();
@@ -63,19 +65,19 @@ if ($stmt_count = $conn->prepare($sql_count)) {
 }
 
 
-
+// SEJARAH TEMPAHAN (HISTORY)
 $history = [];
 $sql = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.reason, ri.status, ri.quantity
         FROM reservations r
         JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
         JOIN item i ON ri.item_id = i.item_id
-        WHERE r.user_id = ?
-        ORDER BY ri.reserve_date ASC
+        WHERE r.person_id = ?
+        ORDER BY ri.reserve_date DESC -- DIBETULKAN: Biasanya sejarah diisih secara DESC (terkini dahulu)
         LIMIT ? OFFSET ?";
 
 if ($stmt = $conn->prepare($sql)) {
     
-    $stmt->bind_param("iii", $user_id, $rowsPerPage, $offset);
+    $stmt->bind_param("iii", $person_id, $rowsPerPage, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
@@ -87,21 +89,21 @@ if ($stmt = $conn->prepare($sql)) {
 }
 
 
-
-
+// KIRAAN STATUS (Jika anda tidak menggunakannya dalam kod ini, ia boleh dibuang)
 $approved = $pending = $rejected = $returned = 0; 
 
 
+// TEMPAHAN AKAN DATANG (UPCOMING BOOKINGS)
 $upcoming_bookings_all = [];
 $sql_upcoming = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
-                 FROM reservations r
-                 JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
-                 JOIN item i ON ri.item_id = i.item_id
-                 WHERE r.user_id = ? AND ri.status IN ('approved', 'pending', 'checked out')
-                 ORDER BY ri.reserve_date ASC";
+                  FROM reservations r
+                  JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
+                  JOIN item i ON ri.item_id = i.item_id
+                  WHERE r.person_id = ? AND ri.status IN ('Approved', 'Pending', 'Checked Out') -- DITUKAR: Status huruf besar untuk konsistensi
+                  ORDER BY ri.reserve_date ASC";
 
 if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
-    $stmt_upcoming->bind_param("i", $user_id);
+    $stmt_upcoming->bind_param("i", $person_id);
     $stmt_upcoming->execute();
     $result_upcoming = $stmt_upcoming->get_result();
     while ($row_up = $result_upcoming->fetch_assoc()) {

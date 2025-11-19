@@ -1,14 +1,18 @@
 <?php
 
 session_start();
+// Pastikan tiada output sebelum tag PHP pembuka di config.php atau logger.php
 include '../config.php';
-include_once '../logger.php'; 
+include_once '../logger.php';
 
+// Fungsi Utiliti untuk membina semula Query String Pagination
+// Ralat 'T_FUNCTION' sering berlaku di sini jika ada karakter tersembunyi
 function build_pagination_query($page_param_name, $page_number) {
-    $params = $_GET; 
+    $params = $_GET;
     
-
+    // Pastikan 'tab' ditetapkan dengan betul
     if (!isset($params['tab'])) {
+        // Logik default tab
         if ($page_param_name == 'page_returns') {
             $params['tab'] = 'returns';
         } elseif ($page_param_name == 'page_logs') {
@@ -16,21 +20,28 @@ function build_pagination_query($page_param_name, $page_number) {
         }
     }
     
-    $params[$page_param_name] = $page_number; 
+    $params[$page_param_name] = $page_number;
+    
+    // Nyahsetkan parameter pagination tab yang satu lagi untuk mengelakkan konflik URL
     if ($page_param_name == 'page_returns' && isset($params['page_logs'])) unset($params['page_logs']);
     if ($page_param_name == 'page_logs' && isset($params['page_returns'])) unset($params['page_returns']);
     
-    return http_build_query($params); 
+    return http_build_query($params);
 }
 
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: ../login.php");
+$allowed_role = 'Admin';
+if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
+    header("Location: login.php");
     exit();
 }
-$admin_id = (int)$_SESSION['admin_id'];
 
-$admin = array('name' => 'Admin');
-if ($stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?")) {
+$person_id = (int)$_SESSION['person_id'];
+
+// Ambil nama Admin/Pengguna yang sedang log masuk dari Sesi
+$admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
+
+// Ambil nama dari jadual 'person' yang disatukan
+if ($stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?")) {
     $stmt_admin->bind_param("i", $admin_id);
     $stmt_admin->execute();
     $stmt_admin->bind_result($aname);
@@ -42,38 +53,36 @@ if ($stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?")) {
 
 $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' : 'returns';
 
-
 $records = array();
+// Ambil kategori dari jadual 'categories'
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 
+// ---- Pagination dan Filter Laporan Barangan Dipulangkan ----
 $items_per_page_returns = 10;
 $page_returns = isset($_GET['page_returns']) ? (int)$_GET['page_returns'] : 1;
 if ($page_returns < 1) $page_returns = 1;
-
 
 $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
-
+// 2. Query Laporan Barangan Dipulangkan
 $sql_base_report = "FROM reservation_items ri
-     JOIN reservations r ON ri.reserve_id = r.reserve_id
-     JOIN user u ON r.user_id = u.user_id
-     JOIN item i ON ri.item_id = i.item_id
-     JOIN categories c ON i.category_id = c.category_id
-     LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
-     LEFT JOIN assets a ON ra.asset_id = a.asset_id
-     LEFT JOIN technician tech ON ri.approved_by = tech.tech_id
-     LEFT JOIN admin adm ON ri.approved_by = adm.admin_id";
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    JOIN person u ON r.person_id = u.person_id /* User (Peminjam) dari reservations */
+    JOIN item i ON ri.item_id = i.item_id
+    JOIN categories c ON i.category_id = c.category_id
+    LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
+    LEFT JOIN assets a ON ra.asset_id = a.asset_id /* Sambungan ke Asset (jika ada) */
+    LEFT JOIN person p_handler ON ri.approved_by = p_handler.person_id"; /* Handler (Admin/Tech) yang meluluskan */
 	
 $where_clauses_report = array(
-    "ri.status = 'Returned'",
-    "ri.return_date BETWEEN ? AND ?"
+    "ri.status = 'Returned'", // Status item yang telah dipulangkan
+    "ri.return_date BETWEEN ? AND ?" // Filter berdasarkan tarikh pulangan
 );
 $param_types_report = "ss";
 $param_values_report = array($report_start_date, $report_end_date);
@@ -87,8 +96,10 @@ if ($report_category_id > 0) {
 $sql_where_report = " WHERE " . implode(' AND ', $where_clauses_report);
 
 
+// Kiraan Rekod (Returned Items)
 $stmt_count_report = $conn->prepare("SELECT COUNT(ri.id) " . $sql_base_report . $sql_where_report);
 if ($stmt_count_report) {
+    // Pengikatan Parameter untuk COUNT
     $bind_params_count = array();
     $bind_params_count[] = $param_types_report;
     for ($i = 0; $i < count($param_values_report); $i++) {
@@ -103,31 +114,32 @@ if ($stmt_count_report) {
     
     $total_pages_returns = ceil($total_records_returns / $items_per_page_returns);
     if ($total_pages_returns == 0) $total_pages_returns = 1;
-    if ($page_returns > $total_pages_returns && $total_records_returns > 0) $page_returns = $total_pages_returns;
-    $offset_returns = ($page_returns - 1) * $items_per_page_returns; 
+    if ($total_records_returns > 0 && $page_returns > $total_pages_returns) $page_returns = $total_pages_returns;
+    $offset_returns = ($page_returns - 1) * $items_per_page_returns;
 } else {
-    
     $total_records_returns = 0;
     $total_pages_returns = 1;
     $offset_returns = 0;
 }
 
 
-$sql_report = "SELECT 
-                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-                 ri.reserve_date, ri.return_date, ri.return_condition,
-                 COALESCE(tech.name, adm.name) AS technician_name
-              " . $sql_base_report . $sql_where_report . " 
-              ORDER BY ri.return_date DESC
-              LIMIT ? OFFSET ?";
+// Select Query (Returned Items)
+$sql_report = "SELECT
+    u.name AS user_name, i.item_name, a.asset_code, c.category_name,
+    ri.reserve_date, ri.return_date, ri.return_condition,
+    p_handler.name AS handler_name
+    " . $sql_base_report . $sql_where_report . "
+    ORDER BY ri.return_date DESC
+    LIMIT ? OFFSET ?";
 
-$param_values_select = array_merge($param_values_report); 
-$param_types_select = $param_types_report . "ii"; 
+$param_values_select = array_merge($param_values_report);
+$param_types_select = $param_types_report . "ii";
 $param_values_select[] = $items_per_page_returns;
 $param_values_select[] = $offset_returns;
 
 $stmt_report = $conn->prepare($sql_report);
 if ($stmt_report) {
+    // Pengikatan Parameter untuk SELECT
     $bind_params_select = array();
     $bind_params_select[] = $param_types_select;
     for ($i = 0; $i < count($param_values_select); $i++) {
@@ -141,12 +153,8 @@ if ($stmt_report) {
 }
 
 
-
-
-
+// ---- Pagination dan Filter Log Aktiviti ----
 $logs = array();
-
-
 $items_per_page_logs = 10;
 $page_logs = isset($_GET['page_logs']) ? (int)$_GET['page_logs'] : 1;
 if ($page_logs < 1) $page_logs = 1;
@@ -155,8 +163,9 @@ $log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : dat
 $log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
 $log_user_type = isset($_GET['user_type']) ? $_GET['user_type'] : '';
 $log_search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$end_date_sql = $log_end_date . ' 23:59:59';
+$end_date_sql = $log_end_date . ' 23:59:59'; // Untuk memasukkan log hari akhir
 
+// 3. Query Log Aktiviti (Menggunakan jadual activity_logs anda)
 $sql_base_log = "FROM activity_logs";
 $where_clauses_log = array("timestamp BETWEEN ? AND ?");
 $param_types_log = "ss";
@@ -177,8 +186,10 @@ if (!empty($log_search)) {
 $sql_where_log = " WHERE " . implode(' AND ', $where_clauses_log);
 
 
+// Kiraan Rekod (Activity Logs)
 $stmt_count_log = $conn->prepare("SELECT COUNT(log_id) " . $sql_base_log . $sql_where_log);
 if ($stmt_count_log) {
+    // Pengikatan Parameter untuk COUNT
     $bind_params_count_log = array();
     $bind_params_count_log[] = $param_types_log;
     for ($i = 0; $i < count($param_values_log); $i++) {
@@ -193,8 +204,8 @@ if ($stmt_count_log) {
     
     $total_pages_logs = ceil($total_records_logs / $items_per_page_logs);
     if ($total_pages_logs == 0) $total_pages_logs = 1;
-    if ($page_logs > $total_pages_logs && $total_records_logs > 0) $page_logs = $total_pages_logs;
-    $offset_logs = ($page_logs - 1) * $items_per_page_logs; 
+    if ($total_records_logs > 0 && $page_logs > $total_pages_logs) $page_logs = $total_pages_logs;
+    $offset_logs = ($page_logs - 1) * $items_per_page_logs;
 } else {
     $total_records_logs = 0;
     $total_pages_logs = 1;
@@ -202,19 +213,20 @@ if ($stmt_count_log) {
 }
 
 
+// Select Query (Activity Logs)
+$sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address
+    " . $sql_base_log . $sql_where_log . "
+    ORDER BY timestamp DESC
+    LIMIT ? OFFSET ?";
 
-$sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address 
-              " . $sql_base_log . $sql_where_log . " 
-              ORDER BY timestamp DESC
-              LIMIT ? OFFSET ?"; 
-
-$param_values_select_log = array_merge($param_values_log); 
-$param_types_select_log = $param_types_log . "ii"; 
+$param_values_select_log = array_merge($param_values_log);
+$param_types_select_log = $param_types_log . "ii";
 $param_values_select_log[] = $items_per_page_logs;
 $param_values_select_log[] = $offset_logs;
 
 $stmt_log = $conn->prepare($sql_log);
 if ($stmt_log) {
+    // Pengikatan Parameter untuk SELECT
     $bind_params_select_log = array();
     $bind_params_select_log[] = $param_types_select_log;
     for ($i = 0; $i < count($param_values_select_log); $i++) {
@@ -229,13 +241,12 @@ if ($stmt_log) {
 
 $conn->close();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1"> 
-    <title>System Reports — UniKL Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>System Reports - UniKL Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -269,13 +280,13 @@ $conn->close();
         .badge { font-size: 0.8rem; padding: 0.4em 0.6em; }
         /* Gaya untuk Tab */
         .nav-tabs { border-bottom: 2px solid #e2e8f0; margin-bottom: 0; }
-        .nav-tabs .nav-link { 
-            border: none; 
+        .nav-tabs .nav-link {
+            border: none;
             border-bottom: 2px solid transparent;
             color: #64748b;
             font-weight: 600;
             padding: 12px 20px;
-            margin-bottom: -2px; 
+            margin-bottom: -2px;
         }
         .nav-tabs .nav-link.active {
             color: #3b82f6;
@@ -319,7 +330,7 @@ $conn->close();
             .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
             .sidebar.open { transform: translateX(0); }
             .main-content { margin-left: 0; width: 100%; }
-            .topbar { padding: 10px 15px; justify-content: flex-start; } 
+            .topbar { padding: 10px 15px; justify-content: flex-start; }
             .topbar h3 { font-size: 16px; flex-grow: 1; }
             .topbar .admin-name { display: none; }
             .topbar .admin-profile { margin-left: auto; }
@@ -330,10 +341,10 @@ $conn->close();
             .nav-tabs .nav-link { padding: 10px 12px; font-size: 14px; }
 
             /* FILTER FORMS */
-            #reportForm .row, #logForm .row { 
-                --bs-gutter-x: 0.5rem; /* Kurangkan padding sisi */
+            #reportForm .row, #logForm .row {
+                --bs-gutter-x: 0.5rem;
             }
-            #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6, 
+            #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6,
             #logForm .col-md-3 {
                 width: 100%;
                 margin-bottom: 8px;
@@ -359,7 +370,7 @@ $conn->close();
                 align-items: flex-start !important;
                 gap: 10px;
             }
-            .d-flex.justify-content-between.align-items-center.mb-3 > div, 
+            .d-flex.justify-content-between.align-items-center.mb-3 > div,
             .d-flex.justify-content-between.align-items-center.mb-3 > a,
             .d-flex.justify-content-between.align-items-center.mb-3 > div a {
                 width: 100%;
@@ -393,7 +404,7 @@ $conn->close();
         <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
         <h3>System Reports</h3>
         <div class="admin-profile">
-            <span class="admin-name"><?= htmlspecialchars($admin['name']) ?></span>
+            <span class="admin-name"><?= htmlspecialchars($admin_name) ?></span>
             <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
             </a>
@@ -403,13 +414,13 @@ $conn->close();
 
         <ul class="nav nav-tabs" id="reportTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <a class="nav-link <?php if($active_tab == 'returns') echo 'active'; ?>" 
+                <a class="nav-link <?php if($active_tab == 'returns') echo 'active'; ?>"
                    href="?tab=returns" id="returns-tab" role="tab">
                     <i class="fa-solid fa-right-left me-2"></i> Returned Items Report
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a class="nav-link <?php if($active_tab == 'activity') echo 'active'; ?>" 
+                <a class="nav-link <?php if($active_tab == 'activity') echo 'active'; ?>"
                    href="?tab=activity" id="activity-tab" role="tab">
                     <i class="fa-solid fa-clipboard-list me-2"></i> Activity Log
                 </a>
@@ -418,7 +429,7 @@ $conn->close();
 
         <div class="tab-content" id="reportTabContent">
             
-            <div class="tab-pane fade <?php if($active_tab == 'returns') echo 'show active'; ?>" 
+            <div class="tab-pane fade <?php if($active_tab == 'returns') echo 'show active'; ?>"
                  id="returns-pane" role="tabpanel">
                 
                 <div class="card p-4">
@@ -483,7 +494,7 @@ $conn->close();
                             <a href="generate_pdf_admin.php?start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i>Export as PDF</a>
                             <a href="export_excel.php?export=returns&start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-success">
                             <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
-                        </a>                    
+                        </a>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -513,7 +524,7 @@ $conn->close();
                                         <td><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
                                         <td><?= date("d M Y", strtotime($record['return_date'])) ?></td>
                                         <td class="text-muted"><?= htmlspecialchars($record['return_condition'] ?: 'Not specified') ?></td>
-                                        <td><?= htmlspecialchars($record['technician_name'] ?: 'N/A') ?></td>
+                                        <td><?= htmlspecialchars($record['handler_name'] ?: 'N/A') ?></td>
                                     </tr>
                                 <?php endforeach; endif; ?>
                             </tbody>
@@ -538,7 +549,7 @@ $conn->close();
                 </div>
             </div>
 
-            <div class="tab-pane fade <?php if($active_tab == 'activity') echo 'show active'; ?>" 
+            <div class="tab-pane fade <?php if($active_tab == 'activity') echo 'show active'; ?>"
                  id="activity-pane" role="tabpanel">
                 
                 <div class="card p-4">
@@ -581,7 +592,7 @@ $conn->close();
 
                     <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">Log Records (<?= $total_records_logs ?> records found)</h5>
-        
+                    
                     <a href="export_excel.php?export=activity&log_start_date=<?= urlencode($log_start_date) ?>&log_end_date=<?= urlencode($log_end_date) ?>&user_type=<?= urlencode($log_user_type) ?>&search=<?= urlencode($log_search) ?>" target="_blank" class="btn btn-success">
                         <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
                     </a>
@@ -604,7 +615,7 @@ $conn->close();
                                     <tr>
                                         <td style="white-space: nowrap;"><?= date("d M Y, h:i:s A", strtotime($log['timestamp'])) ?></td>
                                         <td>
-                                            <?php 
+                                            <?php
                                             $user_type = htmlspecialchars($log['user_type']);
                                             $badge_class = 'bg-secondary';
                                             if ($user_type == 'admin') $badge_class = 'bg-danger text-white';
@@ -643,9 +654,9 @@ $conn->close();
                 </div>
             </div>
 
-        </div> 
-    </div> 
-</div> 
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -671,7 +682,7 @@ $conn->close();
                 link.addEventListener('click', function() {
                     if (window.innerWidth <= 768) {
                         
-                        setTimeout(() => { 
+                        setTimeout(() => {
                             sidebar.classList.remove('open');
                             overlay.classList.remove('active');
                         }, 100);
@@ -679,48 +690,45 @@ $conn->close();
                 });
             });
         }
-        
-        
-        
-        
-        
     });
 
     
     flatpickr("#start_date", { dateFormat: "Y-m-d" });
     flatpickr("#end_date", { dateFormat: "Y-m-d" });
+    flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
+    flatpickr("#log_end_date", { dateFormat: "Y-m-d" });
 
     var monthFilter = document.getElementById('month_filter');
     var yearFilter = document.getElementById('year_filter');
     var categoryFilter = document.getElementById('category_filter');
     
+    // Fungsi untuk mengemas kini tarikh dan memohon semula penapis berdasarkan bulan/tahun/kategori
     function updateAndSubmit() {
         var year = yearFilter.value;
         var month = monthFilter.value;
         
-        
-        var params = new URLSearchParams(window.location.search);
-        
-        
+        // Kira tarikh mula (hari pertama bulan) dan tarikh tamat (hari terakhir bulan)
         var startDate = new Date(year, month - 1, 1);
         var endDate = new Date(year, month, 0);
         
         var formatDate = function(date) {
             var y = date.getFullYear();
             
-            var m = ('0' + (date.getMonth() + 1)).slice(-2); 
+            var m = ('0' + (date.getMonth() + 1)).slice(-2);
             var d = ('0' + date.getDate()).slice(-2);
             return y + '-' + m + '-' + d;
         };
 
+        // Bina URLSearchParams baharu
+        var params = new URLSearchParams(window.location.search);
         
         params.set('start_date', formatDate(startDate));
         params.set('end_date', formatDate(endDate));
-        params.set('category_id', categoryFilter.value); 
-        params.set('tab', 'returns'); 
-        params.delete('page_returns'); 
+        params.set('category_id', categoryFilter.value);
+        params.set('tab', 'returns');
+        params.delete('page_returns'); // Tetapkan semula pagination
         
-        
+        // Pindahkan ke URL baharu
         window.location.search = params.toString();
     }
 
@@ -729,9 +737,6 @@ $conn->close();
     if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
     if (categoryFilter) categoryFilter.addEventListener('change', updateAndSubmit);
 
-    
-    flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
-    flatpickr("#log_end_date", { dateFormat: "Y-m-d" });
     
 </script>
 </body>

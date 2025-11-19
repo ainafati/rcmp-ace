@@ -1,227 +1,151 @@
 <?php
-
 session_start();
-include 'config.php'; 
+include 'config.php'; // Fail ini mesti menyediakan sambungan $conn
 
-/**
- * Masukkan logger khas.
- */
-if (file_exists('logger.php')) {
-    include 'logger.php';
-} else {
+// Pastikan ia adalah permintaan POST
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
-    if (!function_exists('log_activity')) {
-        function log_activity($conn, $user_type, $user_id, $action, $details) {
-            error_log("Logger function not found. Log attempt: $details");
-        }
-    }
-}
-
-/**
- * Mengendalikan semua percubaan log masuk yang gagal.
- */
-function handle_failed_login($conn, $email, $role, $error_message, $user_id = null, $action = 'LOGIN_FAIL') {
+    // BARIS 7, 8, & 9 YANG DIBETULKAN: Gantikan '??' dengan isset() dan operator ternary
+    $email = isset($_POST['email']) ? $_POST['email'] : '';
+    $password = isset($_POST['password']) ? $_POST['password'] : '';
+    $selected_role = isset($_POST['role']) ? $_POST['role'] : ''; // <-- PERANAN YANG DIPILIH DARI BORANG
     
-    $log_details = "Login attempt failed for email '{$email}' as '{$role}'. Reason: {$error_message}";
-    log_activity($conn, $role, $user_id, $action, $log_details);
-
-    $_SESSION['error'] = $error_message;
+    // Simpan data untuk mengisi semula borang jika gagal
+    $_SESSION['login_attempt_role'] = $selected_role;
     $_SESSION['login_attempt_email'] = $email;
-    $_SESSION['login_attempt_role'] = $role;
     
-    header("Location: login.php");
-    exit();
-}
-
-/**
- * FUNGSI BANTUAN (1): Menyemak domain emel.
- */
-function is_valid_domain($email, $allowed_domains) {
-    $lower_email = strtolower($email);
-    foreach ($allowed_domains as $domain) {
-        if (substr($lower_email, -strlen($domain)) === $domain) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * FUNGSI BANTUAN (2): Menyemak emel di jadual role yang lain.
- */
-function check_email_in_other_roles($conn, $email, $current_role) {
-    $roles_to_check = [
-        'admin' => 'admin',
-        'tech'  => 'technician',
-        'user'  => 'user'
-    ];
-    unset($roles_to_check[$current_role]);
-
-    foreach ($roles_to_check as $role_name => $table_name) {
-        try {
-            $sql = "SELECT email FROM $table_name WHERE email = ? LIMIT 1";
-            $stmt = $conn->prepare($sql);
-            if ($stmt) {
-                $stmt->bind_param("s", $email);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                if ($result->num_rows === 1) {
-                    $stmt->close();
-                    return $role_name; 
-                }
-                $stmt->close();
-            }
-        } catch (Exception $e) {
-            error_log("Cross-check error for $table_name: " . $e->getMessage());
-        }
-    }
-    return null; 
-}
-
-
-
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    header("Location: login.php");
-    exit();
-}
-
-
-$role = isset($_POST['role']) ? $_POST['role'] : '';
-$email = isset($_POST['email']) ? trim($_POST['email']) : '';
-$password = isset($_POST['password']) ? $_POST['password'] : '';
-
-
-if (empty($role) || empty($email) || empty($password)) {
-    handle_failed_login($conn, $email, $role, "Please fill in all fields.", null, 'LOGIN_FAIL_EMPTY');
-}
-
-
-$table_name = '';
-$id_column = '';
-$name_column = 'name';
-$password_column = 'password';
-$status_column = 'status'; 
-$dashboard_redirect = '';
-$session_key = '';
-$allowed_domains = []; 
-
-switch ($role) {
-    case 'admin':
-        $table_name = 'admin';
-        $id_column = 'admin_id';
-        $session_key = 'admin_id';
-        $dashboard_redirect = 'admin/manageItem_admin.php';
-        $allowed_domains = ['@unikl.edu.my','@t.unikl.edu.my','@gmail.com'];
-        break;
-    case 'tech':
-        $table_name = 'technician';
-        $id_column = 'tech_id';
-        $session_key = 'tech_id';
-        $dashboard_redirect = 'technician/dashboard_tech.php';
-        $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my','@gmail.com'];
-        break;
-    case 'user':
-        $table_name = 'user';
-        $id_column = 'user_id';
-        $session_key = 'user_id';
-        $dashboard_redirect = 'user/dashboard_user.php';
-        $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my','@gmail.com'];
-        break;
-    default:
-        handle_failed_login($conn, $email, $role, "Invalid role selected.", null, 'LOGIN_FAIL_ROLE');
-}
-
-
-if (!is_valid_domain($email, $allowed_domains)) {
-    $error_message = "Invalid email domain for '{$role}' role. Please use an authorized email.";
-    handle_failed_login($conn, $email, $role, $error_message, null, 'LOGIN_FAIL_INVALID_DOMAIN');
-}
-
-
-$sql = "SELECT $id_column, $name_column, $password_column, $status_column FROM $table_name WHERE email = ? LIMIT 1";
-$stmt = $conn->prepare($sql);
-
-if ($stmt === false) {
-    error_log("SQL Prepare Error: " . $conn->error);
-    handle_failed_login($conn, $email, $role, "Server error. Please contact the administrator.", null, 'SERVER_ERROR');
-}
-
-$stmt->bind_param("s", $email);
-$stmt->execute();
-$result = $stmt->get_result();
-
-
-if ($result->num_rows === 1) {
-    $row = $result->fetch_assoc();
+    // Bersihkan input
+    $email = filter_var($email, FILTER_SANITIZE_EMAIL);
     
-    $user_id = $row[$id_column];
-    $user_name = $row[$name_column];
-    $hashed_password = $row[$password_column];
-    $status = $row[$status_column]; 
-
+    // 1. Cari pengguna dalam Jadual Person
+    $stmt = $conn->prepare("SELECT person_id, name, password, status FROM person WHERE email = ?");
     
-    
-    
-    
-    if (strtolower($status) !== 'active') {
-        
-        
-        $error_message = "Your account is currently '{$status}'. Please contact the administrator for assistance.";
-        $action_code = strtoupper($role) . '_LOGIN_FAIL_STATUS_' . strtoupper($status);
-        
-        $stmt->close();
-        handle_failed_login($conn, $email, $role, $error_message, $user_id, $action_code);
-    }
-    
-    
-    
-
-    
-    if (password_verify($password, $hashed_password)) {
-        
-        session_regenerate_id(true); 
-        $_SESSION[$session_key] = $user_id;
-        $_SESSION['name'] = $user_name;
-        $_SESSION['role'] = $role;
-
-        
-        $action_code = strtoupper($role) . '_LOGIN_SUCCESS'; 
-        $log_details = "User '{$user_name}' (ID: {$user_id}) successfully logged in as '{$role}'.";
-        log_activity($conn, $role, $user_id, $action_code, $log_details);
-        
-        $stmt->close();
-        $conn->close();
-        header("Location: $dashboard_redirect");
+    if (!$stmt) {
+        $_SESSION['error'] = "Database error: " . $conn->error;
+        header("Location: login.php");
         exit();
-
-    } else {
-        
-        $action_code = strtoupper($role) . '_LOGIN_FAIL_PASSWORD';
+    }
+    
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($person = $result->fetch_assoc()) {
         $stmt->close();
-        handle_failed_login($conn, $email, $role, "Incorrect email or password.", $user_id, $action_code);
-    }
-
-} else {
-    
-    $stmt->close(); 
-
-    
-    $found_in_role = check_email_in_other_roles($conn, $email, $role);
-
-    if ($found_in_role !== null) {
         
-        $correct_role_name = ucfirst($found_in_role); 
-        $current_role_name = ucfirst($role);
-        $error_message = "That email is registered as '{$correct_role_name}', not '{$current_role_name}'. Please select the '{$correct_role_name}' role and try again.";
-        $action_code = strtoupper($role) . '_LOGIN_FAIL_WRONG_ROLE';
-        handle_failed_login($conn, $email, $role, $error_message, null, $action_code);
+        // 2. Sahkan Kata Laluan (GUNA password_verify)
+        if (password_verify($password, $person['password'])) { 
+        // Guna: if ($password === $person['password']) { jika masih guna plain text
+            
+            // 2.1 Semak Status Akaun
+            if ($person['status'] === 'Suspended') {
+                $_SESSION['error'] = "Your account is suspended. Please contact the administrator.";
+                header("Location: login.php");
+                exit();
+            }
 
+// 3. Ambil Semua Peranan Pengguna (DIBETULKAN SINTAKS SQL)
+            $stmt_roles = $conn->prepare("
+                SELECT r.role_name 
+                FROM person_roles pr 
+                JOIN roles r ON pr.role_id = r.role_id 
+                WHERE pr.person_id = ? 
+            ");
+
+            // Semak jika prepare gagal sebelum memanggil bind_param
+            if (!$stmt_roles) {
+                // Ralat ini harus ditangkap jika terdapat ralat sintaks DB sebenar
+                $_SESSION['error'] = "Database error (Role Query): " . $conn->error;
+                header("Location: login.php");
+                exit();
+            }
+            
+            $stmt_roles->bind_param("i", $person['person_id']);
+            $stmt_roles->execute();
+            $roles_result = $stmt_roles->get_result();
+            
+            // ... (Sambungan kod anda) ...            $roles_db = [];
+            while ($row = $roles_result->fetch_assoc()) {
+                $roles_db[] = $row['role_name'];
+            }
+            $stmt_roles->close();
+
+            if (empty($roles_db)) {
+                $_SESSION['error'] = "Login successful, but no role assigned. Please contact the administrator.";
+                header("Location: login.php");
+                exit();
+            }
+            
+            // 4. SAHKAN PERANAN YANG DIPILIH (Selected Role)
+            // Terjemahkan peranan borang kepada format DB
+            
+            // PENGGANTIAN SINTAKS MATCH DENGAN LOGIK IF/ELSE ATAU SWITCH LAMA
+            // Sintaks 'match' memerlukan PHP 8.0, jadi kita guna 'switch'
+            $mapped_role = null;
+            switch ($selected_role) {
+                case 'admin':
+                    $mapped_role = 'Admin';
+                    break;
+                case 'tech':
+                    $mapped_role = 'Technician';
+                    break;
+                case 'user':
+                    $mapped_role = 'User';
+                    break;
+                default:
+                    $mapped_role = null;
+            }
+
+            // Semak jika peranan yang DIPILIH wujud dalam peranan pengguna (DB)
+            if (is_null($mapped_role) || !in_array($mapped_role, $roles_db)) {
+                $_SESSION['error'] = "The selected role is not valid for this account, or you do not have permission.";
+                header("Location: login.php");
+                exit();
+            }
+
+            // 5. Tetapkan Sesi (Session)
+            $_SESSION['person_id'] = $person['person_id'];
+            $_SESSION['name'] = $person['name'];
+            
+            // Peranan yang mana pengguna sedang log masuk SEKARANG
+            $_SESSION['logged_in_role'] = $mapped_role; 
+            
+            // SEMUA peranan yang dimiliki oleh pengguna (untuk rujukan lain)
+            $_SESSION['all_roles'] = $roles_db; 
+            
+            // 6. Logik Pengarahan (Redirect) - Berdasarkan peranan YANG DIPILIH
+            switch ($mapped_role) {
+                case 'Admin':
+                    header("Location: admin/manageItem_admin.php");
+                    break;
+                case 'Technician':
+                    header("Location: technician/dashboard_tech.php");
+                    break;
+                case 'User':
+                    header("Location: user/dashboard_user.php");
+                    break;
+                default:
+                    $_SESSION['error'] = "Role selected is valid but dashboard path is missing.";
+                    header("Location: login.php"); 
+            }
+            exit();
+
+        } else {
+            // Ralat Kata Laluan
+            $_SESSION['error'] = "Invalid email or password.";
+            header("Location: login.php");
+            exit();
+        }
     } else {
-        
-        $action_code = strtoupper($role) . '_LOGIN_FAIL_EMAIL';
-        handle_failed_login($conn, $email, $role, "Incorrect email or password.", null, $action_code);
+        // Ralat Emel tidak ditemui
+        $stmt->close();
+        $_SESSION['error'] = "Invalid email or password.";
+        header("Location: login.php");
+        exit();
     }
+} else {
+    // Jika akses bukan melalui borang POST
+    header("Location: login.php");
+    exit();
 }
-
-$conn->close();
 ?>

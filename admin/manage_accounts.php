@@ -2,30 +2,49 @@
 session_start();
 include 'config.php';
 
+// Pastikan sambungan DB berjaya
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-if (!isset($_SESSION['admin_id'])) {
+// ******************************************************
+// 1. PERLINDUNGAN SESI & PENGAMBILAN NAMA PENGGUNA (Person)
+// ******************************************************
+$allowed_role = 'Admin';
+if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
     header("Location: login.php");
     exit();
 }
-$admin_id = (int)$_SESSION['admin_id'];
-$admin = ['name' => 'Admin'];
-$stmt_admin = $conn->prepare("SELECT name FROM admin WHERE admin_id = ?");
-$stmt_admin->bind_param("i", $admin_id);
-$stmt_admin->execute();
-$result_admin = $stmt_admin->get_result();
-if ($admin_data = $result_admin->fetch_assoc()) {
-    $admin = $admin_data;
-}
-$stmt_admin->close();
 
+$person_id = (int)$_SESSION['person_id'];
+
+// Ambil nama Admin/Pengguna yang sedang log masuk dari Sesi
+$admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
+
+// ******************************************************
+// 2. PERTANYAAN SQL YANG DIBETULKAN (Menggunakan p.id AS id)
+// ******************************************************
 $sql = "
-    (SELECT tech_id AS id, name, email, ic_num, status, suspension_remarks, phoneNum, 'Technician' AS role, created_at FROM technician)
-    UNION ALL
-    (SELECT user_id AS id, name, email, ic_num, status, suspension_remarks, phoneNum, 'User' AS role, created_at FROM user)
-    ORDER BY created_at ASC
+    SELECT
+        p.person_id AS person_unique_id,
+        p.name,
+        p.email,
+        p.id AS id,             -- DIKEMAS KINI: Menggunakan lajur 'id' dari jadual person
+        p.status,
+        p.suspension_remarks,
+        p.phoneNum,
+        p.created_at,
+        GROUP_CONCAT(r.role_name SEPARATOR ', ') AS roles_list
+    FROM 
+        person p
+    JOIN 
+        person_roles pr ON p.person_id = pr.person_id
+    JOIN 
+        roles r ON pr.role_id = r.role_id
+    GROUP BY
+        p.person_id, p.name, p.email, p.id, p.status, p.suspension_remarks, p.phoneNum, p.created_at
+    ORDER BY
+        p.created_at ASC
 ";
 
 $result = $conn->query($sql);
@@ -151,8 +170,8 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add Account</button>
             <div class="user-profile">
-                <span class="user-name"><?= htmlspecialchars($admin['name']) ?></span>
-                <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
+<span class="user-name"><?= $admin_name ?></span>               
+               <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
             </div>
@@ -198,16 +217,14 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                     <small class="text-muted"><?= htmlspecialchars(isset($a['phoneNum']) ? $a['phoneNum'] : 'N/A') ?></small>
                                 </td>
                                 <td><span class="badge rounded-pill <?= strtolower($a['status']) === 'active' ? 'text-bg-success' : 'text-bg-danger' ?>"><?= htmlspecialchars($a['status']) ?></span></td>
-                                <td><span class="badge rounded-pill text-bg-info"><?= htmlspecialchars($a['role']) ?></span></td>
-                                <td>
+<td><span class="badge rounded-pill text-bg-info"><?= htmlspecialchars($a['roles_list']) ?></span></td>                                 <td>
                                     <button class="btn btn-sm btn-outline-warning" title="Edit User"
                                         onclick="editUser(
-                                            '<?= $a['id'] ?>',
+                                            '<?= $a['person_unique_id'] ?>',
                                             '<?= htmlspecialchars(addslashes($a['name'])) ?>',
                                             '<?= htmlspecialchars(addslashes($a['email'])) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['ic_num']) ? $a['ic_num'] : '')) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
-                                            '<?= htmlspecialchars(addslashes($a['role'])) ?>',
+                                            '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>',   '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
+                                            '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>',
                                             '<?= htmlspecialchars(addslashes($a['status'])) ?>',
                                             '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
                                         )">
@@ -215,8 +232,8 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                     </button>
                                     
                                     <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this account? This action cannot be undone.');">
-                                        <input type="hidden" name="id" value="<?= $a['id'] ?>">
-                                        <input type="hidden" name="role" value="<?= htmlspecialchars($a['role']) ?>">
+                                        <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
+                                        <input type="hidden" name="role" value="<?= htmlspecialchars($a['roles_list']) ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
@@ -245,15 +262,14 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 
                 <div class="mb-3"><label class="form-label">Email (UniKL)</label>
                     <input type="email" name="email" class="form-control" required
-                           pattern="[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my"
-                           title="Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)">
+                            pattern="[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my"
+                            title="Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)">
                 </div>
                 
-                <div class="mb-3"><label class="form-label">IC Number (12-digit)</label>
-                    <input type="text" name="ic_num" class="form-control" required
-                           pattern="\d{12}"
-                           title="Enter 12 digits IC number without dash (-)"
-                           placeholder="e.g., 990101105000">
+                <div class="mb-3"><label class="form-label">Staff ID</label>
+                    <input type="text" name="id" class="form-control" required         pattern="\d{12}"
+                            title="Enter 12 digits IC number without dash (-)"
+                            placeholder="e.g., 990101105000">
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
@@ -276,7 +292,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" name="id" id="editId">
+                <input type="hidden" name="person_id" id="editPersonId">
                 <input type="hidden" name="role" id="editRole">
                 <div class="mb-3">
                     <label class="form-label">Name</label>
@@ -287,9 +303,8 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                     <input type="email" id="editEmail" name="email" class="form-control bg-light" readonly>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">IC Number</label>
-                    <input type="text" id="editIcNum" name="ic_num" class="form-control bg-light" readonly>
-                </div>
+                    <label class="form-label">Staff ID / Student ID</label>
+                    <input type="text" id="editId" name="id" class="form-control bg-light" readonly> </div>
                 <div class="mb-3">
                     <label class="form-label">Phone Number</label>
                     <input type="text" name="phoneNum" id="editPhone" class="form-control">
@@ -346,14 +361,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function editUser(id, name, email, ic_num, phone, role, status, remarks) {
-    document.getElementById('editId').value = id;
+function editUser(person_unique_id, name, email, id, phone, roles_list, status, remarks) {
+    document.getElementById('editPersonId').value = person_unique_id;
     document.getElementById('editName').value = name;
     document.getElementById('editEmail').value = email;
-    document.getElementById('editIcNum').value = ic_num;
+    document.getElementById('editId').value = id; // Menggunakan 'id'
     document.getElementById('editPhone').value = phone;
+    document.getElementById('editRole').value = roles_list.trim(); 
     document.getElementById('editStatus').value = status.trim();
-    document.getElementById('editRole').value = role.trim();
     document.getElementById('editRemarks').value = remarks; 
 
     const remarksContainer = document.getElementById('editRemarksContainer');
@@ -396,14 +411,14 @@ document.getElementById('addAccountForm').addEventListener('submit', function(e)
     
     const uniklEmailPattern = /^[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my$/;
 
-    if (!uniklEmailPattern.test(email)) { // <-- DIKEMAS KINI
-        e.preventDefault(); // Stop form submission
+    if (!uniklEmailPattern.test(email)) { 
+        e.preventDefault(); 
         Swal.fire({
             icon: 'error',
             title: 'Invalid Email',
-            text: 'Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)', // Mesej dikemas kini
+            text: 'Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)', 
             didClose: () => {
-                emailInput.focus(); // Re-focus
+                emailInput.focus(); 
             }
         });
     }
@@ -430,13 +445,13 @@ document.getElementById('editAccountForm').addEventListener('submit', function(e
     const remarks = remarksTextarea.value.trim();
 
     if (status === 'suspended' && remarks === '') {
-        e.preventDefault(); // Stop submission
+        e.preventDefault(); 
         Swal.fire({
             icon: 'warning',
             title: 'Remarks Required',
             text: 'Please provide a reason for suspending this account.'
         }).then(() => {
-             remarksTextarea.focus(); // Focus the textarea
+             remarksTextarea.focus(); 
         });
     }
 });

@@ -37,7 +37,7 @@ function get_return_items_due($conn, $days_offset) {
                 i.item_name
             FROM reservation_items ri
             JOIN reservations r ON ri.reserve_id = r.reserve_id
-            JOIN user u ON r.user_id = u.user_id
+            JOIN person u ON r.person_id = u.person_id
             JOIN item i ON ri.item_id = i.item_id
             WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) = $target_date_sql";
             
