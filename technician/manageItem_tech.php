@@ -1,412 +1,172 @@
 <?php
+// ----------------------------------------------------------------------
+// DIAGNOSTIK: Paparan Ralat (Dikekalkan)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// ----------------------------------------------------------------------
+
 session_start();
+// Pastikan anda mempunyai fail config.php di direktori induk (../config.php)
+include '../config.php'; 
 
-include '../config.php'; // Pastikan fail konfigurasi ini berfungsi dengan baik
+// ----------------------------------------------------------------------
+// 1. ACCESS CONTROL & SESSION CHECK
+// ----------------------------------------------------------------------
 
-// --- SECURITY CHECK ---
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
+    $_SESSION['error'] = "Akses ditolak atau sesi tamat. Sila log masuk sebagai Technician.";
     header("Location: ../login.php");
     exit();
 }
-$person_id = (int)$_SESSION['person_id'];
 
-// Dapatkan nama Technician
+$person_id = (int) $_SESSION['person_id']; 
+
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+if ($stmt_tech === FALSE) { session_unset(); session_destroy(); header("Location: ../logout.php"); exit(); }
 $stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
 $result_tech = $stmt_tech->get_result();
 $tech_data = $result_tech->fetch_assoc();
 $stmt_tech->close();
 
-if ($tech_data) {
-    $tech_name = $tech_data['name'];
-} else {
-    $tech_name = 'Technician Unknown'; 
-}
+$tech_name = $tech_data ? htmlspecialchars($tech_data['name']) : 'Technician Unknown'; 
 
-// FUNGSI UTILITY
-function safe_unlink($path) {
-    if (file_exists($path) && is_file($path)) {
-        return unlink($path);
-    }
-    return false;
-}
 
-function log_activity($conn, $user_type, $user_id, $action_code, $details) {
-    // Funtion placeholder (Pastikan fungsi ini wujud dalam projek anda)
-    return true; 
-}
+// ----------------------------------------------------------------------
+// 2. HELPER FUNCTIONS
 // ----------------------------------------------------------------------
 
-
-// =================================================================================================
-// 1. HANDLER: TAMBAH ITEM BARU (TERMASUK AUTO-GENERATE ASSET CODE)
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
-    $item_name = trim($_POST['item_name']);
-    $category_id = (int)$_POST['category_id'];
-    $description = trim($_POST['description']);
-    $quantity = (int)$_POST['quantity'];
-    $batch_brand = trim($_POST['batch_brand']);
-    $batch_model = trim($_POST['batch_model']);
-
-    $db_path_item = ""; 
-    
-    // --- START LOGIK MUAT NAIK IMEJ ITEM BARU ---
-    if (isset($_FILES['item_image']) && $_FILES['item_image']['error'] === 0) { 
-        $image = $_FILES['item_image'];
-        $image_name = uniqid('item_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
-        $db_path_item = 'uploads/' . $image_name;
-        $server_path = '../' . $db_path_item;
-
-        if (!is_dir('../uploads')) { mkdir('../uploads', 0777, true); }
-        
-        if (!move_uploaded_file($image['tmp_name'], $server_path)) {
-            $db_path_item = ""; 
-        }
+/**
+ * Memadam fail fizikal dari server, menggunakan path dari DB (cth: uploads/category/file.png).
+ */
+function safe_unlink($db_filepath) {
+    if (!$db_filepath) return;
+    // Path Server Relatif: naik satu tahap dari teknisi/
+    $server_path = '../' . $db_filepath; 
+    if (file_exists($server_path) && is_file($server_path)) {
+        @unlink($server_path);
     }
-    // --- END LOGIK MUAT NAIK IMEJ ITEM BARU ---
-
-    $conn->begin_transaction();
-    try {
-        // 1. Masukkan Jenis Item ke jadual 'item'
-        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
-        $stmt_item->bind_param("siss", $item_name, $category_id, $description, $db_path_item);
-        $stmt_item->execute();
-        $new_item_id = $conn->insert_id;
-        $stmt_item->close();
-
-        // 2. Masukkan Unit Aset ke jadual 'assets' dengan AUTO-GENERATE CODE
-        if ($quantity > 0) {
-            // A. Dapatkan Prefix Kategori dari jadual categories
-            $stmt_prefix = $conn->prepare("SELECT prefix FROM categories WHERE category_id = ?");
-            $stmt_prefix->bind_param("i", $category_id);
-            $stmt_prefix->execute();
-            $result_prefix = $stmt_prefix->get_result();
-            
-            // Penggantian untuk '??' - Versi Lama
-            $prefix_data = $result_prefix->fetch_assoc();
-            if ($prefix_data && isset($prefix_data['prefix'])) {
-                $category_prefix = $prefix_data['prefix'];
-            } else {
-                $category_prefix = 'AST'; // Default 'AST' jika tiada prefix
-            }
-            $stmt_prefix->close();
-
-
-            // B. Dapatkan Nombor Siri Terakhir bagi KATEGORI ini (berdasarkan prefix)
-            $sql_last_serial = "
-                SELECT MAX(CAST(SUBSTRING_INDEX(a.asset_code, '-', -1) AS UNSIGNED)) as max_serial
-                FROM assets a
-                WHERE a.asset_code LIKE ?
-            ";
-            
-            $stmt_last_serial = $conn->prepare($sql_last_serial);
-            $prefix_like = $category_prefix . '-%';
-            $stmt_last_serial->bind_param("s", $prefix_like);
-            $stmt_last_serial->execute();
-            $result_serial = $stmt_last_serial->get_result();
-            
-            // Penggantian untuk '??' - Versi Lama
-            $serial_data = $result_serial->fetch_assoc();
-            $last_serial = (isset($serial_data['max_serial']) && $serial_data['max_serial'] !== null) ? $serial_data['max_serial'] : 0;
-
-            $stmt_last_serial->close();
-
-
-            // C. Gelung untuk masukkan unit baru dengan asset_code yang dijana
-            $stmt_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model) VALUES (?, ?, ?, ?)");
-            for ($i = 0; $i < $quantity; $i++) {
-                $last_serial++; // Tambah satu (increment)
-                
-                // Format Nombor Siri (Contoh: LPT-0001) - Guna 4 digit padding
-                $new_asset_serial = str_pad($last_serial, 4, '0', STR_PAD_LEFT);
-                $new_asset_code = $category_prefix . '-' . $new_asset_serial;
-
-                // KEMASKINI BIND PARAM: tambah $new_asset_code
-                $stmt_asset->bind_param("isss", $new_item_id, $new_asset_code, $batch_brand, $batch_model);
-                $stmt_asset->execute();
-            }
-            $stmt_asset->close();
-        }
-
-        $conn->commit();
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
-        log_activity($conn, 'tech', $person_id, 'TECH_ADD_ITEM', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Successfully created ' . htmlspecialchars($item_name) . ' with ' . $quantity . ' units.'];
-    } catch (Exception $e) {
-        $conn->rollback();
-        safe_unlink('../' . $db_path_item); 
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: Item creation failed. ' . $e->getMessage()];
-    }
-    header("Location: manageItem_tech.php"); exit();
 }
 
+/**
+ * Mengendalikan muat naik imej ke subdirektori (cth: uploads/category/).
+ */
+function handleImageUpload($fileInputName, $dbSubDir) {
+    global $conn;
+    
+    if (empty($dbSubDir)) $dbSubDir = 'uploads/';
+    if (substr($dbSubDir, -1) !== '/') { $dbSubDir .= '/'; }
 
-// =================================================================================================
-// 2. HANDLER: KEMASKINI ITEM JENIS (TERMASUK AUTO-GENERATE ASSET CODE)
+    // Target directory relatif kepada manageItem_tech.php (di teknisi/)
+    $targetDir = '../' . $dbSubDir;
 
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
-    $item_id = (int)$_POST['edit_item_id'];
-    $item_name = trim($_POST['edit_item_name']);
-    $category_id = (int)$_POST['edit_category_id'];
-    $description = trim($_POST['edit_description']);
-    $quantity_to_add = (int)$_POST['quantity'];
-    $batch_brand = trim($_POST['batch_brand']);
-    $batch_model = trim($_POST['batch_model']);
+    if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] != UPLOAD_ERR_OK) {
+        return NULL; 
+    }
 
-    $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
-    $bind_params = ["s", $item_name, "i", $category_id, "s", $description]; // Type, value pairs
-    $db_path_item = "";
-    $old_image_url = null;
+    $file = $_FILES[$fileInputName];
+    $fileExt = strtolower(pathinfo(basename($file["name"]), PATHINFO_EXTENSION));
+    
+    // Validasi
+    if ($file["size"] > 5000000) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Image size is too large (max 5MB).']; return NULL; }
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Only JPG, JPEG, PNG, & WEBP files are allowed.']; return NULL; }
 
-    // --- START LOGIK MUAT NAIK IMEJ ITEM SUNTINGAN ---
-    if (isset($_FILES['edit_item_image']) && $_FILES['edit_item_image']['error'] === 0) {
-        // Dapatkan imej lama sebelum overwrite
-        $stmt_old = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
-        $stmt_old->bind_param("i", $item_id);
-        $stmt_old->execute();
-        $stmt_old->bind_result($old_image_url);
-        $stmt_old->fetch();
-        $stmt_old->close();
+    $newFileName = uniqid('img_', true) . "." . $fileExt;
+    $server_path = $targetDir . $newFileName; 
+    $db_path = $dbSubDir . $newFileName; // Path yang disimpan dalam DB: uploads/item/file.png
 
-        $image = $_FILES['edit_item_image'];
-        $image_name = uniqid('item_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
-        $db_path_item = 'uploads/' . $image_name;
-        $server_path = '../' . $db_path_item;
-        
-        if (move_uploaded_file($image['tmp_name'], $server_path)) {
-            $update_fields[] = "image_url = ?";
-            array_push($bind_params, "s", $db_path_item);
+    // Pastikan direktori wujud
+    if (!is_dir($targetDir)) {
+        if (!mkdir($targetDir, 0777, true)) {
+             $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat mencipta direktori muat naik atau kebenaran tidak mencukupi.'];
+             return NULL;
         }
     }
-    // --- END LOGIK MUAT NAIK IMEJ ITEM SUNTINGAN ---
-    
-    // Siapkan query kemaskini
-    $sql_update = "UPDATE item SET " . implode(", ", $update_fields) . " WHERE item_id = ?";
-    array_push($bind_params, "i", $item_id);
 
-    $conn->begin_transaction();
-    try {
-        // 1. Kemaskini Jenis Item
-        $stmt_update = $conn->prepare($sql_update);
-        
-        // Bind parameters secara dinamik
-        $types = ''; $values = [];
-        foreach ($bind_params as $param) {
-            if (strlen($param) == 1 && in_array($param, ['s', 'i', 'd'])) {
-                $types .= $param;
-            } else {
-                $values[] = &$param; // Gunakan pass by reference
-            }
-        }
-        // Perlu menggunakan call_user_func_array untuk bind_param dinamik
-        call_user_func_array(array($stmt_update, 'bind_param'), array_merge(array($types), $values));
-
-        $stmt_update->execute();
-        $stmt_update->close();
-        
-        // Padam imej lama secara fizikal HANYA jika muat naik baru berjaya
-        if (!empty($db_path_item) && !empty($old_image_url)) { safe_unlink('../' . $old_image_url); }
-
-
-        // 2. Tambah Unit Aset Baru (Jika Kuantiti > 0) dengan AUTO-GENERATE CODE
-        if ($quantity_to_add > 0) {
-            // A. Dapatkan Prefix Kategori dari jadual categories
-            $stmt_prefix = $conn->prepare("SELECT prefix FROM categories WHERE category_id = ?");
-            $stmt_prefix->bind_param("i", $category_id); // Gunakan $category_id dari form edit
-            $stmt_prefix->execute();
-            $result_prefix = $stmt_prefix->get_result();
-            
-            // Penggantian untuk '??' - Versi Lama
-            $prefix_data = $result_prefix->fetch_assoc();
-            if ($prefix_data && isset($prefix_data['prefix'])) {
-                $category_prefix = $prefix_data['prefix'];
-            } else {
-                $category_prefix = 'AST'; // Default 'AST'
-            }
-            $stmt_prefix->close();
-
-            // B. Dapatkan Nombor Siri Terakhir bagi KATEGORI ini
-            $sql_last_serial = "
-                SELECT MAX(CAST(SUBSTRING_INDEX(a.asset_code, '-', -1) AS UNSIGNED)) as max_serial
-                FROM assets a
-                WHERE a.asset_code LIKE ?
-            ";
-            
-            $stmt_last_serial = $conn->prepare($sql_last_serial);
-            $prefix_like = $category_prefix . '-%';
-            $stmt_last_serial->bind_param("s", $prefix_like);
-            $stmt_last_serial->execute();
-            $result_serial = $stmt_last_serial->get_result();
-            
-            // Penggantian untuk '??' - Versi Lama (ini yang menyebabkan ralat di baris 240)
-            $serial_data = $result_serial->fetch_assoc();
-            $last_serial = (isset($serial_data['max_serial']) && $serial_data['max_serial'] !== null) ? $serial_data['max_serial'] : 0;
-
-            $stmt_last_serial->close();
-
-            // C. Gelung untuk masukkan unit baru dengan asset_code yang dijana
-            $stmt_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model) VALUES (?, ?, ?, ?)");
-            for ($i = 0; $i < $quantity_to_add; $i++) {
-                $last_serial++;
-                $new_asset_serial = str_pad($last_serial, 4, '0', STR_PAD_LEFT);
-                $new_asset_code = $category_prefix . '-' . $new_asset_serial;
-
-                // KEMASKINI BIND PARAM
-                $stmt_asset->bind_param("isss", $item_id, $new_asset_code, $batch_brand, $batch_model);
-                $stmt_asset->execute();
-            }
-            $stmt_asset->close();
-        }
-
-
-        $conn->commit();
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah mengemas kini item '{$item_name}' (ID: {$item_id}). Ditambah {$quantity_to_add} unit.";
-        log_activity($conn, 'tech', $person_id, 'TECH_EDIT_ITEM', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item updated successfully! Added ' . $quantity_to_add . ' new units.'];
-    } catch (Exception $e) {
-        $conn->rollback();
-        safe_unlink('../' . $db_path_item); 
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: Item update failed. ' . $e->getMessage()];
-    }
-    header("Location: manageItem_tech.php"); exit();
-}
-
-
-// =================================================================================================
-// 3. HANDLER: PADAM ITEM JENIS 
-
-if (isset($_GET['delete_item_id'])) {
-    $delete_id = (int)$_GET['delete_item_id'];
-    
-    // Dapatkan nama dan URL imej item untuk log & pemadaman
-    $stmt_info = $conn->prepare("SELECT item_name, image_url FROM item WHERE item_id = ?");
-    $stmt_info->bind_param("i", $delete_id);
-    $stmt_info->execute();
-    $stmt_info->bind_result($item_name_to_delete, $image_url_to_delete);
-    $stmt_info->fetch();
-    $stmt_info->close();
-
-    $conn->begin_transaction();
-    try {
-        // Hapus aset berkaitan dari reservation_assets dahulu
-        $conn->query("DELETE FROM reservation_assets WHERE asset_id IN (SELECT asset_id FROM assets WHERE item_id = $delete_id)");
-        
-        // Hapus aset (unit) yang berkaitan
-        $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
-        
-        // Hapus jenis item
-        $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
-        $stmt->bind_param("i", $delete_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        $conn->commit();
-
-        // Padam imej secara fizikal
-        if (!empty($image_url_to_delete)) { 
-            safe_unlink('../' . $image_url_to_delete);
-        }
-
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah memadam item: '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
-        log_activity($conn, 'tech', $person_id, 'TECH_DELETE_ITEM', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item Type and all associated units deleted successfully!'];
-    } catch (Exception $e) {
-        $conn->rollback();
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: Item deletion failed. ' . $e->getMessage()];
-    }
-    header("Location: manageItem_tech.php"); exit();
-}
-
-
-// =================================================================================================
-// 4. HANDLER: TAMBAH/EDIT/PADAM KATEGORI 
-
-// Tambah Kategori 
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
-    $category_name = trim($_POST['category_name']);
-    $category_prefix = trim($_POST['category_prefix']); 
-    
-    $stmt = $conn->prepare("INSERT INTO categories (category_name, prefix) VALUES (?, ?)"); // UPDATE SQL
-    $stmt->bind_param("ss", $category_name, $category_prefix);
-    if ($stmt->execute()) {
-        $new_cat_id = $stmt->insert_id;
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}). Prefix: {$category_prefix}";
-        log_activity($conn, 'tech', $person_id, 'TECH_ADD_CATEGORY', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
+    if (move_uploaded_file($file["tmp_name"], $server_path)) {
+        return $db_path; 
     } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Failed to add category.'];
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat memuat naik imej (Semak kebenaran fail).'];
+        return NULL;
     }
-    $stmt->close();
-    header("Location: manageItem_tech.php"); exit();
 }
 
-// Edit Kategori 
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
-    $category_id = (int)$_POST['edit_category_id'];
-    $category_name = trim($_POST['edit_category_name']);
-    $category_prefix = trim($_POST['edit_category_prefix']);
+/**
+ * Menjana akronim ringkas dari nama item.
+ * Contoh: "Portable Speaker" -> "PS"
+ * @param string $itemName Nama penuh item.
+ * @return string Akronim ringkas (huruf besar).
+ */
+function generateItemAcronym($itemName) {
+    // 1. Bersihkan nama: Buang karakter yang bukan huruf atau ruang.
+    $cleanedName = preg_replace('/[^a-zA-Z\s]/', '', $itemName);
     
-    $stmt = $conn->prepare("UPDATE categories SET category_name = ?, prefix = ? WHERE category_id = ?"); // UPDATE SQL
-    $stmt->bind_param("ssi", $category_name, $category_prefix, $category_id);
-    if ($stmt->execute()) {
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}' dan prefix '{$category_prefix}'.";
-        log_activity($conn, 'tech', $person_id, 'TECH_EDIT_CATEGORY', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
-    } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Failed to update category.'];
-    }
-    $stmt->close();
-    header("Location: manageItem_tech.php"); exit();
-}
-
-// Padam Kategori 
-if (isset($_GET['delete_category_id'])) {
-    $delete_id = (int)$_GET['delete_category_id'];
+    // 2. Pecahkan nama kepada perkataan.
+    $words = explode(' ', $cleanedName);
+    $acronym = '';
     
-    $stmt_name = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
-    $stmt_name->bind_param("i", $delete_id);
-    $stmt_name->execute();
-    $stmt_name->bind_result($category_name_to_delete);
-    $stmt_name->fetch();
-    $stmt_name->close();
-
-    $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
-    $stmt->bind_param("i", $delete_id);
-    if ($stmt->execute()) {
-        $log_details = "Technician '{$tech_name}' (ID: {$person_id}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
-        log_activity($conn, 'tech', $person_id, 'TECH_DELETE_CATEGORY', $log_details);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted successfully!'];
-    } else {
-         $_SESSION['message'] = ['type' => 'error', 'text' => 'Failed to delete category. Ensure no items are linked.'];
+    // 3. Ambil huruf pertama setiap perkataan.
+    foreach ($words as $word) {
+        if (!empty($word)) {
+            $acronym .= strtoupper($word[0]);
+        }
     }
-    $stmt->close();
-    header("Location: manageItem_tech.php"); exit();
+    
+    // Fallback jika nama item terlalu pendek.
+    if (empty($acronym) && strlen($cleanedName) >= 2) {
+        $acronym = strtoupper(substr($cleanedName, 0, 2));
+    } elseif (empty($acronym)) {
+        $acronym = 'XX'; // Placeholder jika nama kosong
+    }
+
+    // Hadkan akronim kepada 3 huruf untuk menjaga format kod aset
+    return substr($acronym, 0, 3);
 }
 
 
-// =================================================================================================
-// 5. DATA FETCHING 
-
-$categories = [];
-// UPDATE: Ambil prefix juga
-$stmt_cat = $conn->prepare("SELECT category_id, category_name, prefix FROM categories ORDER BY category_name ASC"); 
-$stmt_cat->execute();
-$result_cat = $stmt_cat->get_result();
-while($row = $result_cat->fetch_assoc()) {
-    $categories[] = $row;
+// FUNGSI PENGESAHAN call_user_func_array untuk PHP lama
+function refValues($arr){
+    if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
+        $refs = array();
+        foreach($arr as $key => $value)
+            $refs[$key] = &$arr[$key];
+        return $refs;
+    }
+    return $arr;
 }
-$stmt_cat->close();
 
-$item_details = [];
-// Query untuk mendapatkan ringkasan item termasuk bilangan unit tersedia dan jumlah
-$stmt_item = $conn->prepare("
+// ----------------------------------------------------------------------
+// 3. DATA FETCHING AWAL
+// ----------------------------------------------------------------------
+
+// 1. Fetch Pending Requests Count for Badge
+$pending_count_for_badge = 0; 
+// Menggunakan reservation_items dan mengira DISTINCT reserve_id untuk permintaan tertunda
+$stmt_badge = $conn->prepare("SELECT COUNT(DISTINCT reserve_id) FROM reservation_items WHERE status = 'Pending'");
+
+if ($stmt_badge) {
+    $stmt_badge->execute();
+    $stmt_badge->bind_result($pending_count_for_badge);
+    $stmt_badge->fetch();
+    $stmt_badge->close();
+}
+
+
+// 2. Fetch All Categories (PREFIX DIBUANG)
+$categories = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
+
+// 3. Fetch Item Type Summary (PREFIX DIBUANG)
+$item_details_query = "
     SELECT 
-        i.item_id, i.item_name, i.description, i.category_id, i.image_url, 
-        c.category_name, c.prefix, -- Tambah prefix di sini
+        i.item_id,
+        i.item_name,
+        i.description,
+        i.image_url,
+        c.category_name,
+        c.category_id,
         COUNT(a.asset_id) AS total_units,
         SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) AS available_units
     FROM item i
@@ -414,19 +174,337 @@ $stmt_item = $conn->prepare("
     LEFT JOIN assets a ON i.item_id = a.item_id
     GROUP BY i.item_id
     ORDER BY i.item_name ASC
-");
-$stmt_item->execute();
-$result_item = $stmt_item->get_result();
-while ($row = $result_item->fetch_assoc()) {
-    $item_details[] = $row;
+";
+$item_details = [];
+$result = $conn->query($item_details_query);
+if ($result) {
+    $item_details = $result->fetch_all(MYSQLI_ASSOC);
+} 
+
+// ----------------------------------------------------------------------
+// 4. LOGIC FOR CATEGORIES (TANPA PREFIX)
+// ----------------------------------------------------------------------
+
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
+    $category_name = trim($_POST['category_name']);
+    
+    if (!empty($category_name)) {
+        // SQL TANPA prefix
+        $stmt = $conn->prepare("INSERT INTO categories (category_name) VALUES (?)");
+        
+        if ($stmt === FALSE) {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Add Cat): ' . $conn->error];
+        } else {
+            $stmt->bind_param("s", $category_name);
+            
+            if ($stmt->execute()) {
+                $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
+            } else {
+                $_SESSION['message'] = ['type' => 'error', 'text' => 'Error adding category: ' . $stmt->error];
+            }
+            $stmt->close();
+        }
+    } else {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Category name cannot be empty.'];
+    }
+    header("Location: manageItem_tech.php");
+    exit();
 }
-$stmt_item->close();
 
-// Placeholder for pending requests count (e.g., from check_out table)
-$pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
 
-// =================================================================================================
-?><!DOCTYPE html>
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
+    $category_id = (int)$_POST['edit_category_id'];
+    $category_name = trim($_POST['edit_category_name']);
+    
+    $update_fields = ["category_name = ?"];
+    $update_params = [$category_name];
+    $types = "s";
+    
+    // Semua logik berkaitan imej DIBUANG
+
+    $update_params[] = $category_id;
+    $types .= "i";
+    
+    $update_query = "UPDATE categories SET " . implode(", ", $update_fields) . " WHERE category_id = ?";
+    $stmt = $conn->prepare($update_query);
+
+    if ($stmt === FALSE) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Edit Cat): ' . $conn->error];
+    } else {
+        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
+
+        if ($stmt->execute()) {
+            $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
+        } else {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'Error updating category: ' . $stmt->error];
+        }
+        $stmt->close();
+    }
+    
+    header("Location: manageItem_tech.php"); exit();
+}
+
+
+if (isset($_GET['delete_category_id'])) {
+    $delete_id = (int)$_GET['delete_category_id'];
+    
+    // SQL DIBUANG: image_url dan prefix
+    $stmt_info = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?"); 
+    $stmt_info->bind_param("i", $delete_id);
+    $stmt_info->execute();
+    $stmt_info->bind_result($category_name_to_delete);
+    $stmt_info->fetch();
+    $stmt_info->close();
+    
+    $check_item = $conn->prepare("SELECT COUNT(*) FROM item WHERE category_id = ?");
+    $check_item->bind_param("i", $delete_id);
+    $check_item->execute();
+    $check_item->bind_result($item_count);
+    $check_item->fetch();
+    $check_item->close();
+
+    if ($item_count > 0) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot delete category: ' . $item_count . ' item type(s) are still linked to it.'];
+        header("Location: manageItem_tech.php"); exit();
+    }
+    
+    $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
+    $stmt->bind_param("i", $delete_id);
+    if ($stmt->execute()) {
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
+    } else {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category: ' . $stmt->error];
+    }
+    $stmt->close();
+    header("Location: manageItem_tech.php"); exit();
+}
+
+
+// ----------------------------------------------------------------------
+// 5. LOGIC FOR ITEM TYPES AND UNITS (DENGAN KOD ASET BARU)
+// ----------------------------------------------------------------------
+
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
+    
+    $item_name = trim($_POST['item_name']);
+    $category_id = (int)$_POST['category_id'];
+    $description = trim($_POST['description']);
+    $quantity = (int)$_POST['quantity'];
+    $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
+    $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
+    
+    $image_path = handleImageUpload('item_image', 'uploads/item'); 
+
+    $conn->begin_transaction();
+    try {
+        // A. Insert Item Type (dengan image_url)
+        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
+        if ($stmt_item === FALSE) throw new Exception("SQL Prepare Error (Add Item): " . $conn->error);
+        
+        // PEMBETULAN SINTAKS LAMA (Baris 287 asal)
+        $image_path_to_bind = isset($image_path) ? $image_path : '';          
+        $stmt_item->bind_param("siss", $item_name, $category_id, $description, $image_path_to_bind);
+        if (!$stmt_item->execute()) throw new Exception("Error adding item type: " . $stmt_item->error);
+        $new_item_id = $conn->insert_id;
+        $stmt_item->close();
+        
+        if ($new_item_id > 0 && $quantity > 0) {
+            
+            // B. JANA AKRONIM dari NAMA ITEM BARU
+            $akronim = generateItemAcronym($item_name); 
+
+            // C. Insert Units (Assets)
+            $asset_status = 'Available';
+            $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
+            if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Add Asset): " . $conn->error);
+            
+            // Mula mengira dari 1 kerana item_id ini baru
+            $start_count = 0; 
+            $first_code = '';
+            $last_code = '';
+
+            for ($i = 1; $i <= $quantity; $i++) {
+                $asset_number = $start_count + $i;
+                // Format kod aset: [AKRONIM]-[NOMBOR TURUTAN 4 DIGIT]
+                $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
+
+                if ($i == 1) $first_code = $asset_code;
+                if ($i == $quantity) $last_code = $asset_code;
+
+                $asset_insert_stmt->bind_param("issss", $new_item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
+                if (!$asset_insert_stmt->execute()) throw new Exception("Error adding asset unit: " . $asset_insert_stmt->error);
+            }
+            $asset_insert_stmt->close();
+        }
+
+        $conn->commit();
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item Type and ' . $quantity . ' unit successfully added! (Code: ' . $first_code . ' until ' . $last_code . ')'];
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        safe_unlink($image_path); 
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
+    }
+
+    header("Location: manageItem_tech.php");
+    exit();
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
+    
+    $item_id = (int)$_POST['edit_item_id'];
+    $item_name = trim($_POST['edit_item_name']);
+    $category_id = (int)$_POST['edit_category_id'];
+    $description = trim($_POST['edit_description']);
+    $quantity_to_add = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
+    $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
+    $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
+
+    if ($item_id <= 0 || $category_id <= 0) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID selected for update.'];
+        header("Location: manageItem_tech.php"); exit();
+    }
+
+    $conn->begin_transaction();
+
+    try {
+        $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
+        $update_params = [$item_name, $category_id, $description];
+        $types = "sis";
+        $old_image_path = NULL;
+        $new_image_path = handleImageUpload('edit_item_image', 'uploads/item');
+
+        $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
+        $old_img_stmt->bind_param("i", $item_id);
+        $old_img_stmt->execute();
+        $old_img_stmt->bind_result($old_image_path);
+        $old_img_stmt->fetch();
+        $old_img_stmt->close();
+
+        if ($new_image_path) {
+            $update_fields[] = "image_url = ?";
+            $update_params[] = $new_image_path;
+            $types .= "s";
+            safe_unlink($old_image_path); 
+        }
+
+        $update_params[] = $item_id;
+        $types .= "i";
+
+        $update_query = "UPDATE item SET " . implode(", ", $update_fields) . " WHERE item_id = ?";
+        $stmt = $conn->prepare($update_query);
+        if ($stmt === FALSE) throw new Exception("SQL Prepare Error (Update Item): " . $conn->error);
+        
+        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
+
+        if (!$stmt->execute()) throw new Exception("Error updating item type: " . $stmt->error);
+        $stmt->close();
+        
+        $message_part_2 = "";
+        $first_new_code = '';
+
+        if ($quantity_to_add > 0) {
+            
+            // 1. JANA AKRONIM BARU (sekiranya nama item telah diubah)
+            $akronim = generateItemAcronym($item_name); 
+
+            // 2. DAPATKAN KIRAAN UNIT SEDIA ADA UNTUK ITEM_ID INI
+            // Query hanya mengira unit dalam item_id ini
+            $asset_stmt = $conn->prepare("SELECT COUNT(*) AS max_num FROM assets WHERE item_id = ?");
+            if ($asset_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Asset Max Count): " . $conn->error);
+            
+            $asset_stmt->bind_param("i", $item_id);
+            $asset_stmt->execute();
+            $asset_stmt->bind_result($max_num);
+            $asset_stmt->fetch();
+            $asset_stmt->close();
+            
+            $start_count = intval($max_num); // Jumlah unit sedia ada (e.g. 5)
+
+            // 3. MASUKKAN UNIT BARU
+            $asset_status = 'Available';
+            $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
+            if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Add Asset): " . $conn->error);
+            
+            for ($i = 1; $i <= $quantity_to_add; $i++) {
+                // Nombor baru akan bermula dari (start_count + 1)
+                $asset_number = $start_count + $i;
+                $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
+
+                if ($i == 1) $first_new_code = $asset_code;
+
+                $asset_insert_stmt->bind_param("issss", $item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
+                if (!$asset_insert_stmt->execute()) throw new Exception("Error adding new asset unit: " . $asset_insert_stmt->error);
+            }
+            $asset_insert_stmt->close();
+            $message_part_2 = " and add " . $quantity_to_add . " new unit (Asset Code starts: " . $first_new_code . ").";
+        }
+
+        $conn->commit();
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item berjaya dikemas kini' . $message_part_2 . '!'];
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        safe_unlink($new_image_path);
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
+    }
+
+    header("Location: manageItem_tech.php");
+    exit();
+}
+
+if (isset($_GET['delete_item_id'])) {
+    
+    $delete_id = (int)$_GET['delete_item_id'];
+    
+    $stmt_info = $conn->prepare("SELECT item_name, image_url FROM item WHERE item_id = ?");
+    $stmt_info->bind_param("i", $delete_id);
+    $stmt_info->execute();
+    $stmt_info->bind_result($item_name_to_delete, $image_to_delete);
+    $stmt_info->fetch();
+    $stmt_info->close();
+    
+    $conn->begin_transaction();
+    
+    try {
+        $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
+        $asset_ids = [];
+        while ($row = $assets_to_delete_res->fetch_assoc()) { $asset_ids[] = $row['asset_id']; }
+        if (!empty($asset_ids)) {
+            $asset_id_list = implode(',', $asset_ids);
+            // Padam dari reservation_assets dahulu
+            $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
+        }
+        
+        // Padam dari assets
+        $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
+        
+        // Padam dari item
+        $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
+        $stmt->bind_param("i", $delete_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $conn->commit();
+        
+        safe_unlink($image_to_delete);
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'The item type and all its units have been deleted.'];
+        
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot deleted item.It may be part of booking record: ' . $e->getMessage()];
+    }
+    header("Location: manageItem_tech.php"); exit();
+}
+
+
+// ----------------------------------------------------------------------
+// 6. HTML/PRESENTATION START
+// ----------------------------------------------------------------------
+?>
+
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -436,11 +514,11 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- DEFINISI WARNA TEMA (ROOT VARIABLES) --- */
+        /* --- THEME COLOR DEFINITIONS (ROOT VARIABLES) --- */
         :root {
-            --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
-            --primary-hover: #0891b2; /* Cyan 700 (Warna Hover/Gelap) */
-            --danger-color: #ef4444; /* Merah */
+            --primary-color: #06b6d4; /* Cyan 600 (Dark Teal Blue) */
+            --primary-hover: #0891b2; /* Cyan 700 (Hover/Darker Color) */
+            --danger-color: #ef4444; /* Red */
             
             --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
@@ -461,7 +539,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
         }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
         
-        /* LOGO ICON (Menggunakan --primary-color) */
+        /* LOGO ICON (Using --primary-color) */
         .logo-icon { 
             width: 40px; height: 40px; 
             background-color: var(--primary-color); /* Cyan */
@@ -478,7 +556,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
             margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; 
         }
         
-        /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
+        /* ACTIVE & HOVER LINK (Using --primary-color) */
         .sidebar a.active, .sidebar a:hover { 
             background: var(--primary-color); /* Cyan */
             color: #fff; 
@@ -495,7 +573,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
             background: var(--danger-color); 
         }
         
-        /* 5. SIDEBAR BADGE STYLE */
+        /* SIDEBAR BADGE STYLE */
         .sidebar a .badge {
             margin-left: auto; 
             font-size: 0.75rem;
@@ -506,7 +584,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
             color: white;
         }
 
-        /* Badge pada Active/Hover state */
+        /* Badge on Active/Hover state */
         .sidebar a.active .badge, .sidebar a:hover .badge {
             background-color: #ffffff;
             color: var(--danger-color); 
@@ -533,24 +611,23 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
         .form-control, .form-select { border-radius: 8px; }
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
         
-        /* PRIMARY BUTTON (Menggunakan --primary-color dan --primary-hover) */
+        /* PRIMARY BUTTON (Using --primary-color and --primary-hover) */
         .btn-primary { 
             background-color: var(--primary-color); /* Cyan */
             border: none; 
         }
         .btn-primary:hover { 
-            background-color: var(--primary-hover); /* Cyan Gelap */
+            background-color: var(--primary-hover); /* Darker Cyan */
         }
         
-        /* DIBUANG: .category-img-sm (Kerana imej berpindah ke Item) */
         .item-img-sm { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-right: 15px; }
         
-        /* Sembunyikan toggle menu di desktop */
+        /* Hide menu toggle on desktop */
         .menu-toggle {
             display: none;
         }
 
-        /* --- KOD MOBILE VIEW (RESPONSIF) MULA --- */
+        /* --- MOBILE VIEW CODE (RESPONSIVE) STARTS --- */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -559,23 +636,23 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                 display: block; 
             }
 
-            /* Kelas baru untuk mobile yang AKTIF */
+            /* New class for active mobile sidebar */
             .sidebar.active {
                 transform: translateX(0);
                 box-shadow: 4px 0 10px rgba(0,0,0,0.1);
             }
 
-            /* Main content guna 100% lebar skrin, tiada margin kiri */
+            /* Main content uses 100% width, no left margin */
             .main-content {
                 margin-left: 0;
             }
             
-            /* Tambah padding di atas untuk memberi ruang kepada topbar */
+            /* Add top padding for topbar clearance */
             body {
                 padding-top: 70px;
             }
 
-            /* Jadikannya fixed di atas */
+            /* Fix topbar to the top */
             .topbar {
                 position: fixed; 
                 top: 0; 
@@ -592,7 +669,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                 flex-grow: 1; 
             }
 
-            /* Tunjukkan toggle menu di mobile */
+            /* Show menu toggle on mobile */
             .menu-toggle {
                 display: block !important; 
                 font-size: 24px;
@@ -600,26 +677,46 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                 color: #334155;
             }
 
-            /* Pastikan form di col-lg-4 diletakkan di atas table di col-lg-8 pada mobile */
+            /* Ensure form (col-lg-4) is stacked above table (col-lg-8) on mobile */
             .col-lg-4, .col-lg-8 {
                 width: 100% !important;
             }
 
-            /* Laraskan padding container */
+            /* Adjust container padding */
             .container-fluid {
                 padding: 20px;
             }
 
-            /* Jadual: Pastikan scrollable secara mendatar */
+            /* Table: Ensure horizontal scrollability */
             .table-responsive {
                 overflow-x: auto;
             }
         }
-        /* --- KOD MOBILE VIEW (RESPONSIF) TAMAT --- */
-
+        /* --- MOBILE VIEW CODE (RESPONSIVE) ENDS --- */
     </style>
 </head>
 <body>
+<?php 
+// 7. MESSAGE DISPLAY
+if (isset($_SESSION['message'])):
+    $message = $_SESSION['message'];
+    $type = $message['type'] === 'success' ? 'success' : 'error';
+    $text = $message['text'];
+    // Clear message from session to prevent repeated display
+    unset($_SESSION['message']);
+    // Inject SweetAlert2 script
+    echo "<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            Swal.fire({
+                icon: '{$type}',
+                title: 'Operation Status', // Modal title
+                text: '{$text}', // Modal text content
+                showConfirmButton: true
+            });
+        });
+    </script>";
+endif;
+?>
 
 <div class="sidebar" id="offcanvasSidebar">
     <div>
@@ -637,7 +734,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <a href="../logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
 <div class="main-content">
@@ -648,7 +745,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
             <div class="user-profile">
-                <span class="user-name d-none d-sm-inline"><?= htmlspecialchars($tech_name) ?></span> 
+                <span class="user-name d-none d-sm-inline"><?= $tech_name ?></span> 
                 <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                     <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
@@ -661,7 +758,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
             <div class="col-lg-4">
                 <div class="card shadow-sm p-4 mb-4">
                     <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
-                    <p class="text-muted small">Create a new item type and add initial stock in one step.</p>
+                    <p class="text-muted small">Create a new item type and add initial stock in one step. <strong>Asset Codes are generated automatically from the Item Name acronym (e.g., PS-0001).</strong></p>
                     <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                         <input type="hidden" name="add_item_type_and_units" value="1">
                         <h6 class="mt-3">A. Item Type Information</h6>
@@ -705,7 +802,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                         <div class="mb-3">
                             <label class="form-label">Number of Units to Add</label>
                             <input type="number" name="quantity" class="form-control" min="1" value="1" required>
-                            <small class="text-muted">Each unit will get a unique asset code.</small>
+                            <small class="text-muted">Each unit will get a unique asset code based on Item Name acronym (e.g., PS-0001).</small>
                         </div>
                         <button type="submit" class="btn btn-success w-100 mt-3">Create Item & Add Units</button>
                     </form>
@@ -726,7 +823,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                                 <tr>
                                     <td>
                                         <?php if (!empty($item['image_url'])): ?>
-                                            <img src="../<?= htmlspecialchars($item['image_url']) ?>" class="item-img-sm" alt="Item Image">
+                                            <img src="<?= htmlspecialchars('../' . $item['image_url']) ?>" class="item-img-sm" alt="Item Image">
                                         <?php endif; ?>
                                         <strong><?= htmlspecialchars($item['item_name']) ?></strong>
                                     </td>
@@ -762,7 +859,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                     <div class="col-md-5">
                         <h6>Add New Category</h6>
                         <hr>
-                        <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+                        <form method="post" action="manageItem_tech.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
                                 <label for="category_name" class="form-label">Category Name</label>
@@ -803,7 +900,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
                 <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+            <form method="post" action="manageItem_tech.php">
                 <div class="modal-body">
                     <input type="hidden" name="edit_category" value="1">
                     <input type="hidden" id="edit_category_id" name="edit_category_id">
@@ -849,7 +946,7 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
 
                     <hr>
                     <h6 class="mt-3">Add More Units (Optional)</h6>
-                    <p class="small text-muted">Fill this section only if you want to add new stock for this item.</p>
+                    <p class="small text-muted">New unit Asset Codes will be generated based on the updated Item Name acronym.</p>
                     <div class="mb-3">
                         <label class="form-label">Number of New Units to Add</label>
                         <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
@@ -872,41 +969,73 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    <?php
-    if (isset($_SESSION['message'])) {
-        $message = $_SESSION['message'];
-        
-        $text_escaped = str_replace("'", "\'", $message['text']);
-        echo "Swal.fire({
-            icon: '{$message['type']}',
-            title: '{$text_escaped}',
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3500,
-            timerProgressBar: true
-        });";
-        unset($_SESSION['message']);
-    }
-    ?>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar Toggle Logic for Mobile View
+        const sidebar = document.getElementById('offcanvasSidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
 
-    // Mengendalikan Edit Modal Kategori (Logik bersarang dibuang)
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('active');
+            });
+        }
+        
+        // Close sidebar if clicking outside on mobile (optional, but good)
+        document.querySelector('.main-content').addEventListener('click', function(e) {
+            if (window.innerWidth <= 992 && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
+                sidebar.classList.remove('active');
+            }
+        });
+
+    });
+
+    /**
+     * Function to open the Edit Category modal and populate data.
+     * @param {object} category - Category data object.
+     */
     function openEditCategoryModal(category) {
         document.getElementById('edit_category_id').value = category.category_id;
         document.getElementById('edit_category_name').value = category.category_name;
+        // Prefix field removed from modal
         
-        var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
-        editModal.show();
+        var editCategoryModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+        editCategoryModal.show();
+    }
+    
+    /**
+     * Function to open the Edit Item Type modal and populate data.
+     * @param {object} item - Item data object.
+     */
+    function openEditItemModal(item) {
+        document.getElementById('edit_item_id').value = item.item_id;
+        document.getElementById('edit_item_name').value = item.item_name;
+        document.getElementById('edit_description').value = item.description;
+        
+        // Set Category Select value
+        document.getElementById('edit_category_id_select').value = item.category_id;
+
+        // Reset Add More Units fields
+        document.getElementById('edit_item_quantity').value = 0;
+        document.getElementById('edit_item_brand').value = '';
+        document.getElementById('edit_item_model').value = '';
+        
+        var editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+        editItemModal.show();
     }
 
+    /**
+     * Function for Category deletion confirmation.
+     * @param {number} id - Category ID.
+     * @param {string} name - Category name.
+     */
     function deleteCategory(id, name) {
         Swal.fire({
-            title: `Delete '${name}'?`,
-            text: "This action cannot be undone! Ensure no active items are linked to this category.",
+            title: 'Are you sure?',
+            text: "You are about to delete the category: " + name + ". This action cannot be undone and can only be performed if no item types are linked to it.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
+            cancelButtonColor: '#3085d6',
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
@@ -915,30 +1044,19 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
         });
     }
 
-    function openEditItemModal(item) {
-        document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('edit_item_name').value = item.item_name;
-        
-        // Tetapkan nilai Category ID (Dropdown)
-        document.getElementById('edit_category_id_select').value = item.category_id; 
-        document.getElementById('edit_description').value = item.description;
-
-        // Reset fields Add Units
-        document.getElementById('edit_item_quantity').value = 0;
-        document.getElementById('edit_item_brand').value = '';
-        document.getElementById('edit_item_model').value = '';
-
-        new bootstrap.Modal(document.getElementById('editItemModal')).show();
-    }
-
+    /**
+     * Function for Item Type deletion confirmation.
+     * @param {number} id - Item ID.
+     * @param {string} name - Item name.
+     */
     function deleteItem(id, name) {
         Swal.fire({
-            title: `Delete '${name}' and all its units?`,
-            text: "This will permanently delete the item type AND all of its associated asset units. This action cannot be undone!",
+            title: 'Are you sure?',
+            text: "You are about to delete the item type: " + name + ". This will delete ALL associated units (Assets) and records. This action cannot be undone.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
+            cancelButtonColor: '#3085d6',
             confirmButtonText: 'Yes, delete everything!'
         }).then((result) => {
             if (result.isConfirmed) {
@@ -946,31 +1064,6 @@ $pending_count_for_badge = 5; // Gantikan dengan logik carian sebenar jika ada
             }
         });
     }
-
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.querySelector('.sidebar');
-        const toggleButton = document.getElementById('sidebarToggle');
-        const links = document.querySelectorAll('.sidebar a'); 
-
-        if (toggleButton && sidebar) {
-            toggleButton.addEventListener('click', function() {
-                sidebar.classList.toggle('active');
-            });
-
-            // Tutup sidebar pada skrin kecil apabila link diklik
-            links.forEach(link => {
-                link.addEventListener('click', () => {
-                    
-                    if (window.innerWidth <= 992) {
-                        sidebar.classList.remove('active');
-                    }
-                });
-            });
-
-        }
-    });
-    
 </script>
 </body>
 </html>

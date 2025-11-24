@@ -22,7 +22,6 @@
         }
 
         .header img {
-            /* Placeholder: Laluan imej akan digantikan oleh PHP ({{logo_path}}) */
             width: 120px; 
             margin-bottom: 10px;
         }
@@ -39,33 +38,34 @@
             font-size: 11pt;
             color: #555;
         }
-        
+
         /* Data table styles */
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
         }
 
         th, td {
             border: 1px solid #c0c0c0; /* Softer border lines */
-            padding: 10px 8px; /* Padding sedikit diubah untuk fit A4-L */
+            padding: 12px 10px; 
             text-align: left;
             vertical-align: top;
-            font-size: 9.5pt; /* Font size sedikit dikecilkan */
+            font-size: 10pt;
         }
 
-        thead tr {
-            /* Gunakan Kelabu Arang (Dark Charcoal Gray) */
-            background-color: #343a40; 
-        }
-        th {
-            color: #ffffff; 
-            font-weight: bold;
-            font-size: 9.5pt;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+thead tr {
+    /* Gunakan Kelabu Arang (Dark Charcoal Gray) */
+    background-color: #343a40; 
+}
+th {
+color: #ffffff; 
+    font-weight: bold;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+	}
         tbody tr:nth-child(even) {
             background-color: #f7f7f7; /* Soft gray striping */
         }
@@ -75,34 +75,34 @@
             display: block;
             margin-bottom: 3px;
             color: #003366;
-            font-size: 10pt; /* Jadikan nama item lebih menonjol */
         }
     </style>
 </head>
 <body>
     
-<div class="header">
- <img src="assets/unikl-logo.png" alt="UniKL Logo">    
-    <h1>EQUIPMENT RETURN REPORT</h1>
-    <p>Report for the period: <strong>{{start_date}}</strong> to <strong>{{end_date}}</strong></p>
-</div>
+    <div class="header">
+        <img src="assets/unikl-logo.png" alt="UniKL Logo">
+        <h1>EQUIPMENT RETURN REPORT</h1>
+        <p>Report for the period: <strong>{{start_date}}</strong> to <strong>{{end_date}}</strong></p>
+    </div>
 
-<table>
-    <thead>
-        <tr>
-            <th style="width: 5%;">No.</th>
-            <th style="width: 15%;">User Name</th>
-            <th style="width: 25%;">Item Details</th>
-            <th style="width: 10%;">Borrow Date</th>
-            <th style="width: 10%;">Return Date</th>
-            <th style="width: 10%;">Duration</th>
-            <th style="width: 15%;">Return Condition</th>
-            <th style="width: 10%;">Handled By</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{table_rows}}
-    </tbody>
-</table>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 15%;">User Name</th>
+                <th style="width: 25%;">Item Details</th>
+                <th style="width: 10%;">Borrow Date</th>
+                <th style="width: 10%;">Return Date</th>
+                <th style="width: 10%;">Duration</th>
+                <th style="width: 15%;">Return Condition</th>
+                <th style="width: 10%;">Handled By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{table_rows}}
+        </tbody>
+    </table>
+
 </body>
 </html>

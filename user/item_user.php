@@ -1,5 +1,7 @@
 <?php
-
+// ====================================================================
+// BAHAGIAN 1: PHP INITIALIZATION DAN DATA FETCHING
+// ====================================================================
 session_start();
 include '../config.php'; 
 
@@ -7,13 +9,16 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
+// 1. Semak Sesi Pengguna
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php"); 
     exit();
 }
 
+// Gunakan person_id untuk semua query
 $person_id = (int) $_SESSION['person_id'];
 
+// 2. Dapatkan Butiran Pengguna (Kekal sama)
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("Error preparing statement: " . $conn->error);
@@ -30,10 +35,6 @@ if (!$user) {
     exit();
 }
 
-
-// =======================================================
-// PHP: 1. Mengambil Kategori untuk Filter Pill (Diperlukan)
-// =======================================================
 $categories = [];
 $res_cat = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name");
 if ($res_cat) {

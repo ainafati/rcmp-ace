@@ -2,13 +2,9 @@
 session_start();
 include '../config.php';
 
-
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
-
-
-
 
 $allowed_role = 'Admin';
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
@@ -17,19 +13,14 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_r
 }
 
 $person_id = (int)$_SESSION['person_id'];
-
-
 $admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
-
-
-
 
 $sql = "
     SELECT
         p.person_id AS person_unique_id,
         p.name,
         p.email,
-        p.id AS id,             -- DIKEMAS KINI: Menggunakan lajur 'id' dari jadual person
+        p.id AS id,             -- Menggunakan lajur 'id' dari jadual person (Staff/Student ID)
         p.status,
         p.suspension_remarks,
         p.phoneNum,
@@ -72,6 +63,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
         .sidebar-overlay.active { display: block; }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+        /* THEME: Corporate Blue */
         .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
         .logo-text span { font-size: 12px; color: #94a3b8; }
@@ -171,7 +163,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add Account</button>
             <div class="user-profile">
 <span class="user-name"><?= $admin_name ?></span>               
-               <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
+                <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
             </div>
@@ -223,7 +215,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                             '<?= $a['person_unique_id'] ?>',
                                             '<?= htmlspecialchars(addslashes($a['name'])) ?>',
                                             '<?= htmlspecialchars(addslashes($a['email'])) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>',   '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
+                                            '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>',  '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
                                             '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>',
                                             '<?= htmlspecialchars(addslashes($a['status'])) ?>',
                                             '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
@@ -267,9 +259,10 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
                 
                 <div class="mb-3"><label class="form-label">Staff ID</label>
-                    <input type="text" name="id" class="form-control" required         pattern="\d{12}"
-                            title="Enter staff ID correctly"
-                            placeholder="e.g., 990101105000">
+                    <input type="text" name="id" class="form-control" required          
+                        pattern="\d{6,12}" 
+                        title="Enter staff ID (6 to 12 digits)"
+                        placeholder="e.g., 990101">
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>

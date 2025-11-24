@@ -267,7 +267,7 @@ case 'approve':
         
         $partial_reason_for_email = '';
         if ($info && $original_qty > $new_quantity) {
-            $partial_reason_for_email = "<strong>Quantity Reduced:</strong> Requested {$original_qty}, Approved {$new_quantity}. Reason: {$partial_reason}";
+            $partial_reason_for_email = "Quantity Reduced: Requested {$original_qty}, Approved {$new_quantity}. Reason: {$partial_reason}";
         }
         
         

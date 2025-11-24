@@ -3,9 +3,6 @@
 session_start();
 include '../config.php'; 
 
-
-
-
 $allowed_role = 'Admin';
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
     header("Location: ../login.php");
@@ -18,19 +15,19 @@ $admin_name_session = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['nam
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-
-$username = trim(isset($_POST['username']) ? $_POST['username'] : '');
-$email = trim(isset($_POST['email']) ? $_POST['email'] : '');
-$id = trim(isset($_POST['id']) ? $_POST['id'] : '');
-$phoneNumber = trim(isset($_POST['phoneNumber']) ? $_POST['phoneNumber'] : '');
-$password = isset($_POST['password']) ? $_POST['password'] : '';
-$role = isset($_POST['role']) ? $_POST['role'] : '';
+    $username = trim(isset($_POST['username']) ? $_POST['username'] : '');
+    $email = trim(isset($_POST['email']) ? $_POST['email'] : '');
+    $id = trim(isset($_POST['id']) ? $_POST['id'] : '');
+    $phoneNumber = trim(isset($_POST['phoneNumber']) ? $_POST['phoneNumber'] : '');
+    $password = isset($_POST['password']) ? $_POST['password'] : '';
+    $role = isset($_POST['role']) ? $_POST['role'] : '';
 
     
     
+    // 1. Dapatkan Role ID
     $roles_to_find = [$role];
     if (strtolower($role) === 'technician') {
-        
+        // Technician juga adalah User
         $roles_to_find[] = 'User';
     }
     
@@ -51,11 +48,12 @@ $role = isset($_POST['role']) ? $_POST['role'] : '';
     }
     $stmt_roles->close();
 
-$role_id_main = isset($roles_map[$role]) ? $roles_map[$role] : null;
-$role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null; 
+    $role_id_main = isset($roles_map[$role]) ? $roles_map[$role] : null;
+    $role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null; 
 
     
     
+    // 2. Validasi Input
     
     $needle = '@unikl.edu.my';
     
@@ -74,12 +72,13 @@ $role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null;
         exit();
     }
     
-    
-    if (!preg_match('/^\d{12}$/', $id)) {
-          $_SESSION['error_message'] = "Format Nombor Pengenalan (IC/ID) tidak sah. Mesti 12 digit.";
-          header("Location: manage_accounts.php");
-          exit();
+    // START OF FIX: MENGUBAH VALIDASI 12 DIGIT KEPADA 6-12 DIGIT
+    if (!preg_match('/^\d{6,12}$/', $id)) {
+        $_SESSION['error_message'] = "Format Nombor Pengenalan (ID) tidak sah. Mesti antara 6 hingga 12 digit.";
+        header("Location: manage_accounts.php");
+        exit();
     }
+    // END OF FIX
     
     if ($role !== 'Technician' && $role !== 'User' && $role !== 'Admin') { 
         $_SESSION['error_message'] = "Peranan tidak sah.";
@@ -99,12 +98,12 @@ $role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null;
 
     
     
-    
+    // 3. Simpan ke Database (Transaction)
     
     $conn->begin_transaction();
     try {
         
-        
+        // INSERT ke jadual person
         $sql_person = "INSERT INTO person (name, email, id, phoneNum, password, status) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt_person = $conn->prepare($sql_person);
         
@@ -127,12 +126,13 @@ $role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null;
         $stmt_person->close();
         
         
+        // INSERT ke jadual person_roles
         $roles_to_insert = [$role_id_main];
         $role_message = $role;
 
         
         if (strtolower($role) === 'technician') {
-            
+            // Tambah peranan 'User'
             $roles_to_insert[] = $role_id_user;
             $role_message = "{$role} (dan User)"; 
         }
@@ -154,8 +154,11 @@ $role_id_user = isset($roles_map['User']) ? $roles_map['User'] : null;
         
         
         
-
-
+        
+        $log_message = "Admin ID: {$admin_id_session} ({$admin_name_session}) telah menambah akaun baru (ID Person: {$new_person_id}, Role: {$role_message}).";
+        // Anda boleh tambah logging function di sini
+        
+        
         $_SESSION['success_message'] = "{$role_message} account created successfully!";
 
     } catch (Exception $e) {

@@ -1,12 +1,7 @@
 <?php
 session_start();
 
-
-
-
 include '../config.php'; 
-
-
 
 
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
@@ -435,7 +430,8 @@ $events_json = json_encode($events);
     .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
     .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
     
-</style></head>
+</style>
+</head>
 <body>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div> 
