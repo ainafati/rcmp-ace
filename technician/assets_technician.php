@@ -10,7 +10,7 @@ if (!isset($_SESSION['person_id'])) {
 $person_id = (int)$_SESSION['person_id'];
 
 
-// Ambil nama technician (menggunakan jadual person)
+
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
 $stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
@@ -111,7 +111,7 @@ $stmt_assets->execute();
 $all_assets = $stmt_assets->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_assets->close();
 
-$available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
+$available_statuses = ['Available', 'Checked Out', 'Maintenance', 'Damaged'];
 
 ?>
 <!DOCTYPE html>
@@ -124,75 +124,155 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <style>
-        /* CSS LENGKAP & SERAGAM UNTUK TEMA BARU ANDA */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
-        .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5, .modal-title { font-weight: 600; color: #1e293b; }
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-        .table tbody td { border-bottom: 1px solid #f1f5f9; }
-        .table tbody tr:last-child td { border-bottom: none; }
-        .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-        .btn { border-radius: 8px; font-weight: 500; }
-        .btn-primary { background-color: #3b82f6; border: none; }
-        .btn-primary:hover { background-color: #2563eb; }
+<style>
+    /* --- DEFINISI WARNA TEMA (ROOT VARIABLES) --- */
+    :root {
+        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
+        --primary-hover: #0891b2; /* Cyan 700 (Warna Hover/Gelap) */
+        --danger-color: #ef4444; /* Merah */
+        
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b; 
+        --text-muted: #64748b; 
+        --border-color: #e5e7eb;
+    }
 
-        /* KOD TAMBAHAN UNTUK MOBILE VIEW */
-        @media (max-width: 992px) {
-            /* Sembunyikan sidebar pada skrin kecil */
-            .sidebar {
-                display: none;
-            }
+    /* BASE & TYPOGRAPHY */
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
+    
+    /* SIDEBAR (Desktop) */
+    .sidebar { 
+        width: 250px; position: fixed; top: 0; bottom: 0; left: 0; 
+        background: var(--card-bg); padding: 20px; 
+        border-right: 1px solid var(--border-color); z-index: 1000; 
+        display: flex; flex-direction: column; justify-content: space-between; 
+    }
+    .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    
+    /* LOGO ICON (Menggunakan --primary-color) */
+    .logo-icon { 
+        width: 40px; height: 40px; 
+        background-color: var(--primary-color); /* Cyan */
+        color: white; border-radius: 8px; 
+        display: flex; align-items: center; justify-content: center; font-size: 20px; 
+    }
+    
+    .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
+    .logo-text span { font-size: 12px; color: #94a3b8; }
+    
+    .sidebar a { 
+        display: flex; align-items: center; gap: 12px; 
+        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
+        margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; 
+    }
+    
+    /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
+    .sidebar a.active, .sidebar a:hover { 
+        background: var(--primary-color); /* Cyan */
+        color: #fff; 
+    }
 
-            /* Main content guna 100% lebar skrin, tiada margin kiri */
-            .main-content {
-                margin-left: 0;
-            }
+    /* LOGOUT LINK */
+    .sidebar a.logout-link { 
+        color: var(--danger-color); 
+        font-weight: 600; 
+        margin-top: auto; 
+    } 
+    .sidebar a.logout-link:hover { 
+        color: #fff; 
+        background: var(--danger-color); 
+    }
 
-            /* Laraskan padding topbar untuk skrin kecil */
-            .topbar {
-                padding: 15px 20px;
-            }
+    /* MAIN CONTENT & TOPBAR */
+    .main-content { margin-left: 250px; }
+    .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+    .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
+    .container-fluid { padding: 30px; }
+    
+    /* CARD & TABLE */
+    .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+    .card h5, .modal-title { font-weight: 600; color: var(--text-dark); }
+    .table thead th { background: var(--bg-light-gray); color: var(--text-muted); border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+    .table tbody td { border-bottom: 1px solid #f1f5f9; }
+    .table tbody tr:last-child td { border-bottom: none; }
+    .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
+    
+    /* BUTTONS */
+    .btn { border-radius: 8px; font-weight: 500; }
+    
+    /* PRIMARY BUTTON (Menggunakan --primary-color dan --primary-hover) */
+    .btn-primary { 
+        background-color: var(--primary-color); /* Cyan */
+        border: none; 
+    }
+    .btn-primary:hover { 
+        background-color: var(--primary-hover); /* Cyan Gelap */
+    }
 
-            /* Laraskan padding container */
-            .container-fluid {
-                padding: 20px;
-            }
-            
-            /* Saiz fon topbar pada skrin kecil */
-            .topbar h3 {
-                font-size: 20px;
-            }
-
-            /* Jadual: Jadikan scrollable secara mendatar (Horizontal Scroll) */
-            .table-responsive {
-                overflow-x: auto;
-            }
-            
-            /* Pastikan elemen form filter berderet ke bawah (stack) dengan baik */
-            .g-3 {
-                --bs-gutter-x: 0; /* Buang gutter untuk susunan yang kemas */
-            }
-            .col-md-4, .col-md-auto {
-                width: 100% !important; /* Setiap elemen ambil 100% lebar */
-                margin-bottom: 10px;
-            }
+    /* KOD TAMBAHAN UNTUK MOBILE VIEW */
+    @media (max-width: 992px) {
+        /* Tukar dari display: none; kepada logik offcanvas (transform) untuk mobile */
+        .sidebar {
+             /* Gunakan transform untuk offcanvas effect */
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            width: 280px; 
+            z-index: 1050; /* Pastikan ia berada di atas overlay */
+            display: flex; /* Kekalkan display flex untuk susunan dalam sidebar */
         }
-        /* END KOD TAMBAHAN UNTUK MOBILE VIEW */
-    </style>
+        
+        /* Kelas yang perlu ditambah oleh JS apabila butang toggle ditekan */
+        .sidebar.active {
+            transform: translateX(0);
+        }
+        
+        /* Main content guna 100% lebar skrin, tiada margin kiri */
+        .main-content {
+            margin-left: 0;
+        }
+
+        /* Topbar fixed di mobile */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 999;
+            padding: 15px 20px;
+        }
+        
+        /* Tambah padding di body untuk mengelakkan kandungan tersembunyi di bawah topbar */
+        body {
+            padding-top: 60px; /* Anggaran ketinggian topbar */
+        }
+
+        /* Saiz fon topbar pada skrin kecil */
+        .topbar h3 {
+            font-size: 20px;
+        }
+
+        /* Laraskan padding container */
+        .container-fluid {
+            padding: 20px;
+        }
+        
+        /* Jadual: Jadikan scrollable secara mendatar (Horizontal Scroll) */
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        /* Pastikan elemen form filter berderet ke bawah (stack) dengan baik */
+        .g-3 {
+            --bs-gutter-x: 0;
+        }
+        .col-md-4, .col-md-auto {
+            width: 100% !important;
+            margin-bottom: 10px;
+        }
+    }
+    /* END KOD TAMBAHAN UNTUK MOBILE VIEW */
+</style>
 </head>
 <body>
 
@@ -252,7 +332,7 @@ $available_statuses = ['Available', 'Borrowed', 'Maintenance', 'Damaged'];
                                 $status = strtolower($asset['status']);
                                 $badge_class = 'text-bg-light';
                                 if ($status == 'available') $badge_class = 'text-bg-success';
-                                if (in_array($status, ['borrowed', 'checked out'])) $badge_class = 'text-bg-warning';
+                                if (in_array($status, ['checked out'])) $badge_class = 'text-bg-warning';
                                 if (in_array($status, ['damaged', 'maintenance'])) $badge_class = 'text-bg-danger';
                             ?>
 <tr>

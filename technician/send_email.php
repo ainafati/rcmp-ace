@@ -12,31 +12,31 @@ function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $
     $mail = new PHPMailer(true);
 
     try {
-        // --- DEBUGGING: TUKAR KE DEBUG_OFF (0) APABILA LIVE ---
+        
         $mail->SMTPDebug = SMTP::DEBUG_SERVER; 
         $mail->Debugoutput = 'error_log'; 
-        // -----------------------------------------------------
+        
 
         $mail->isSMTP();
         
-        // GUNA PEMALAR DARI config_email.php
-        $mail->Host      = SMTP_HOST;      // e.g., smtp.office365.com
+        
+        $mail->Host      = SMTP_HOST;      
         $mail->SMTPAuth  = true;
-        $mail->Username  = $smtp_user;    // nexcheck.rcmp@unikl.edu.my
+        $mail->Username  = $smtp_user;    
         $mail->Password  = $smtp_pass;
         
-        // GUNA PEMALAR DARI config_email.php (587 & STARTTLS)
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
-        $mail->Port      = SMTP_PORT;      // e.g., 587
         
-        // Pengirim (From)
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
+        $mail->Port      = SMTP_PORT;      
+        
+        
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
         $mail->addAddress($to_email, $user_name);
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation of Assigned Assets ' . $item_name;
         
-        // --- Logik Paparan Partial Reason ---
+        
         $partial_notice = '';
         if ($partial_reason) {
             $partial_notice = "<p style='color: #e74c3c; font-weight: bold; border: 1px dashed #e74c3c; padding: 10px;'>

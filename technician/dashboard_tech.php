@@ -1,14 +1,14 @@
 <?php
 session_start();
 
-// ----------------------------------------------------------------------
-// 0. CONFIGURATION & INITIALIZATION
-// ----------------------------------------------------------------------
+
+
+
 include '../config.php'; 
 
-// ----------------------------------------------------------------------
-// 1. ACCESS CONTROL & SESSION CHECK
-// ----------------------------------------------------------------------
+
+
+
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
@@ -19,7 +19,7 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technicia
 
 $person_id = (int) $_SESSION['person_id']; 
 
-// Fetch Technician's basic information
+
 $stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
 $stmt->bind_param("i", $person_id);
 $stmt->execute();
@@ -34,9 +34,9 @@ if (!$tech) {
     exit();
 }
 
-// ----------------------------------------------------------------------
-// 2. HELPER FUNCTIONS AND BADGES
-// ----------------------------------------------------------------------
+
+
+
 
 function get_reservation_item_count($conn, $status) {
     $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
@@ -76,47 +76,47 @@ function fetch_asset_details($conn, $status_condition_sql) {
 
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
 
-// ----------------------------------------------------------------------
-// 3. DASHBOARD SUMMARY COUNTS
-// ----------------------------------------------------------------------
 
-// Total Assets (excluding broken/decom/missing)
+
+
+
+
 $totalAssetsResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 $totalAssetsRow = $totalAssetsResult->fetch_assoc();
 $totalAssetsCount = isset($totalAssetsRow['total']) ? (int)$totalAssetsRow['total'] : 0;
 
-// Available Assets
+
 $availableResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status = 'Available'");
 $availableRow = $availableResult->fetch_assoc();
 $availableCount = isset($availableRow['total']) ? (int)$availableRow['total'] : 0;
 
-// Checked Out Assets
+
 $checkedOutResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status = 'Checked Out'");
 $checkedOutRow = $checkedOutResult->fetch_assoc();
 $checkedOutCount = isset($checkedOutRow['total']) ? (int)$checkedOutRow['total'] : 0;
 
-// Overdue Reservation Items
+
 $overdueResult = $conn->query("SELECT COUNT(DISTINCT ri.id) AS total FROM reservation_items ri WHERE ri.status = 'Checked Out' AND ri.return_date < CURDATE()");
 $overdueRow = $overdueResult->fetch_assoc();
 $overdueCount = isset($overdueRow['total']) ? (int)$overdueRow['total'] : 0;
 
-// Maintenance Assets
+
 $sql_maintenance_count = "SELECT COUNT(*) AS maintenance_count FROM assets WHERE status = 'Maintenance'";
 $result_maintenance = $conn->query($sql_maintenance_count);
 $maintenance_count = ($result_maintenance && $result_maintenance->num_rows > 0) ? $result_maintenance->fetch_assoc()['maintenance_count'] : 0;
 
 
-// ----------------------------------------------------------------------
-// 4. MODAL DATA FETCH (Detailed Lists)
-// ----------------------------------------------------------------------
 
-// Total Assets Details
+
+
+
+
 $total_assets_details = fetch_asset_details($conn, "a.status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 
-// Available Assets Details
+
 $available_assets_details = fetch_asset_details($conn, "a.status = 'Available'");
 
-// Checked Out Assets Details
+
 $checked_out_sql = "
     SELECT
         a.asset_id, a.asset_code, a.status,
@@ -136,7 +136,7 @@ $checked_out_sql = "
 $checked_out_result = $conn->query($checked_out_sql);
 $checked_out_details = $checked_out_result ? $checked_out_result->fetch_all(MYSQLI_ASSOC) : [];
 
-// Overdue Details
+
 $overdue_details_sql = "
     SELECT
         ri.id AS reservation_item_id, u.name AS user_name, u.phoneNum AS user_phone, i.item_name,
@@ -153,13 +153,13 @@ $overdue_details_sql = "
 $overdue_details_result = $conn->query($overdue_details_sql);
 $overdue_details = $overdue_details_result ? $overdue_details_result->fetch_all(MYSQLI_ASSOC) : [];
 
-// Maintenance Assets Details
+
 $maintenance_assets_details = fetch_asset_details($conn, "a.status = 'Maintenance'");
 
 
-// ----------------------------------------------------------------------
-// 5. CHART DATA (Loan Distribution by Category)
-// ----------------------------------------------------------------------
+
+
+
 
 $chart_sql = "
     SELECT 
@@ -185,9 +185,9 @@ foreach ($chart_data as $row) {
 $totalLoans = array_sum($chartValues);
 
 
-// ----------------------------------------------------------------------
-// 6. CALENDAR DATA (Events)
-// ----------------------------------------------------------------------
+
+
+
 
 $events = []; 
 
@@ -204,16 +204,16 @@ $historyResult = $conn->query($historySql);
 if ($historyResult) {
     while ($h = $historyResult->fetch_assoc()) {
         
-        // Event for Reservation period (Green)
+        
         $events[] = [
             'title' => "{$h['item_name']} ({$h['quantity']}) - {$h['username']}",
             'start' => date('Y-m-d', strtotime($h['reserve_date'])),
-            'end' => date('Y-m-d', strtotime($h['return_date'] . ' +1 day')), // End date is exclusive
-            'color' => '#10b981', // Green
+            'end' => date('Y-m-d', strtotime($h['return_date'] . ' +1 day')), 
+            'color' => '#10b981', 
             'description' => 'Reservation'
         ];
 
-        // Event for Buffer period (Yellow/Amber)
+        
         if ($h['status'] === 'Checked Out' && !empty($h['return_date'])) {
             $bufferStartDate = date('Y-m-d', strtotime($h['return_date'] . ' +1 day'));
             $bufferEndDate = date('Y-m-d', strtotime($h['return_date'] . ' +2 days')); 
@@ -222,7 +222,7 @@ if ($historyResult) {
                 'title' => "Buffer: {$h['item_name']}",
                 'start' => $bufferStartDate,
                 'end' => $bufferEndDate,
-                'color' => '#f59e0b', // Amber
+                'color' => '#f59e0b', 
                 'textColor' => '#854d0e',
                 'description' => 'Buffer Period - Pending Check-in'
             ];
@@ -232,14 +232,14 @@ if ($historyResult) {
     error_log("Error fetching reservation history for calendar: " . $conn->error);
 }
 
-// ----------------------------------------------------------------------
-// 7. JSON ENCODING & DB CLOSURE
-// ----------------------------------------------------------------------
 
-// Close DB Connection
+
+
+
+
 $conn->close();
 
-// Encode all necessary PHP data for JavaScript usage
+
 $total_assets_details_json = json_encode($total_assets_details);
 $available_assets_details_json = json_encode($available_assets_details);
 $checked_out_details_json = json_encode($checked_out_details);
@@ -260,168 +260,182 @@ $events_json = json_encode($events);
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <style>
-        /* BASE & TYPOGRAPHY */
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-        h3, h5, .modal-title { font-weight: 600; color: #1e293b; }
-        .card { border-radius: 12px; border: 1px solid #e5e7eb; }
+<style>
+    /* ---------------------------------- */
+    /* --- COLOR PALETTE (UPDATED) --- */
+    /* ---------------------------------- */
+    :root {
+        /* Warna Utama (Cyan/Teal) */
+        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
+        --primary-light: #f0f9ff; /* Biru Sangat Muda untuk Latar Belakang Aktif */
+        --primary-hover: #0891b2; /* Cyan 700 */
+        --danger-color: #ef4444; /* Merah untuk Logout */
         
-        /* COLOR PALETTE */
-        .bg-primary-blue { background-color: #4a80ff; } 
-        .text-primary-blue { color: #4a80ff; }
-        .text-green { color: #10b981; }
-        .text-orange { color: #f97316; }
-        .text-red { color: #ef4444; }
-        .text-amber { color: #f59e0b; }
+        /* Warna Sedia Ada (Kekal Sama) */
+        --bg-light-gray: #f8fafc;
+        --text-dark: #1e293b; 
+        --text-muted: #64748b;
+    }
+    
+    /* BASE & TYPOGRAPHY */
+    body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
+    h3, h5, .modal-title { font-weight: 600; color: var(--text-dark); }
+    .card { border-radius: 12px; border: 1px solid #e5e7eb; }
+    
+    /* UTILITY COLORS (Diselaraskan) */
+    .bg-primary-blue { background-color: var(--primary-color); } /* Diganti dengan Cyan */
+    .text-primary-blue { color: var(--primary-color); } /* Diganti dengan Cyan */
+    .text-green { color: #10b981; }
+    .text-orange { color: #f97316; }
+    .text-red { color: #ef4444; }
+    .text-amber { color: #f59e0b; }
 
-        /* ---------------------------------- */
-        /* --- SIDEBAR STYLES (FINAL MATCH) --- */
-        /* ---------------------------------- */
-        .sidebar { 
-            width: 250px; 
-            position: fixed; 
-            top: 0; 
-            bottom: 0; 
-            left: 0; 
-            background: #ffffff; 
-            padding: 20px 0; 
-            border-right: 1px solid #e5e7eb; 
-            display: flex; 
-            flex-direction: column; 
-            z-index: 1000;
-        }
-        .sidebar-header { padding: 0 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        
-        /* LOGO ICON: KOTAK BIRU (Match Image) */
-        .logo-icon { 
-            width: 40px; height: 40px; 
-            background-color: #4a80ff; /* Biru Penuh */
-            color: white; 
-            border-radius: 10px; 
-            display: flex; align-items: center; justify-content: center; 
-            font-size: 20px; 
-        }
+    /* ---------------------------------- */
+    /* --- SIDEBAR STYLES (UPDATED) --- */
+    /* ---------------------------------- */
+    .sidebar { 
+        width: 250px; 
+        position: fixed; 
+        top: 0; 
+        bottom: 0; 
+        left: 0; 
+        background: #ffffff; 
+        padding: 20px 0; 
+        border-right: 1px solid #e5e7eb; 
+        display: flex; 
+        flex-direction: column; 
+        z-index: 1000;
+    }
+    .sidebar-header { padding: 0 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    
+    /* LOGO ICON: KOTAK CYAN/TEAL */
+    .logo-icon { 
+        width: 40px; height: 40px; 
+        background-color: var(--primary-color); /* Menggunakan Cyan */
+        color: white; 
+        border-radius: 10px; 
+        display: flex; align-items: center; justify-content: center; 
+        font-size: 20px; 
+    }
 
-        /* Logo Text Styles */
-        .logo-text strong { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
-        .logo-text span { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
-        
-        /* Sidebar Links Container */
-        .sidebar-nav { margin-top: 30px; padding: 0 15px; flex-grow: 1; } 
-        .sidebar-footer { padding: 0 15px; margin-top: auto; }
+    /* Logo Text Styles */
+    .logo-text strong { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); }
+    .logo-text span { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
+    
+    /* Sidebar Links Container */
+    .sidebar-nav { margin-top: 30px; padding: 0 15px; flex-grow: 1; } 
+    .sidebar-footer { padding: 0 15px; margin-top: auto; }
 
-        .sidebar a { 
-            display: flex; align-items: center; gap: 12px; 
-            color: #64748b; text-decoration: none; padding: 12px 15px; 
-            margin-bottom: 8px; border-radius: 8px; 
-            font-weight: 500; 
-            transition: all 0.2s ease-in-out; 
-            position: relative; /* For badge */
-        }
+    .sidebar a { 
+        display: flex; align-items: center; gap: 12px; 
+        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
+        margin-bottom: 8px; border-radius: 8px; 
+        font-weight: 500; 
+        transition: all 0.2s ease-in-out; 
+        position: relative; 
+    }
 
-        /* ACTIVE & HOVER STYLE */
-        .sidebar a.active, .sidebar a:hover:not(.logout-link) { 
-            background: #4a80ff; /* Biru Penuh */
-            color: #fff; 
-        }
+    /* ACTIVE & HOVER STYLE (Menggunakan Cyan) */
+    .sidebar a.active, .sidebar a:hover:not(.logout-link) { 
+        background: var(--primary-color); /* Cyan Penuh */
+        color: #fff; 
+    }
 
-        /* BADGE STYLES */
-        .sidebar a .badge { margin-left: auto; background-color: #ef4444; color: white; }
-        .sidebar a.active .badge { background-color: #ffffff; color: #ef4444; }
+    /* BADGE STYLES */
+    .sidebar a .badge { margin-left: auto; background-color: var(--danger-color); color: white; }
+    .sidebar a.active .badge { background-color: #ffffff; color: var(--danger-color); }
 
 
-        /* LOGOUT BUTTON: MERAH TEKS SAHAJA (Match Image - Teks Merah) */
-        .sidebar-footer a.logout-link {
-            background: transparent !important; /* Pastikan tiada latar belakang kotak */
-            color: #ef4444 !important; /* Warna Merah */
-            border-radius: 8px;
-            font-weight: 500 !important; 
-            padding: 12px 15px;
-            margin-top: 25px; 
-            justify-content: flex-start; 
-        }
-        .sidebar-footer a.logout-link:hover {
-            background: #fee2e2 !important; /* Latar belakang hover Merah Pudar */
-            color: #ef4444 !important;
-        }
+    /* LOGOUT BUTTON: MERAH TEKS SAHAJA */
+    .sidebar-footer a.logout-link {
+        background: transparent !important; 
+        color: var(--danger-color) !important; /* Warna Merah */
+        border-radius: 8px;
+        font-weight: 500 !important; 
+        padding: 12px 15px;
+        margin-top: 25px; 
+        justify-content: flex-start; 
+    }
+    .sidebar-footer a.logout-link:hover {
+        background: #fee2e2 !important; /* Latar belakang hover Merah Pudar */
+        color: var(--danger-color) !important;
+    }
 
-        /* MAIN LAYOUT & TOPBAR */
-        .main-content { margin-left: 250px; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .container-fluid { padding: 30px; }
-        .topbar h3 { margin-right: auto; font-weight: 700; color: #1e293b; }
-        
-        /* SUMMARY CARD STYLES */
-        .card-summary {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e5e7eb;
-            cursor: pointer;
-            padding: 20px;
-            text-align: left;
-            height: 100%;
-            transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
-        }
-        .card-summary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-        }
+    /* MAIN LAYOUT & TOPBAR (Kekal Sama, guna primary-color baru) */
+    .main-content { margin-left: 250px; }
+    .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #e5e7eb; }
+    .container-fluid { padding: 30px; }
+    .topbar h3 { margin-right: auto; font-weight: 700; color: var(--text-dark); }
+    
+    /* SUMMARY CARD STYLES */
+    .card-summary {
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+        padding: 20px;
+        text-align: left;
+        height: 100%;
+        transition: transform 0.2s, box-shadow 0.2s;
+        position: relative;
+    }
+    .card-summary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+    .card-summary .icon-wrapper {
+        position: absolute; top: 20px; right: 20px;
+        width: 35px; height: 35px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem;
+    }
 
-        .card-summary .icon-wrapper {
-            position: absolute; top: 20px; right: 20px;
-            width: 35px; height: 35px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem;
-        }
+    .card-summary .count { font-size: 2.5rem; font-weight: 700; line-height: 1.1; margin-bottom: 5px; }
+    .card-summary .label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; }
+    
+    /* Specific Card Styling (Menggunakan primary-color baru) */
+    .card-total-assets .icon-wrapper { background-color: var(--primary-light); color: var(--primary-color); }
+    .card-available .icon-wrapper { background-color: #d1fae5; color: #10b981; }
+    .card-checked-out .icon-wrapper { background-color: #fff7ed; color: #f97316; }
+    .card-overdue .icon-wrapper { background-color: #fee2e2; color: #ef4444; }
+    .card-maintenance .icon-wrapper { background-color: #fefce8; color: #f59e0b; } 
+    
+    /* FullCalendar Customization */
+    #calendar-container { padding: 10px; }
 
-        .card-summary .count { font-size: 2.5rem; font-weight: 700; line-height: 1.1; margin-bottom: 5px; }
-        .card-summary .label { font-size: 0.85rem; color: #64748b; font-weight: 500; text-transform: uppercase; }
-        
-        /* Specific Card Styling */
-        .card-total-assets .icon-wrapper { background-color: #eef2ff; color: #4a80ff; }
-        .card-available .icon-wrapper { background-color: #d1fae5; color: #10b981; }
-        .card-checked-out .icon-wrapper { background-color: #fff7ed; color: #f97316; }
-        .card-overdue .icon-wrapper { background-color: #fee2e2; color: #ef4444; }
-        .card-maintenance .icon-wrapper { background-color: #fefce8; color: #f59e0b; } 
-        
-        /* FullCalendar Customization */
-        #calendar-container { padding: 10px; }
+    /* Technician Info Card */
+    .technician-info-card i {
+        width: 30px; font-size: 1.1rem; color: var(--primary-color); text-align: center;
+    }
+    
+    /* Chart Bar Styling */
+    .loan-chart-item { margin-bottom: 15px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
+    .loan-chart-item .label { width: 30%; font-weight: 500; }
+    .loan-chart-item .bar-wrapper { flex-grow: 1; margin: 0 10px; position: relative; }
+    .loan-chart-bar { background-color: #e5e7eb; height: 10px; border-radius: 5px; overflow: hidden; }
+    .loan-chart-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+    .loan-chart-item .value { font-weight: 600; color: var(--text-dark); width: 10%; text-align: right; }
+    .loan-chart-footer { border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; font-weight: 600; font-size: 1rem; }
+    .loan-chart-total { color: var(--text-dark); font-size: 1.2rem; }
+    
+    /* Chart colors (Menggunakan primary-color baru) */
+    .bg-blue-fill { background-color: var(--primary-color); }
+    .bg-green-fill { background-color: #10b981; }
+    .bg-orange-fill { background-color: #f97316; }
+    .bg-red-fill { background-color: #ef4444; }
+    
+    /* FullCalendar event colors */
+    .fc-event-main-frame { color: white !important; }
 
-        /* Technician Info Card */
-        .technician-info-card i {
-            width: 30px; font-size: 1.1rem; color: #4a80ff; text-align: center;
-        }
-        
-        /* Chart Bar Styling */
-        .loan-chart-item { margin-bottom: 15px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
-        .loan-chart-item .label { width: 30%; font-weight: 500; }
-        .loan-chart-item .bar-wrapper { flex-grow: 1; margin: 0 10px; position: relative; }
-        .loan-chart-bar { background-color: #e5e7eb; height: 10px; border-radius: 5px; overflow: hidden; }
-        .loan-chart-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
-        .loan-chart-item .value { font-weight: 600; color: #1e293b; width: 10%; text-align: right; }
-        .loan-chart-footer { border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; font-weight: 600; font-size: 1rem; }
-        .loan-chart-total { color: #1e293b; font-size: 1.2rem; }
-        
-        /* Chart colors */
-        .bg-blue-fill { background-color: #4a80ff; }
-        .bg-green-fill { background-color: #10b981; }
-        .bg-orange-fill { background-color: #f97316; }
-        .bg-red-fill { background-color: #ef4444; }
-        
-        /* FullCalendar event colors */
-        .fc-event-main-frame { color: white !important; }
-
-        /* Custom badge styles for modal tables */
-        .badge-status-available { background-color: #d1fae5; color: #065f46; }
-        .badge-status-checked-out { background-color: #fff7ed; color: #b45309; }
-        .badge-status-maintenance { background-color: #fefce8; color: #a16207; }
-        .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
-        .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
-
-    </style>
-</head>
+    /* Custom badge styles for modal tables */
+    .badge-status-available { background-color: #d1fae5; color: #065f46; }
+    .badge-status-checked-out { background-color: #fff7ed; color: #b45309; }
+    .badge-status-maintenance { background-color: #fefce8; color: #a16207; }
+    .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
+    .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
+    
+</style></head>
 <body>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div> 
@@ -446,7 +460,7 @@ $events_json = json_encode($events);
     </div>
     
 <div class="sidebar-footer">
-    <a href="../logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
 </div> 	
 </div>
 
@@ -546,7 +560,7 @@ $events_json = json_encode($events);
                     
                     <div id="loanChartContainer">
                         <?php 
-                        // Sediakan senarai warna untuk chart fills
+                        
                         $colors_fill = ['bg-blue-fill', 'bg-green-fill', 'bg-orange-fill', 'bg-red-fill'];
                         $chart_index = 0;
                         
@@ -680,9 +694,9 @@ $events_json = json_encode($events);
 
 <script>
     
-    // =================================================================
-    // 1. DATA DEFINITIONS (Populated by PHP)
-    // =================================================================
+    
+    
+    
     const totalAssetsDetails = <?php echo $total_assets_details_json; ?>;
     const availableAssetsDetails = <?php echo $available_assets_details_json; ?>;
     const checkedOutAssetsDetails = <?php echo $checked_out_details_json; ?>;
@@ -692,9 +706,9 @@ $events_json = json_encode($events);
 
     document.addEventListener('DOMContentLoaded', function() {
         
-        // =================================================================
-        // 2. Sidebar Toggle Logic
-        // =================================================================
+        
+        
+        
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
         const overlay = document.getElementById('sidebarOverlay');
@@ -715,9 +729,9 @@ $events_json = json_encode($events);
         checkScreenSize(); 
 
         
-        // =================================================================
-        // 3. FullCalendar Logic (Standard View)
-        // =================================================================
+        
+        
+        
         const calendarEl = document.getElementById('calendar');
         if (calendarEl) {
             const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -725,25 +739,25 @@ $events_json = json_encode($events);
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' // Paparan penuh
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' 
                 },
                 events: eventsData,
                 height: 'auto',
                 firstDay: 1, 
-                // Set warna untuk event
+                
                 eventDidMount: function(info) {
                     if (info.event.extendedProps.description === 'Reservation') {
-                        info.el.style.backgroundColor = '#10b981'; // Green
+                        info.el.style.backgroundColor = '#10b981'; 
                         info.el.style.borderColor = '#059669';
                         info.el.style.color = 'white';
                     } else if (info.event.extendedProps.description === 'Buffer Timeline - Pending Check-in') {
-                        info.el.style.backgroundColor = '#f59e0b'; // Amber
+                        info.el.style.backgroundColor = '#f59e0b'; 
                         info.el.style.borderColor = '#d97706';
                         info.el.style.color = 'white';
                     }
                 },
                 eventContent: function(arg) {
-                    // Paparkan title event secara normal
+                    
                     return { html: '<div class="fc-event-main-frame">' + arg.event.title + '</div>' };
                 }
                 
@@ -752,9 +766,9 @@ $events_json = json_encode($events);
         } else { console.error("Calendar element #calendar not found."); }
 
         
-        // =================================================================
-        // 4. Asset Table Creation Function
-        // =================================================================
+        
+        
+        
         function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
             if (!assetList || assetList.length === 0) {
                 return '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No matching assets found.</div>';
@@ -801,9 +815,9 @@ $events_json = json_encode($events);
         }
 
         
-        // =================================================================
-        // 5. Modal Trigger Setup Function 
-        // =================================================================
+        
+        
+        
         function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
             const card = document.getElementById(cardId);
             const modalElement = document.getElementById(modalElementId);
@@ -842,18 +856,18 @@ $events_json = json_encode($events);
         }
 
         
-        // =================================================================
-        // 6. Modal Trigger Call 
-        // =================================================================
+        
+        
+        
         setupModalTrigger('totalAssetsCard', 'totalAssetsModal', 'totalAssetsList', totalAssetsDetails);
         setupModalTrigger('availableAssetsCard', 'availableAssetsModal', 'availableAssetsList', availableAssetsDetails);
         setupModalTrigger('checkedOutAssetsCard', 'checkedOutAssetsModal', 'checkedOutAssetsList', checkedOutAssetsDetails, true); 
         setupModalTrigger('maintenanceAssetsCard', 'maintenanceAssetsModal', 'maintenanceAssetsList', maintenanceAssetsDetails);
 
 
-        // =================================================================
-        // 7. Overdue Modal Logic
-        // =================================================================
+        
+        
+        
         const overdueCard = document.getElementById('overdueCard');
         const overdueModalElement = document.getElementById('overdueModal');
         const overdueListContainer = document.getElementById('overdueList');

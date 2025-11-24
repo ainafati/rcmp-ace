@@ -6,14 +6,14 @@ error_reporting(E_ALL);
 
 session_start();
 
-// PEMBETULAN PATH (Berdasarkan imej struktur fail anda)
-// config.php berada di ../
+
+
 include __DIR__ . '/../config.php';
-// config_email.php dan send_email.php berada di direktori yang sama
+
 include 'config_email.php';
 require 'send_email.php';
 
-// Pastikan sambungan DB ($conn) tersedia dari config.php
+
 
 if (!isset($_SESSION['person_id'])) {
     header('Content-Type: application/json');
@@ -21,11 +21,11 @@ if (!isset($_SESSION['person_id'])) {
     echo json_encode(['message' => 'Access Denied. Please log in again.']);
     exit();
 }
-// Gunakan person_id dari SESSION
+
 $person_id = (int)$_SESSION['person_id']; 
 
 $action = '';
-// PEMBETULAN PHP 5.6: Guna isset() untuk mengambil action
+
 if (isset($_POST['action'])) {
     $action = $_POST['action'];
 } elseif (isset($_GET['action'])) {
@@ -43,16 +43,16 @@ header('Content-Type: application/json');
 
 switch ($action) {
 case 'approve':
-    // 1. AMBIL VARIABEL ASAL DAN BARU
+    
     $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
-    $selectedAssets = isset($_POST['selectedAssets']) ? $_POST['selectedAssets'] : array(); // Array
+    $selectedAssets = isset($_POST['selectedAssets']) ? $_POST['selectedAssets'] : array(); 
     $new_quantity = isset($_POST['approved_quantity']) ? (int)$_POST['approved_quantity'] : 0;
     $partial_reason = isset($_POST['partial_reason']) ? trim($_POST['partial_reason']) : '';
     
-    // Asingkan person_id daripada Sesi
+    
     $person_id = isset($_SESSION['person_id']) ? (int)$_SESSION['person_id'] : 0; 
     
-    // Dapatkan kuantiti asal
+    
     $original_qty = 0;
     try {
         $stmt_original = $conn->prepare("SELECT quantity, reserve_id FROM reservation_items WHERE id = ?");
@@ -71,9 +71,9 @@ case 'approve':
         exit();
     }
 
-    // =========================================================================
-    // 2. PEMBETULAN KRITIKAL: LOGIK PENOLAKAN PENUH (Jika Kuantiti Diluluskan = 0)
-    // =========================================================================
+    
+    
+    
     if ($new_quantity == 0) {
         if (strlen($partial_reason) < 5) {
             http_response_code(400);
@@ -81,19 +81,19 @@ case 'approve':
             exit();
         }
 
-        // Hantar kepada proses REJECT
-        $reason = $partial_reason; // Guna partial_reason sebagai rejection_reason
+        
+        $reason = $partial_reason; 
         
         $conn->begin_transaction();
         try {
-            // A. UPDATE status item kepada 'Rejected'
+            
             $stmt_r = $conn->prepare("UPDATE reservation_items SET status = 'Rejected', rejection_reason = ? WHERE id = ?");
             if (!$stmt_r) throw new Exception("Prepare failed (reject update): " . $conn->error);
             $stmt_r->bind_param("si", $reason, $reservation_item_id);
             $stmt_r->execute();
             $stmt_r->close();
 
-            // B. Dapatkan Person ID & Item Name untuk Notifikasi
+            
             $person_id_applicant = null;
             $item_name = '';
             
@@ -114,7 +114,7 @@ case 'approve':
             }
             $stmt_info->close();
 
-            // C. Simpan Notifikasi REJECT
+            
             if ($person_id_applicant !== null) {
                 $message_notify = "Your request for" . $item_name . "has been rejected. Reason: " . htmlspecialchars($reason);
                 $stmt_notify = $conn->prepare("INSERT INTO notifications (person_id, message, type, related_id) VALUES (?, ?, 'reject', ?)");
@@ -126,7 +126,7 @@ case 'approve':
             
             $conn->commit();
             echo json_encode(['success' => true, 'message' => 'Permintaan ditolak sepenuhnya kerana Kuantiti Diluluskan ialah 0.']);
-            exit(); // Hentikan proses di sini.
+            exit(); 
 
         } catch (Exception $e) {
             $conn->rollback();
@@ -136,36 +136,36 @@ case 'approve':
             exit();
         }
     }
-    // =========================================================================
-    // AKHIR LOGIK PENOLAKAN PENUH
-    // =========================================================================
+    
+    
+    
 
 
-    // 3. Validasi yang lebih ketat (Jika $new_quantity > 0)
+    
     if (empty($reservation_item_id) || empty($selectedAssets) || $new_quantity <= 0) {
         http_response_code(400); 
         echo json_encode(['message' => 'Maklumat tidak lengkap (ID, Assets, atau Kuantiti).']); 
         exit();
     }
     
-    // 4. VALIDASI BARU: Jika kuantiti dikurangkan, sebab wajib ada
+    
     if ($new_quantity < $original_qty && strlen($partial_reason) < 5) {
         http_response_code(400); 
         echo json_encode(['message' => 'Sebab penolakan sebahagian diperlukan jika kuantiti dikurangkan.']); 
         exit();
     }
 
-    // 5. Validasi Aset Mismatch
+    
     if (count($selectedAssets) !== $new_quantity) {
           http_response_code(400); 
           echo json_encode(['message' => 'Ralat Mismatch: Jumlah aset tidak sepadan dengan kuantiti yang diluluskan.']); 
           exit();
     }
 
-    // (Blok Transaction untuk Partial/Full Approve)
+    
     $conn->begin_transaction();
     try {
-        // 6. UPDATE reservation_items
+        
         $stmt = $conn->prepare("UPDATE reservation_items 
                                SET status = 'Approved', 
                                    approved_by = ?, 
@@ -175,21 +175,21 @@ case 'approve':
                                WHERE id = ?");
         if (!$stmt) throw new Exception("Prepare failed (update item): " . $conn->error);
         
-        // PENTING: Pastikan $person_id bukan 0 (ID Juruteknik yang sedang log masuk)
+        
         if ($person_id === 0) throw new Exception("Person ID (Technician) is missing from session."); 
 
         $stmt->bind_param("iisi", $person_id, $new_quantity, $partial_reason, $reservation_item_id); 
         $stmt->execute();
         $stmt->close();
 
-        // 7. Hapus rekod reservation_assets lama (Jika ada)
+        
         $stmt_delete_ra = $conn->prepare("DELETE FROM reservation_assets WHERE reservation_item_id = ?");
         if (!$stmt_delete_ra) throw new Exception("Prepare failed (delete ra): " . $conn->error);
         $stmt_delete_ra->bind_param("i", $reservation_item_id);
         $stmt_delete_ra->execute();
         $stmt_delete_ra->close();
         
-        // 8. Logik INSERT dan UPDATE ASSETS
+        
         $stmt_asset_insert = $conn->prepare("INSERT INTO reservation_assets (reservation_item_id, asset_id) VALUES (?, ?)");
         if (!$stmt_asset_insert) throw new Exception("Prepare failed (insert asset): " . $conn->error);
 
@@ -199,23 +199,23 @@ case 'approve':
         foreach ($selectedAssets as $asset_id) {
             $asset_id_int = (int)$asset_id;
             
-            // 8a. INSERT ke reservation_assets
+            
             $stmt_asset_insert->bind_param("ii", $reservation_item_id, $asset_id_int);
             $stmt_asset_insert->execute();
 
-            // 8b. UPDATE status aset
+            
             $stmt_asset_update->bind_param("i", $asset_id_int);
             $stmt_asset_update->execute();
         }
         $stmt_asset_insert->close();
         $stmt_asset_update->close();
         
-        $conn->commit(); // COMMIT Transaction
+        $conn->commit(); 
         
         
-        // =========================================================================
-        // 9. LOGIK NOTIFIKASI APPROVE & INFO EMAIL
-        // =========================================================================
+        
+        
+        
         
         $info = null;
         try {
@@ -249,11 +249,11 @@ case 'approve':
             $info = null; 
         }
 
-        // 9a. Simpan Notifikasi APPROVE (Jika info ditemui)
+        
         if ($info && isset($info['person_id'])) {
-             $message_notify = "Permintaan anda untuk **" . htmlspecialchars($info['item_name']) . "** telah LULUS dan sedia untuk diambil. ";
+             $message_notify = "Your request for" . htmlspecialchars($info['item_name']) . "has passed and is ready to be taken. ";
              if ($original_qty > $new_quantity) {
-                 $message_notify .= " (Kuantiti Dikurangkan dari {$original_qty} ke {$new_quantity}).";
+                 $message_notify .= " (Quantity reduced from {$original_qty} to {$new_quantity}).";
              }
              
              $stmt_notify = $conn->prepare("INSERT INTO notifications (person_id, message, type, related_id) VALUES (?, ?, 'approve', ?)");
@@ -264,15 +264,15 @@ case 'approve':
                  $stmt_notify->close();
              }
         }
-        // 9b. Tambah Maklumat Sebab dalam Mesej Email (sama seperti kod asal anda)
+        
         $partial_reason_for_email = '';
         if ($info && $original_qty > $new_quantity) {
             $partial_reason_for_email = "<strong>Quantity Reduced:</strong> Requested {$original_qty}, Approved {$new_quantity}. Reason: {$partial_reason}";
         }
         
-        // 10. Blok hantar emel (sama seperti kod asal anda)
+        
         $email_sent = false;
-        // ... (Kod email anda di sini) ...
+        
         if ($info && defined('SMTP_USER') && defined('SMTP_PASS') && !empty($info['user_email'])) {
              $email_sent = sendNotificationEmail(
                  $info['user_email'], $info['user_name'], $info['item_name'], 
@@ -281,7 +281,7 @@ case 'approve':
              );
         }
 
-        // 11. Hantar respons JSON kepada AJAX
+        
         $message = "Request approved for {$new_quantity} unit(s)!";
         if ($original_qty > $new_quantity) {
             $message .= " (Original: {$original_qty}). Partial reason recorded.";
@@ -307,7 +307,7 @@ case 'reject':
         exit();
     }
     
-    // 1. UPDATE status item permintaan
+    
     $stmt = $conn->prepare("UPDATE reservation_items SET status = 'Rejected', rejection_reason = ? WHERE id = ?");
     
     if ($stmt === false) {
@@ -320,9 +320,9 @@ case 'reject':
     
     if ($stmt->execute()) {
         
-        // --- LOGIK NOTIFIKASI BERMULA DI SINI ---
         
-        // 2. Dapatkan Person ID pemohon dan Item Name
+        
+        
         $person_id = null;
         $item_name = 'item tidak diketahui';
         
@@ -333,7 +333,7 @@ case 'reject':
                                      WHERE ri.id = ?");
 
         if ($stmt_user === false) {
-            // Log ralat tetapi teruskan (penolakan DB utama sudah berjaya)
+            
             error_log("Notification Prepare Error: " . $conn->error);
         } else {
             $stmt_user->bind_param("i", $reservation_item_id);
@@ -348,7 +348,7 @@ case 'reject':
             $stmt_user->close();
         }
         
-        // 3. Simpan Notifikasi (Hanya jika person_id ditemui)
+        
         if ($person_id !== null) {
             $message = "Permintaan anda untuk **" . $item_name . "** telah DITOLAK. Sebab: " . htmlspecialchars($reason);
             
@@ -363,11 +363,11 @@ case 'reject':
             }
         }
         
-        // 4. Hantar respons JSON kepada AJAX (Hanya sekali di akhir)
+        
         echo json_encode(['success' => true, 'message' => 'Permintaan berjaya ditolak dan pengguna telah dimaklumkan.']); 
 
     } else {
-        // Jika UPDATE status GAGAL
+        
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Gagal menolak permintaan. DB Execute Error.']);
     }
@@ -376,7 +376,7 @@ case 'reject':
     break;
 	
 case 'checkout':
-    // ... (kod checkout kekal)
+    
     $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
     $conn->begin_transaction();
     try {
@@ -403,13 +403,13 @@ case 'checkout':
     break;
 
 case 'get_assets_for_checkin':
-    // ACTION INI MENGURUSKAN MODAL CHECK IN
+    
     $reservation_item_id = isset($_GET['reservation_item_id']) ? (int)$_GET['reservation_item_id'] : 0;
     if ($reservation_item_id === 0) {
         http_response_code(400); echo json_encode(['message' => 'Missing ID.']); exit();
     }
     
-    // Query untuk mendapatkan aset yang masih 'Checked Out' untuk tempahan ini
+    
     $stmt = $conn->prepare("
         SELECT a.asset_id, a.asset_code
         FROM assets a
@@ -429,7 +429,7 @@ case 'get_assets_for_checkin':
     break;
 
 case 'checkin_multi':
-    // ACTION INI MENGURUSKAN PENGESAHAN CHECK IN
+    
     $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
     $asset_conditions_json = isset($_POST['asset_conditions']) ? $_POST['asset_conditions'] : '[]';
     $asset_conditions = json_decode($asset_conditions_json, true);
@@ -459,7 +459,7 @@ case 'checkin_multi':
                 $new_asset_status = 'Maintenance';
                 $damaged_count++;
             } elseif ($condition === 'Not_Returned_Yet') { 
-                continue; // LOMPAT: Tidak menukar status, tidak dikira sebagai dikembalikan
+                continue; 
             }
             
             $stmt_asset_update->bind_param("si", $new_asset_status, $asset_id);
@@ -471,7 +471,7 @@ case 'checkin_multi':
         
         $stmt_asset_update->close();
 
-        // 1. Semak baki aset yang masih 'Checked Out' selepas proses ini
+        
         $stmt_check_remaining = $conn->prepare("
             SELECT COUNT(a.asset_id) AS remaining_count
             FROM reservation_assets ra
@@ -485,7 +485,7 @@ case 'checkin_multi':
         $stmt_check_remaining->close();
 
 
-        // 2. Tentukan status akhir reservation_items
+        
         $final_item_status = ($remaining_count > 0) ? 'Checked Out' : 'Returned';
         
         $final_condition = ($damaged_count > 0) ? "{$damaged_count} asset(s) Damaged" : "Good";

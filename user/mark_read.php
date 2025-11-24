@@ -1,15 +1,15 @@
 <?php
-// mark_read.php
 
-// Ensure JSON header
+
+
 header('Content-Type: application/json');
 
-// Turn off error display (log instead)
+
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-// Example: mark a reservation/notification as read
-include 'db_connect.php'; // your DB connection
+
+include 'db_connect.php'; 
 
 $response = ["success" => false];
 

@@ -1,18 +1,18 @@
 <?php
 session_start();
-// Pastikan anda menyertakan config.php untuk sambungan DB
+
 include '../config.php'; 
 
-// --- 1. Security Check ---
+
 if (!isset($_SESSION['person_id'])) {
-    // Redirect atau matikan skrip jika tiada pengesahan
+    
     die("Access denied.");
 }
 
-// --- 2. Determine Export Type ---
+
 $export_type = isset($_GET['export']) ? $_GET['export'] : 'returns';
 
-// Variables for database binding and query
+
 $sql_select = "";
 $sql_from_where = "";
 $param_types = "";
@@ -20,10 +20,10 @@ $param_values = array();
 $filename_prefix = "";
 $header_row = array();
 
-// --- 3. Construct Query based on Export Type ---
+
 
 if ($export_type === 'returns') {
-    // --- Laporan Barangan Dipulangkan (Returned Items) ---
+    
     $filename_prefix = "returned_items";
     $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
     $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
@@ -59,7 +59,7 @@ if ($export_type === 'returns') {
     $sql_order = " ORDER BY ri.return_date DESC";
 
 } elseif ($export_type === 'activity') {
-    // --- Log Aktiviti (Activity Log) ---
+    
     $filename_prefix = "activity_log";
     $log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : date('Y-m-d', strtotime('-7 days'));
     $log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
@@ -97,14 +97,14 @@ if ($export_type === 'returns') {
 }
 
 
-// --- 4. Execute the Prepared Statement ---
+
 
 $sql_full = "SELECT " . $sql_select . " " . $sql_from_where . $sql_order;
 
 $stmt = $conn->prepare($sql_full);
 if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
 
-// Dynamically bind parameters
+
 if (!empty($param_values)) {
     $bind_params = array();
     $bind_params[] = $param_types;
@@ -117,22 +117,20 @@ if (!empty($param_values)) {
 $stmt->execute();
 $result = $stmt->get_result();
 
-// --- 5. CSV Output and Download ---
+
 
 $filename = $filename_prefix . "_" . date('Y-m-d') . ".csv";
 header('Content-Type: text/csv; charset=utf-8');    
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 
-// 'php://output' writes directly to the browser download stream
+
 $output = fopen('php://output', 'w');    
 
-// Write the CSV header row
 fputcsv($output, $header_row);
 
-// Write data rows
 while ($row = $result->fetch_assoc()) {
     if ($export_type === 'returns') {
-        // Output format for Returned Items
+        
         fputcsv($output, array(
             $row['user_name'],
             $row['item_name'],
@@ -144,9 +142,9 @@ while ($row = $result->fetch_assoc()) {
             $row['handled_by_name']    
         ));
     } elseif ($export_type === 'activity') {
-        // Output format for Activity Logs
+        
         fputcsv($output, array(
-            date("Y-m-d H:i:s", strtotime($row['timestamp'])), // Format timestamp
+            date("Y-m-d H:i:s", strtotime($row['timestamp'])), 
             $row['user_type'],
             $row['user_id'],
             $row['action'],
@@ -156,7 +154,7 @@ while ($row = $result->fetch_assoc()) {
     }
 }
 
-// --- 6. Cleanup and Exit ---
+
 $stmt->close();
 fclose($output);
 $conn->close();    

@@ -1,18 +1,18 @@
 <?php
 
 session_start();
-// Pastikan tiada output sebelum tag PHP pembuka di config.php atau logger.php
+
 include '../config.php';
 include_once '../logger.php';
 
-// Fungsi Utiliti untuk membina semula Query String Pagination
-// Ralat 'T_FUNCTION' sering berlaku di sini jika ada karakter tersembunyi
+
+
 function build_pagination_query($page_param_name, $page_number) {
     $params = $_GET;
     
-    // Pastikan 'tab' ditetapkan dengan betul
+    
     if (!isset($params['tab'])) {
-        // Logik default tab
+        
         if ($page_param_name == 'page_returns') {
             $params['tab'] = 'returns';
         } elseif ($page_param_name == 'page_logs') {
@@ -22,7 +22,7 @@ function build_pagination_query($page_param_name, $page_number) {
     
     $params[$page_param_name] = $page_number;
     
-    // Nyahsetkan parameter pagination tab yang satu lagi untuk mengelakkan konflik URL
+    
     if ($page_param_name == 'page_returns' && isset($params['page_logs'])) unset($params['page_logs']);
     if ($page_param_name == 'page_logs' && isset($params['page_returns'])) unset($params['page_returns']);
     
@@ -37,10 +37,10 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_r
 
 $person_id = (int)$_SESSION['person_id'];
 
-// Ambil nama Admin/Pengguna yang sedang log masuk dari Sesi
+
 $admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
 
-// Ambil nama dari jadual 'person' yang disatukan
+
 if ($stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?")) {
     $stmt_admin->bind_param("i", $admin_id);
     $stmt_admin->execute();
@@ -54,11 +54,11 @@ if ($stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?"))
 $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' : 'returns';
 
 $records = array();
-// Ambil kategori dari jadual 'categories'
+
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 
-// ---- Pagination dan Filter Laporan Barangan Dipulangkan ----
+
 $items_per_page_returns = 10;
 $page_returns = isset($_GET['page_returns']) ? (int)$_GET['page_returns'] : 1;
 if ($page_returns < 1) $page_returns = 1;
@@ -70,7 +70,7 @@ $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
-// 2. Query Laporan Barangan Dipulangkan
+
 $sql_base_report = "FROM reservation_items ri
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     JOIN person u ON r.person_id = u.person_id /* User (Peminjam) dari reservations */
@@ -81,8 +81,8 @@ $sql_base_report = "FROM reservation_items ri
     LEFT JOIN person p_handler ON ri.approved_by = p_handler.person_id"; /* Handler (Admin/Tech) yang meluluskan */
 	
 $where_clauses_report = array(
-    "ri.status = 'Returned'", // Status item yang telah dipulangkan
-    "ri.return_date BETWEEN ? AND ?" // Filter berdasarkan tarikh pulangan
+    "ri.status = 'Returned'", 
+    "ri.return_date BETWEEN ? AND ?" 
 );
 $param_types_report = "ss";
 $param_values_report = array($report_start_date, $report_end_date);
@@ -96,10 +96,10 @@ if ($report_category_id > 0) {
 $sql_where_report = " WHERE " . implode(' AND ', $where_clauses_report);
 
 
-// Kiraan Rekod (Returned Items)
+
 $stmt_count_report = $conn->prepare("SELECT COUNT(ri.id) " . $sql_base_report . $sql_where_report);
 if ($stmt_count_report) {
-    // Pengikatan Parameter untuk COUNT
+    
     $bind_params_count = array();
     $bind_params_count[] = $param_types_report;
     for ($i = 0; $i < count($param_values_report); $i++) {
@@ -123,7 +123,7 @@ if ($stmt_count_report) {
 }
 
 
-// Select Query (Returned Items)
+
 $sql_report = "SELECT
     u.name AS user_name, i.item_name, a.asset_code, c.category_name,
     ri.reserve_date, ri.return_date, ri.return_condition,
@@ -139,7 +139,7 @@ $param_values_select[] = $offset_returns;
 
 $stmt_report = $conn->prepare($sql_report);
 if ($stmt_report) {
-    // Pengikatan Parameter untuk SELECT
+    
     $bind_params_select = array();
     $bind_params_select[] = $param_types_select;
     for ($i = 0; $i < count($param_values_select); $i++) {
@@ -153,7 +153,7 @@ if ($stmt_report) {
 }
 
 
-// ---- Pagination dan Filter Log Aktiviti ----
+
 $logs = array();
 $items_per_page_logs = 10;
 $page_logs = isset($_GET['page_logs']) ? (int)$_GET['page_logs'] : 1;
@@ -163,9 +163,9 @@ $log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : dat
 $log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
 $log_user_type = isset($_GET['user_type']) ? $_GET['user_type'] : '';
 $log_search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$end_date_sql = $log_end_date . ' 23:59:59'; // Untuk memasukkan log hari akhir
+$end_date_sql = $log_end_date . ' 23:59:59'; 
 
-// 3. Query Log Aktiviti (Menggunakan jadual activity_logs anda)
+
 $sql_base_log = "FROM activity_logs";
 $where_clauses_log = array("timestamp BETWEEN ? AND ?");
 $param_types_log = "ss";
@@ -186,10 +186,10 @@ if (!empty($log_search)) {
 $sql_where_log = " WHERE " . implode(' AND ', $where_clauses_log);
 
 
-// Kiraan Rekod (Activity Logs)
+
 $stmt_count_log = $conn->prepare("SELECT COUNT(log_id) " . $sql_base_log . $sql_where_log);
 if ($stmt_count_log) {
-    // Pengikatan Parameter untuk COUNT
+    
     $bind_params_count_log = array();
     $bind_params_count_log[] = $param_types_log;
     for ($i = 0; $i < count($param_values_log); $i++) {
@@ -213,7 +213,7 @@ if ($stmt_count_log) {
 }
 
 
-// Select Query (Activity Logs)
+
 $sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address
     " . $sql_base_log . $sql_where_log . "
     ORDER BY timestamp DESC
@@ -226,7 +226,7 @@ $param_values_select_log[] = $offset_logs;
 
 $stmt_log = $conn->prepare($sql_log);
 if ($stmt_log) {
-    // Pengikatan Parameter untuk SELECT
+    
     $bind_params_select_log = array();
     $bind_params_select_log[] = $param_types_select_log;
     for ($i = 0; $i < count($param_values_select_log); $i++) {
@@ -719,16 +719,16 @@ $conn->close();
             return y + '-' + m + '-' + d;
         };
 
-        // Bina URLSearchParams baharu
+        
         var params = new URLSearchParams(window.location.search);
         
         params.set('start_date', formatDate(startDate));
         params.set('end_date', formatDate(endDate));
         params.set('category_id', categoryFilter.value);
         params.set('tab', 'returns');
-        params.delete('page_returns'); // Tetapkan semula pagination
+        params.delete('page_returns'); 
         
-        // Pindahkan ke URL baharu
+        
         window.location.search = params.toString();
     }
 

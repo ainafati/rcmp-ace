@@ -10,7 +10,7 @@ if (!isset($_SESSION['person_id'])) {
 $person_id = (int)$_SESSION['person_id'];
 
 
-// Ambil nama technician (menggunakan jadual person)
+
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
 $stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
@@ -52,25 +52,25 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
 
     $sql .= " ORDER BY u.name ASC, ri.reserve_date ASC, r.priority ASC, r.created_at ASC";
 
-    // 1. Prepared Statement
+    
     $stmt = $conn->prepare($sql);
 
-    // KOD PENTING: Semak kegagalan prepare
+    
     if ($stmt === false) {
-        // Jika gagal, ia akan mati di sini dan memaparkan ralat SQL sebenar
+        
         die('SQL Prepare failed: ' . $conn->error . '. Query: ' . $sql);
     }
     
-    // 2. Binding parameters (Kaedah PHP Lama, yang stabil)
+    
     $bind_params = [];
     $bind_params[] = $bind_types;
     foreach ($bind_values as $key => $value) {
-        $bind_params[] = &$bind_values[$key]; // MESTI menggunakan &
+        $bind_params[] = &$bind_values[$key]; 
     }
-    // Baris ini akan berjaya jika $stmt bukan false
+    
     call_user_func_array([$stmt, 'bind_param'], $bind_params); 
 
-    // 3. Execution (Baris 66 yang sebelum ini Fatal Error)
+    
     $stmt->execute();
     $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -85,7 +85,7 @@ $completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected
 
 
 
-// Query yang dibetulkan untuk membuang tempoh 'cooling down' 24 jam.
+
 $assetSql = "
     SELECT asset_id, item_id, asset_code
     FROM assets
@@ -97,8 +97,8 @@ $assetSql = "
 
 $assetResult = $conn->query($assetSql);
 if (!$assetResult) {
-    // Mesej ralat di sini tidak merujuk kepada table 'user' atau 'person', 
-    // jadi ia tidak memerlukan pembetulan nama jadual, hanya logging.
+    
+    
     die("Error fetching available assets: " . $conn->error);
 }
 $availableAssets = [];
@@ -112,36 +112,36 @@ function create_request_table($requests) {
         return;
     }
 
-    // 1. Kumpulkan (group) permintaan mengikut nama pengguna
+    
     $grouped_requests = [];
     foreach ($requests as $row) {
         $grouped_requests[$row['user_name']][] = $row;
     }
 
-    // 2. Buat ID unik untuk Accordion ini (supaya 4 tab tak bercampur)
+    
     $accordion_id = 'accordion_' . uniqid();
 
     echo '<div class="accordion" id="' . $accordion_id . '">';
 
-    $item_index = 0; // Untuk ID unik bagi setiap item
+    $item_index = 0; 
 
-    // 3. Loop melalui setiap group (setiap pengguna)
+    
     foreach ($grouped_requests as $user_name => $user_items) {
         
         $user_phone = $user_items[0]['user_phone']; 
-        $item_count = count($user_items); // Kira bilangan item
+        $item_count = count($user_items); 
         
-        // 4. Buat ID unik untuk header dan body accordion ini
+        
         $collapse_id = 'collapse_' . $accordion_id . '_' . $item_index;
         $header_id = 'header_' . $accordion_id . '_' . $item_index;
 
         echo '<div class="accordion-item">';
 
-        // 5. ACCORDION HEADER (Bahagian yang boleh diklik)
+        
         echo '<h2 class="accordion-header" id="' . $header_id . '">';
         echo '  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' . $collapse_id . '" aria-expanded="false" aria-controls="' . $collapse_id . '">';
         
-        // Gunakan flexbox untuk susun nama & bilangan item
+        
         echo '    <div classd-flex justify-content-between w-100 pe-3">';
         echo '      <div>';
         echo '        <strong class="fs-6">' . htmlspecialchars($user_name) . '</strong>';
@@ -155,12 +155,12 @@ function create_request_table($requests) {
         echo '  </button>';
         echo '</h2>';
         
-        // 6. ACCORDION BODY (Bahagian yang 'collapsible' - mengandungi jadual)
-        // Tambah 'show' jika nak item pertama terbuka (buang 'collapsed' dari button di atas)
+        
+        
         echo '<div id="' . $collapse_id . '" class="accordion-collapse collapse" aria-labelledby="' . $header_id . '" data-bs-parent="#' . $accordion_id . '">';
-        echo '  <div class="accordion-body p-0">'; // p-0 = padding 0, supaya table rapat ke tepi
+        echo '  <div class="accordion-body p-0">'; 
 
-        // 7. Jadual item (Sama seperti kod sebelum ini)
+        
         echo '<div class="table-responsive"><table class="table mb-0 align-middle">';
         echo '<thead><tr>';
         echo '  <th>Item / Priority</th>';
@@ -170,9 +170,9 @@ function create_request_table($requests) {
         echo '  <th class="text-center">Actions</th>';
         echo '</tr></thead><tbody>';
 
-        // 8. Loop melalui setiap item milik pengguna ini
+        
         foreach ($user_items as $row) {
-            // (Logik untuk badge status & prioriti)
+            
             $status = strtolower(trim($row['status']));
             $badgeClass = 'text-bg-light';
             if ($status == 'approved') $badgeClass = 'text-bg-primary';
@@ -187,9 +187,9 @@ function create_request_table($requests) {
             if ($priority == 1) { $priority_text = 'High Priority'; $priority_class = 'text-bg-danger'; }
             if ($priority == 2) { $priority_text = 'Moderate Priority'; $priority_class = 'text-bg-warning'; }
             
-// DALAM FUNGSI create_request_table, sekitar Baris 200
-// Pastikan anda telah menambah 'user_person_id' dalam query fetch_reservations_by_status
-// dan menggunakan 'reservation_reason' dari query
+
+
+
 echo "<tr id='row-{$row['reservation_item_id']}' 
          data-phone='" . htmlspecialchars($row['user_phone']) . "' 
          data-itemname='" . htmlspecialchars($row['item_name']) . "' 
@@ -199,7 +199,7 @@ echo "<tr id='row-{$row['reservation_item_id']}'
          data-reason='" . htmlspecialchars($row['reservation_reason']) . "' /* <<< PENTING: Tambah baris ini */
          data-qty='{$row['quantity']}'>";       
 
-		 // Papar data item
+		 
             echo "<td><strong>" . htmlspecialchars($row['item_name']) . "</strong>";
             echo "<div><span class='badge rounded-pill $priority_class' style='font-size: 0.7em;'>$priority_text</span></div>";
             echo "</td>";
@@ -209,7 +209,7 @@ echo "<tr id='row-{$row['reservation_item_id']}'
             echo "<td><span class='badge rounded-pill $badgeClass'>" . ucfirst(str_replace('_', ' ', $status)) . "</span></td>";
             echo "<td class='text-center'>";
 
-            // (Logik untuk butang - sama macam kod asal)
+            
             if ($status === 'pending') {
                 echo "<button class='btn btn-success btn-sm' title='Approve' aria-label='Approve Request' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
                 echo "<button class='btn btn-danger btn-sm' title='Reject' aria-label='Reject Request' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
@@ -223,14 +223,14 @@ echo "<tr id='row-{$row['reservation_item_id']}'
             echo "</td></tr>";
         }
 
-        echo '</tbody></table></div>'; // Tamat table
-        echo '</div></div>'; // Tamat accordion-body & accordion-collapse
-        echo '</div>'; // Tamat accordion-item
+        echo '</tbody></table></div>'; 
+        echo '</div></div>'; 
+        echo '</div>'; 
 
-        $item_index++; // Naikkan index untuk ID unik
+        $item_index++; 
     }
 
-    echo '</div>'; // Tamat accordion
+    echo '</div>'; 
 }
 ?>
 <!DOCTYPE html>
@@ -243,75 +243,140 @@ echo "<tr id='row-{$row['reservation_item_id']}'
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; }
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; justify-content: space-between; z-index: 1000;}
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e2f3b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; color: #1e293b; margin: 0; font-size: 22px; }
-        .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5, .modal-title { font-weight: 600; color: #1e293b; }
-        .table thead th { background: #f8fafc; font-weight: 600; text-transform: uppercase; font-size: 12px; color: #64748b; border: none; }
-        .table tbody td { border-bottom-color: #f1f5f9; }
-        .table tbody tr:last-child td { border-bottom: none; }
-        .info-secondary { font-size: 0.85rem; color: #64748b; }
-        .nav-tabs .nav-link { color: #475569; font-weight: 500; border: none; border-bottom: 2px solid transparent;}
-        .nav-tabs .nav-link.active { color: #3b82f6; border-bottom-color: #3b82f6; background-color: transparent;}
-        .nav-tabs { border-bottom-color: #e5e7eb; }
-        .btn { border-radius: 8px; font-weight: 500;}
-        .dataTables_wrapper .dataTables_paginate .page-item.active .page-link { background-color: #3b82f6; border-color: #3b82f6; color: white; }
-        .dataTables_wrapper .dataTables_paginate .page-link { color: #3b82f6; }
-        .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
-        .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
-        .dataTables_info { font-size: 0.9rem; color: #64748b; padding-top: 0.5rem !important; }
+<style>
+    /* --- DEFINISI WARNA TEMA (ROOT VARIABLES) --- */
+    :root {
+        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
+        --primary-light: #f0f9ff; /* Biru Sangat Muda */
+        --primary-hover: #0891b2; /* Cyan 700 */
+        --danger-color: #ef4444; /* Merah */
+        
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b; 
+        --text-muted: #64748b; 
+        --border-color: #e5e7eb;
+    }
 
-        /* --- PEMBETULAN (Performance & Accessibility) --- */
-        @media (max-width: 991.98px) {
-            .sidebar {
-                /* Guna transform (laju) dan bukannya 'left' (perlahan) */
-                transform: translateX(-100%); 
-                transition: transform 0.3s ease-in-out;
-                z-index: 1050; 
-                box-shadow: 4px 0 12px rgba(0,0,0,0.1);
-            }
-            .sidebar.toggled {
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            .topbar {
-                position: sticky;
-                top: 0;
-                z-index: 1000;
-            }
-            .sidebar-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: rgba(0, 0, 0, 0.5);
-                z-index: 1040;
-                display: none;
-            }
-            .sidebar-overlay.active {
-                display: block;
-            }
+    /* BASE & TYPOGRAPHY */
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; }
+    .card h5, .modal-title, .topbar h3 { font-weight: 600; color: var(--text-dark); }
+    
+    /* SIDEBAR */
+    .sidebar { 
+        width: 250px; position: fixed; top: 0; bottom: 0; left: 0; 
+        background: var(--card-bg); padding: 20px; 
+        border-right: 1px solid var(--border-color); 
+        display: flex; flex-direction: column; justify-content: space-between; z-index: 1000;
+    }
+    .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    
+    /* LOGO ICON (Menggunakan --primary-color) */
+    .logo-icon { 
+        width: 40px; height: 40px; 
+        background-color: var(--primary-color); /* Cyan */
+        color: white; border-radius: 8px; 
+        display: flex; align-items: center; justify-content: center; font-size: 20px; 
+    }
+    
+    .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
+    .logo-text span { font-size: 12px; color: #94a3b8; }
+    
+    .sidebar a { 
+        display: flex; align-items: center; gap: 12px; 
+        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
+        margin-bottom: 8px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease-in-out; 
+    }
+    
+    /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
+    .sidebar a.active, .sidebar a:hover { 
+        background: var(--primary-color); /* Cyan */
+        color: #fff; 
+    }
+    
+    /* LOGOUT LINK */
+    .sidebar a.logout-link { 
+        color: var(--danger-color); font-weight: 600; margin-top: auto; 
+    }
+    .sidebar a.logout-link:hover { 
+        color: #fff; 
+        background: var(--danger-color); /* Merah */
+    }
+    
+    /* MAIN CONTENT & TOPBAR */
+    .main-content { margin-left: 250px; }
+    .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+    .topbar h3 { font-weight: 600; color: var(--text-dark); margin: 0; font-size: 22px; }
+    .container-fluid { padding: 30px; }
+    
+    /* CARD & TABLE */
+    .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+    .table thead th { background: var(--bg-light-gray); font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--text-muted); border: none; }
+    .table tbody td { border-bottom-color: #f1f5f9; }
+    .table tbody tr:last-child td { border-bottom: none; }
+    .info-secondary { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* NAVIGATION TABS */
+    .nav-tabs .nav-link { color: #475569; font-weight: 500; border: none; border-bottom: 2px solid transparent;}
+    /* ACTIVE TAB (Menggunakan --primary-color) */
+    .nav-tabs .nav-link.active { 
+        color: var(--primary-color); 
+        border-bottom-color: var(--primary-color); /* Cyan */
+        background-color: transparent;
+    }
+    .nav-tabs { border-bottom-color: var(--border-color); }
+    .btn { border-radius: 8px; font-weight: 500;}
+
+    /* DATATABLES PAGINATION (Menggunakan --primary-color) */
+    .dataTables_wrapper .dataTables_paginate .page-item.active .page-link { 
+        background-color: var(--primary-color); /* Cyan */
+        border-color: var(--primary-color); /* Cyan */
+        color: white; 
+    }
+    .dataTables_wrapper .dataTables_paginate .page-link { 
+        color: var(--primary-color); /* Cyan */
+    }
+    .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
+    .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
+    .dataTables_info { font-size: 0.9rem; color: var(--text-muted); padding-top: 0.5rem !important; }
+
+    /* --- PEMBETULAN (Performance & Accessibility) --- */
+    @media (max-width: 991.98px) {
+        .sidebar {
+            transform: translateX(-100%); 
+            transition: transform 0.3s ease-in-out;
+            z-index: 1050; 
+            box-shadow: 4px 0 12px rgba(0,0,0,0.1);
         }
-        .btn.d-lg-none {
-            border: none;
+        .sidebar.toggled {
+            transform: translateX(0);
         }
-    </style>
+        .main-content {
+            margin-left: 0;
+        }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1040;
+            display: none;
+        }
+        .sidebar-overlay.active {
+            display: block;
+        }
+    }
+    .btn.d-lg-none {
+        border: none;
+    }
+</style>
 </head>
 <body>
 
@@ -722,7 +787,7 @@ function checkInItem(id) {
     const checkInModal = new bootstrap.Modal($modal[0]);
     checkInModal.show();
 
-    // 1. Dapatkan senarai aset yang sedang 'on loan'
+    
     $.ajax({
         url: 'checkout_action.php',
         method: 'GET',
@@ -737,7 +802,7 @@ function checkInItem(id) {
                 return;
             }
 
-            // 2. Bina form check-in secara dinamik
+            
             let html = `<p>Please set the condition for each returned asset (${assets.length} unit(s)).</p>`;
             html += `<form id="checkInForm">`;
             html += `<input type="hidden" id="checkin_reservation_item_id" value="${id}">`; 
@@ -790,12 +855,12 @@ function checkInItem(id) {
 }
 
 
-// =========================================================================================
-// 5. DOCUMENT READY (Event Listeners Global)
-// =========================================================================================
+
+
+
 
 $(document).ready(function() {
-    // --- SIDEBAR TOGGLE LOGIC --- (Anda boleh semak bahagian ini dalam kod asal anda)
+    
     const $sidebar = $('.sidebar');
     const $overlay = $('#sidebarOverlay');
     const $focusableElements = $sidebar.find('a, button');
@@ -833,9 +898,9 @@ $(document).ready(function() {
         }
     });
     
-    // --- MODAL & CHECK-IN LOGIC ---
     
-    // Logik untuk memaparkan kotak Remarks berdasarkan kondisi Check-In
+    
+    
     $('#checkInModalBody').on('change', 'input[type="radio"]', function() {
         const $card = $(this).closest('.checkin-asset-card');
         const $remarksContainer = $card.find('.remarks-container');
@@ -856,13 +921,13 @@ $(document).ready(function() {
             $remarksLabel.text('Remarks (Optional - e.g., Reason left behind):'); 
             $remarksContainer.slideDown(); 
             
-        } else { // 'Good'
+        } else { 
             $remarksLabel.text('Remarks (Optional):'); 
             $remarksContainer.slideUp();
         }
     });
     
-    // Tindakan AJAX Check-In Multi
+    
     $('#confirmCheckInBtn').on('click', function() {
         const reservation_item_id = $('#checkin_reservation_item_id').val();
         let asset_conditions = [];

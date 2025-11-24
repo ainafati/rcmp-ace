@@ -3,14 +3,14 @@
 session_start();
 include '../config.php';
 
-// 1. Authentication and User Setup
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 $person_id = (int)$_SESSION['person_id'];
 
-// Ambil nama technician (menggunakan jadual person)
+
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
 $stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
@@ -41,21 +41,21 @@ function get_reservation_item_count($conn, $status) {
     return $result ? (int) $result['count'] : 0;
 }
 
-// Get pending count for the "Manage Requests" badge
+
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
 
-// Get all categories for the filter dropdown
+
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
 
-// 2. Filter & Pagination Setup
-// Set default dates to the current month if not submitted via POST
+
+
 $start_date = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-01');
 $end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-t');
 $category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
 
-// Set month/year dropdowns to match the currently filtered date range
+
 $current_month = date('m', strtotime($start_date));
 $current_year = date('Y', strtotime($start_date));
 
@@ -64,12 +64,12 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $start = ($page - 1) * $limit;
 
 
-// 3. SQL Query Construction (using Prepared Statements)
+
 
 $sql_base_select = "SELECT
                 u.name AS user_name, i.item_name, a.asset_code, c.category_name,
                 ri.reserve_date, ri.return_date, ri.return_condition,
-                approver.name AS technician_name"; // Alias for Approver/Technician Name
+                approver.name AS technician_name"; 
                 
 $sql_base_from = " FROM reservation_items ri
                 JOIN reservations r ON ri.reserve_id = r.reserve_id
@@ -82,7 +82,7 @@ $sql_base_from = " FROM reservation_items ri
                 LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
                 LEFT JOIN assets a ON ra.asset_id = a.asset_id";
 				
-// Mandatory WHERE clauses for Returned status and Date Range
+
 $sql_where_clauses = [
     "ri.status = 'Returned'",
     "ri.return_date BETWEEN ? AND ?"
@@ -90,7 +90,7 @@ $sql_where_clauses = [
 $param_types = "ss";
 $param_values = [$start_date, $end_date];
 
-// Add Category filter if selected
+
 if ($category_filter_id > 0) {
     $sql_where_clauses[] = "i.category_id = ?";
     $param_types .= "i";
@@ -100,19 +100,19 @@ if ($category_filter_id > 0) {
 $sql_where = " WHERE " . implode(' AND ', $sql_where_clauses);
 
 
-// 4. Count Total Records (for Pagination)
+
 
 $sql_count = "SELECT COUNT(ri.id) AS total" . $sql_base_from . $sql_where;
 $stmt_count = $conn->prepare($sql_count);
 if ($stmt_count === false) { die("SQL Error (Count): " . htmlspecialchars($conn->error)); }
 
-// Bind parameters dynamically for the count query
+
 $bind_params_count = [];
 $bind_params_count[] = &$param_types;
 for ($i = 0; $i < count($param_values); $i++) {
     $bind_params_count[] = &$param_values[$i];
 }
-// Use call_user_func_array for dynamic bind_param calls
+
 call_user_func_array([$stmt_count, 'bind_param'], $bind_params_count);
 
 $stmt_count->execute();
@@ -122,7 +122,7 @@ $total_pages = ceil($total_records / $limit);
 $stmt_count->close();
 
 
-// 5. Fetch Paginated Records
+
 
 $sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY ri.return_date DESC, a.asset_code ASC LIMIT ?, ?";
 $param_types .= "ii";
@@ -132,7 +132,7 @@ $param_values[] = $limit;
 $stmt = $conn->prepare($sql);
 if ($stmt === false) { die("SQL Error (Fetch): " . htmlspecialchars($conn->error)); }
 
-// Bind parameters dynamically for the main query (including LIMIT/OFFSET)
+
 $bind_params = [];
 $bind_params[] = &$param_types;
 for ($i = 0; $i < count($param_values); $i++) {
@@ -147,7 +147,7 @@ $stmt->close();
 
 $conn->close();
 
-// Prepare URL parameters for pagination links
+
 $pagination_params = http_build_query([
     'start_date' => $start_date,
     'end_date' => $end_date,
@@ -165,87 +165,126 @@ $pagination_params = http_build_query([
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* 1. FONT & BODY BACKGROUND */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; }
-
-        /* 2. SIDEBAR (Desktop Default: Fixed di Kiri) */
-        .sidebar { 
-            width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; 
-            z-index: 1050; /* FIX Z-INDEX for Mobile */
-            display: flex; flex-direction: column; justify-content: space-between; 
-            transition: transform 0.3s ease-in-out; 
-        }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
+<style>
+    /* --- DEFINISI WARNA TEMA (ROOT VARIABLES) --- */
+    :root {
+        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
+        --primary-hover: #0891b2; /* Cyan 700 (Warna Hover/Gelap) */
+        --danger-color: #ef4444; /* Merah */
         
-		/* 5. SIDEBAR BADGE STYLE */
-        .sidebar a .badge {
-            margin-left: auto; /* Push badge to the right */
-            font-size: 0.75rem;
-            padding: 0.4em 0.6em;
-            font-weight: 700;
-            border-radius: 10px;
-            background-color: #ef4444; 
-            color: white;
-        }
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b; 
+        --text-muted: #64748b; 
+        --border-color: #e5e7eb;
+    }
 
-        /* Badge color inversion on hover/active */
-        .sidebar a.active .badge, .sidebar a:hover .badge {
-            background-color: #ffffff;
-            color: #ef4444; 
-        }
+    /* 1. FONT & BODY BACKGROUND */
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
 
-        /* 3. MAIN LAYOUT & TOPBAR */
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
-        .topbar { 
-            background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; 
-            position: sticky; top: 0; z-index: 990; 
-        }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
-        .topbar .technician-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .tech-name { font-weight: 600; font-size: 15px; color: #334155; }
-		.container-fluid { padding: 30px; }
+    /* 2. SIDEBAR (Desktop Default: Fixed di Kiri) */
+    .sidebar { 
+        width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: var(--card-bg); padding: 20px; border-right: 1px solid var(--border-color); 
+        z-index: 1050; 
+        display: flex; flex-direction: column; justify-content: space-between; 
+        transition: transform 0.3s ease-in-out; 
+    }
+    .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    
+    /* LOGO ICON (Menggunakan --primary-color) */
+    .logo-icon { 
+        width: 40px; height: 40px; 
+        background-color: var(--primary-color); /* Cyan */
+        color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; 
+    }
+    
+    .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
+    .logo-text span { font-size: 12px; color: #94a3b8; }
+    
+    .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
+    
+    /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
+    .sidebar a.active, .sidebar a:hover { 
+        background: var(--primary-color); /* Cyan */
+        color: #fff; 
+    }
+    
+    /* LOGOUT LINK */
+    .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: auto; }
+    .sidebar a.logout-link:hover { color: #fff; background: var(--danger-color); }
+    
+    /* 5. SIDEBAR BADGE STYLE */
+    .sidebar a .badge {
+        margin-left: auto; 
+        font-size: 0.75rem;
+        padding: 0.4em 0.6em;
+        font-weight: 700;
+        border-radius: 10px;
+        background-color: var(--danger-color); 
+        color: white;
+    }
 
-        /* 4. CARD & TABLE STYLING */
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: #1e293b; }
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-        .table tbody td { border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-        .table tbody tr:last-child td { border-bottom: none; }
+    /* Badge color inversion on hover/active */
+    .sidebar a.active .badge, .sidebar a:hover .badge {
+        background-color: #ffffff;
+        color: var(--danger-color); 
+    }
+
+    /* 3. MAIN LAYOUT & TOPBAR */
+    .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
+    .topbar { 
+        background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); 
+        position: sticky; top: 0; z-index: 990; 
+    }
+    .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
+    .topbar .technician-profile { display: flex; align-items: center; gap: 12px; }
+    .topbar .tech-name { font-weight: 600; font-size: 15px; color: #334155; }
+    .container-fluid { padding: 30px; }
+
+    /* 4. CARD & TABLE STYLING */
+    .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+    .card h5 { font-weight: 600; color: var(--text-dark); }
+    .table thead th { background: var(--bg-light-gray); color: var(--text-muted); border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+    .table tbody td { border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .table tbody tr:last-child td { border-bottom: none; }
+    
+    /* BUTTONS - Tiada btn-primary di sini, tetapi saya sediakan gaya jika anda tambahkannya */
+    .btn-primary { 
+        background-color: var(--primary-color); 
+        border: none; 
+    }
+    .btn-primary:hover { 
+        background-color: var(--primary-hover); 
+    }
+
+    /* PAGINATION */
+    .pagination-container { display: flex; justify-content: flex-end; align-items: center; margin-top: 15px;}
+    .page-link { border-radius: 8px !important; margin: 0 2px; }
+
+    /* KOD TAMBAHAN UNTUK MOBILE VIEW */
+    @media (max-width: 991.98px) {
+        /* Sidebar Off-Canvas Logic */
+        .sidebar { transform: translateX(-100%); }
+        .offcanvas-open .sidebar { transform: translateX(0); }
+        .main-content { margin-left: 0; padding-top: 80px; }
+        .topbar { position: fixed; width: 100%; left: 0; padding: 15px; }
+        .topbar h3 { font-size: 1.2rem; }
+        .container-fluid { padding: 15px; }
+        .d-lg-none { display: inline-block !important; }
         
-        /* 5. MOBILE OPTIMIZATIONS */
-        @media (max-width: 991.98px) {
-            /* Sidebar Off-Canvas Logic */
-            .sidebar { transform: translateX(-100%); }
-            .offcanvas-open .sidebar { transform: translateX(0); }
-            .main-content { margin-left: 0; padding-top: 80px; /* Space for fixed topbar */ }
-            .topbar { position: fixed; width: 100%; left: 0; padding: 15px; }
-            .topbar h3 { font-size: 1.2rem; }
-            .container-fluid { padding: 15px; }
-            .d-lg-none { display: inline-block !important; }
-            
-            /* Table optimization for small screens */
-            .table-responsive { border: 1px solid #e2e8f0; border-radius: 12px; }
-            .table-responsive > .table { margin-bottom: 0; }
-            
-            /* Backdrop for Off-Canvas effect */
-            .offcanvas-backdrop {
-                position: fixed; top: 0; left: 0; z-index: 1040; width: 100vw; height: 100vh;
-                background-color: #000; opacity: 0.5; transition: opacity 0.3s ease-in-out;
-                display: none; 
-            }
-            .offcanvas-open .offcanvas-backdrop { display: block; }
+        /* Table optimization for small screens */
+        .table-responsive { border: 1px solid #e2e8f0; border-radius: 12px; }
+        .table-responsive > .table { margin-bottom: 0; }
+        
+        /* Backdrop for Off-Canvas effect */
+        .offcanvas-backdrop {
+            position: fixed; top: 0; left: 0; z-index: 1040; width: 100vw; height: 100vh;
+            background-color: #000; opacity: 0.5; transition: opacity 0.3s ease-in-out;
+            display: none; 
         }
-        .pagination-container { display: flex; justify-content: flex-end; align-items: center; margin-top: 15px;}
-        .page-link { border-radius: 8px !important; margin: 0 2px; }
-    </style>
+        .offcanvas-open .offcanvas-backdrop { display: block; }
+    }
+</style>
 </head>
 <body>
 
@@ -300,7 +339,7 @@ $pagination_params = http_build_query([
                             <?php for ($m = 1; $m <= 12; $m++) {
                                 $month_name = date('F', mktime(0, 0, 0, $m, 1));
                                 $selected = ($m == $current_month) ? 'selected' : '';
-                                // Use value with leading zero for month
+                                
                                 echo "<option value='" . str_pad($m, 2, '0', STR_PAD_LEFT) . "' $selected>$month_name</option>";
                             } ?>
                         </select>
@@ -422,7 +461,7 @@ $pagination_params = http_build_query([
 
                         <?php 
                         
-                        // Smart pagination link generation
+                        
                         $start_page = max(1, $page - 2);
                         $end_page = min($total_pages, $page + 2);
 
@@ -461,18 +500,18 @@ $pagination_params = http_build_query([
     const startDateHidden = document.getElementById('start_date_hidden');
     const endDateHidden = document.getElementById('end_date_hidden');
 
-    // Initialize Flatpickr for visual date inputs
+    
     flatpickr(startDateDisplay, { 
         dateFormat: "Y-m-d",
         onChange: function(selectedDates, dateStr) {
-            startDateHidden.value = dateStr; // Keep hidden field in sync
+            startDateHidden.value = dateStr; 
         }
     });
     
     flatpickr(endDateDisplay, { 
         dateFormat: "Y-m-d",
         onChange: function(selectedDates, dateStr) {
-            endDateHidden.value = dateStr; // Keep hidden field in sync
+            endDateHidden.value = dateStr; 
         }
     });
 
@@ -481,7 +520,7 @@ $pagination_params = http_build_query([
     const reportForm = document.getElementById('reportForm');
     const categoryFilter = document.getElementById('category_filter');
 
-    // --- Sidebar Toggle Logic (Excellent implementation) ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -506,37 +545,37 @@ $pagination_params = http_build_query([
         backdrop.addEventListener('click', toggleSidebar);
     }
     
-    // --- Date Synchronization Logic ---
+    
     function updateDateInputs() {
         if (!yearSelect || !monthSelect || !startDateHidden || !endDateHidden) return; 
 
         const year = yearSelect.value;
         const month = monthSelect.value;
         
-        // Calculate the last day of the selected month
-        // '0' means the last day of the previous month, so month + 1 is used
+        
+        
         const lastDay = new Date(year, month, 0).getDate(); 
         
         const startDate = `${year}-${month}-01`;
         const endDate = `${year}-${month}-${lastDay}`;
 
-        // Update the visible date pickers and hidden fields
-        startDateDisplay._flatpickr.setDate(startDate, true); // Update Flatpickr instance
-        endDateDisplay._flatpickr.setDate(endDate, true);     // Update Flatpickr instance
         
-        // Ensure hidden fields are also updated by manually triggering the onChange logic
+        startDateDisplay._flatpickr.setDate(startDate, true); 
+        endDateDisplay._flatpickr.setDate(endDate, true);     
+        
+        
         startDateHidden.value = startDate;
         endDateHidden.value = endDate;
     }
 
     function handleFilterChange(event) {
         
-        // If the change came from month or year dropdowns, update the date inputs first
+        
         if (event.target === monthSelect || event.target === yearSelect) {
             updateDateInputs();
         }
 
-        // Auto-submit the form if month, year, or category is changed
+        
         if (event.target === monthSelect || event.target === yearSelect || event.target === categoryFilter) {
             reportForm.submit();
         } 

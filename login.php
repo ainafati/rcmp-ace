@@ -2,12 +2,12 @@
 session_start();
 include 'config.php';
 
-// SEMAKAN SESI DIBETULKAN: Menggunakan $_SESSION['person_id'] dan $_SESSION['logged_in_role']
+
 
 if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     $role = $_SESSION['logged_in_role'];
     
-    // Alihkan berdasarkan peranan yang sedang digunakan
+    
     switch ($role) {
         case 'Admin':
             header("Location: admin/manageItem_admin.php");
@@ -21,7 +21,7 @@ if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     }
 }
 
-// Logik untuk mengisi semula borang jika log masuk gagal
+
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 

@@ -308,22 +308,22 @@ if (isset($_GET['email'])) {
         }
 
 
-        // Event listener for Resend Button
+        
         resendOtpButton.addEventListener('click', resendOtp);
 
-        // Form Submission (Reset Password)
+        
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
 
             const newPassword = newPasswordInput.value;
             const confirmPassword = confirmPasswordInput.value;
             
-            // Client-side validation
+            
             if (newPassword !== confirmPassword) {
                 displayMessage(false, "New password and confirmation do not match.");
                 return;
             }
-            // Validasi minlength 8
+            
             if (newPassword.length < 8) { 
                 displayMessage(false, "Password must be at least 8 characters long (including upper/lower case, number, and symbol).");
                 return;
@@ -333,7 +333,7 @@ if (isset($_GET['email'])) {
                 return;
             }
 
-            // Disable buttons during processing
+            
             resetButton.disabled = true;
             resendOtpButton.disabled = true;
             resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...`;
@@ -369,7 +369,6 @@ if (isset($_GET['email'])) {
             } catch (error) {
                 displayMessage(false, `System Error: Failed to connect to server/API. (${error.message})`);
             } finally {
-                // Restore buttons HANYA jika TIDAK mengalih keluar
                 if (!isRedirecting) {
                     resetButton.disabled = false; 
                     resetButton.textContent = originalResetButtonText;

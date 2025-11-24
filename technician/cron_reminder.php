@@ -1,30 +1,30 @@
 <?php
-// =================================================================
-// 🚨 BAHAGIAN 1: KONFIGURASI DAN LALUAN MUTLAK (WAJIB UNTUK CRON JOB)
-// =================================================================
 
-// 1. TENTUKAN LALUAN ROOT MUTLAK. 
-// Menggunakan double backslash (\) untuk Windows
+
+
+
+
+
 define('ROOT_DIR', 'C:\\xampp\\htdocs\\UniKL ACE\\'); 
 
-// 2. Fail config.php (Kini berada di luar folder 'technician')
-// Laluan: C:\xampp\htdocs\UniKL ACE\config.php
+
+
 require ROOT_DIR . 'config.php'; 
 
-// Konfigurasi SMTP (config_email.php berada di dalam 'technician')
+
 require ROOT_DIR . 'technician/config_email.php'; 
 
-// Memasukkan fail PHPMailer (PHPMailer-master berada di root 'UniKL ACE')
+
 require ROOT_DIR . 'PHPMailer-master/src/Exception.php';
 require ROOT_DIR . 'PHPMailer-master/src/PHPMailer.php';
 require ROOT_DIR . 'PHPMailer-master/src/SMTP.php';
 
-// ... (Sambungan kod yang lain)
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// Semak sambungan DB (jika config.php gagal, skrip akan berhenti di sana)
+
 if ($conn->connect_error) {
     error_log("CRON JOB FAILED: Database connection failed: " . $conn->connect_error);
     echo "CRON JOB FAILED: Database connection error.\n";
@@ -32,9 +32,9 @@ if ($conn->connect_error) {
 }
 
 
-// ----------------------------------------------------------------------------------
-// 2. FUNGSI PANGGILAN DATABASE
-// ----------------------------------------------------------------------------------
+
+
+
 
 function get_return_items_due($conn, $days_offset) {
     $target_date_sql = $days_offset == 0 ? "CURDATE()" : "DATE_ADD(CURDATE(), INTERVAL $days_offset DAY)";
@@ -69,15 +69,15 @@ function get_overdue_items($conn) {
 }
 
 
-// ----------------------------------------------------------------------------------
-// 3. FUNGSI HANTAR E-MEL
-// ----------------------------------------------------------------------------------
+
+
+
 
 function send_email_notification($recipient_email, $recipient_name, $items, $is_today, $is_overdue = false) {
     $mail = new PHPMailer(true);
     try {
         
-        // --- KONFIGURASI SMTP DARI config_email.php ---
+        
         $mail->isSMTP();
         $mail->Host      = SMTP_HOST;
         $mail->SMTPAuth  = true;
@@ -85,14 +85,14 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
         $mail->Username  = SMTP_USER;
         $mail->Password  = SMTP_PASS;
         
-        // Tetapan SMTP_SECURE dan SMTP_PORT
+        
         if (SMTP_SECURE == 'tls') {
              $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         } elseif (SMTP_SECURE == 'ssl') {
              $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
         }
         $mail->Port      = SMTP_PORT;
-        // ----------------------------------------------
+        
         
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
         $mail->addAddress($recipient_email, $recipient_name);
@@ -140,18 +140,18 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
         return true;
         
     } catch (Exception $e) {
-        // Log ralat SMTP ke fail log PHP
+        
         error_log("Failed to send email to $recipient_email. Mailer Error: {$mail->ErrorInfo}");
         return false;
     }
 }
 
 
-// ----------------------------------------------------------------------------------
-// 4. LOGIK UTAMA SCRIPT (PENGHANTARAN)
-// ----------------------------------------------------------------------------------
 
-// 4.1. Item Due Today
+
+
+
+
 $today_items = get_return_items_due($conn, 0);
 if (!empty($today_items)) {
     $users_due_today = [];
@@ -165,7 +165,7 @@ if (!empty($today_items)) {
 }
 
 
-// 4.2. Item Due Tomorrow
+
 $tomorrow_items = get_return_items_due($conn, 1);
 if (!empty($tomorrow_items)) {
     $users_due_tomorrow = [];
@@ -179,7 +179,7 @@ if (!empty($tomorrow_items)) {
 }
 
 
-// 4.3. Item Overdue
+
 $overdue_items = get_overdue_items($conn);
 if (!empty($overdue_items)) {
     $users_overdue = [];
@@ -193,10 +193,10 @@ if (!empty($overdue_items)) {
 }
 
 
-// Gantikan baris echo terakhir dengan ini:
+
 echo "Script Reminder Complete. Found " . count($today_items) . " item(s) due today, " . count($tomorrow_items) . " item(s) due tomorrow, and " . count($overdue_items) . " item(s) overdue.\n";
 
-// TAMBAH INI UNTUK DEBUGGING
+
 if (count($overdue_items) > 0) {
     echo "ATTEMPTING TO SEND EMAIL TO: " . $overdue_items[0]['user_email'] . "\n";
 }

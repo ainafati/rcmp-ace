@@ -1,15 +1,15 @@
 <?php
 session_start();
-include 'config.php';
+include '../config.php';
 
-// Pastikan sambungan DB berjaya
+
 if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// ******************************************************
-// 1. PERLINDUNGAN SESI & PENGAMBILAN NAMA PENGGUNA (Person)
-// ******************************************************
+
+
+
 $allowed_role = 'Admin';
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_role) {
     header("Location: login.php");
@@ -18,12 +18,12 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_r
 
 $person_id = (int)$_SESSION['person_id'];
 
-// Ambil nama Admin/Pengguna yang sedang log masuk dari Sesi
+
 $admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
 
-// ******************************************************
-// 2. PERTANYAAN SQL YANG DIBETULKAN (Menggunakan p.id AS id)
-// ******************************************************
+
+
+
 $sql = "
     SELECT
         p.person_id AS person_unique_id,
@@ -268,7 +268,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 
                 <div class="mb-3"><label class="form-label">Staff ID</label>
                     <input type="text" name="id" class="form-control" required         pattern="\d{12}"
-                            title="Enter 12 digits IC number without dash (-)"
+                            title="Enter staff ID correctly"
                             placeholder="e.g., 990101105000">
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
@@ -365,7 +365,7 @@ function editUser(person_unique_id, name, email, id, phone, roles_list, status, 
     document.getElementById('editPersonId').value = person_unique_id;
     document.getElementById('editName').value = name;
     document.getElementById('editEmail').value = email;
-    document.getElementById('editId').value = id; // Menggunakan 'id'
+    document.getElementById('editId').value = id; 
     document.getElementById('editPhone').value = phone;
     document.getElementById('editRole').value = roles_list.trim(); 
     document.getElementById('editStatus').value = status.trim();

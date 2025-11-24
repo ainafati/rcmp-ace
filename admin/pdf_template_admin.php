@@ -82,10 +82,10 @@
 <body>
     
 <div class="header">
-    <!-- LOGO KEKAL DI SINI (SEBELUM TAJUK) -->
+    
 <img src="../assets/img/Logo-UniKL-PCM.png" alt="UniKL Logo">
     <h1>EQUIPMENT RETURN REPORT</h1>
-    <!-- DESCRIPTION KEKAL DI SINI -->
+    
     <p>Report for the period: <strong>{{start_date}}</strong> to <strong>{{end_date}}</strong></p>
 </div>
 

@@ -1,6 +1,6 @@
 <?php
 session_start();
-// Pastikan laluan config.php adalah betul
+
 include 'config.php'; 
 
 if (!$conn) {
@@ -8,43 +8,43 @@ if (!$conn) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // ----------------------------------------------------
-    // 1. Ambil dan Bersihkan Input (MENGGUNAKAN MEDAN 'ID')
-    // ----------------------------------------------------
+    
+    
+    
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password']; 
     $phoneNum = trim($_POST['phoneNum']);
     
-    // Ambil ID tunggal
+    
     $personId = empty(trim($_POST['person_id'])) ? NULL : trim($_POST['person_id']);
     
-    $user_role_id = 1; // ID untuk 'User'
+    $user_role_id = 1; 
     $status = 'Active'; 
 
-    // ----------------------------------------------------
-    // 2. Pengesahan ID (ID tunggal adalah wajib)
-    // ----------------------------------------------------
+    
+    
+    
     if (empty($personId)) {
         $_SESSION['error'] = "You must provide a <strong>Student ID</strong> or <strong>Staff ID</strong> to register.";
         header("Location: signUp.php");
         exit();
     }
     
-    // ----------------------------------------------------
-    // 3. Pengesahan E-mel & Kata Laluan (Dikekalkan)
-    // ----------------------------------------------------
+    
+    
+    
 	
-	// !!! PERLU TAMBAHKAN KOD INI SEMULA DI SINI !!!
+	
     $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@gmail.com'];
     $lower_email = strtolower($email);
     $is_valid_domain = false;
 	
-// Baris 42: Gantikan str_ends_with() dengan substr()
+
     foreach ($allowed_domains as $domain) {
-        // Logik penggantian str_ends_with(): 
-        // Bandingkan substring dari hujung $lower_email yang panjangnya sama dengan $domain
+        
+        
         $domain_length = strlen($domain);
         if (substr($lower_email, -$domain_length) === $domain) {
              $is_valid_domain = true;
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: signUp.php");
         exit();
     }
-    // ... (Pengesahan kerumitan kata laluan dikekalkan) ...
+    
     $uppercase = preg_match('@[A-Z]@', $password);
     $lowercase = preg_match('@[a-z]@', $password);
     $number    = preg_match('@[0-9]@', $password);
@@ -72,9 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // ----------------------------------------------------
-    // 4. Semak Duplikasi E-mel & ID (Dikemas kini)
-    // ----------------------------------------------------
+    
+    
+    
     $sql_check = "
         SELECT p.id, p.email, r.role_name
         FROM person p
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
     
-    // Ikat E-mel dan ID
+    
     $stmt->bind_param("ss", $email, $personId);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -116,15 +116,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     $stmt->close();
     
-    // ----------------------------------------------------
-    // 5. DAFTAR PENGGUNA BAHARU (TRANSACTION)
-    // ----------------------------------------------------
+    
+    
+    
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
     
     $conn->begin_transaction(); 
 
     try {
-        // A. INSERT ke dalam inventory_person (DENGAN MEDAN 'id' tunggal)
+        
         $sql_person = "INSERT INTO person (name, email, password, phoneNum, status, id) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt_person = $conn->prepare($sql_person);
         
@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             throw new Exception("Prepare INSERT Person failed: " . $conn->error);
         }
         
-        // name, email, hashed_password, phoneNum, status, personId
+        
         $stmt_person->bind_param("ssssss", $name, $email, $hashed_password, $phoneNum, $status, $personId);
 
         if (!$stmt_person->execute()) {
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $new_person_id = $conn->insert_id;
         $stmt_person->close();
         
-        // B. INSERT ke dalam inventory_person_roles (Peranan 'User' = 1)
+        
         $sql_role = "INSERT INTO person_roles (person_id, role_id) VALUES (?, ?)";
         $stmt_role = $conn->prepare($sql_role);
         
@@ -157,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $stmt_role->close();
 
-        // Commit transaksi
+        
         $conn->commit();
 
         $_SESSION['success'] = "Account created successfully. Please log in.";
@@ -452,7 +452,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     const personIdInput = document.getElementById('person_id');
     
-    // ... (Password requirements dikekalkan) ...
+    
     const reqs = {
         length: { el: document.getElementById('length'), valid: false, regex: /.{8,}/ },
         lowercase: { el: document.getElementById('lowercase'), valid: false, regex: /[a-z]/ },
@@ -501,7 +501,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         const form = document.getElementById('signupForm');
         
-        // Cek semua 'required' fields yang lain
+        
         const isFormFilled = form.checkValidity();
 
         if (isPasswordStrong && doPasswordsMatch && isFormFilled) {
@@ -517,7 +517,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     document.getElementById('name').addEventListener('input', checkFormValidity);
     document.getElementById('email').addEventListener('input', checkFormValidity);
     document.getElementById('phoneNum').addEventListener('input', checkFormValidity);
-    personIdInput.addEventListener('input', checkFormValidity); // Listener untuk medan ID tunggal
+    personIdInput.addEventListener('input', checkFormValidity); 
     
     
     document.addEventListener('DOMContentLoaded', checkFormValidity);

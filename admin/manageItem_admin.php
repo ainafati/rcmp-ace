@@ -3,17 +3,17 @@ session_start();
 include '../config.php'; 
 include_once '../logger.php'; 
 
-$allowed_role = 'Admin'; // Peranan yang disimpan dalam sesi adalah 'Admin'
+$allowed_role = 'Admin'; 
 
 if (!isset($_SESSION['person_id']) || !isset($_SESSION['logged_in_role']) || $_SESSION['logged_in_role'] !== $allowed_role) {
-    // Alihkan ke halaman log masuk
+    
     header("Location: ../login.php");
     exit();
 }
 
-// Guna person_id daripada sesi yang disahkan
+
 $person_id_session = (int)$_SESSION['person_id']; 
-$admin_data = ['name' => 'Admin']; // Fallback
+$admin_data = ['name' => 'Admin']; 
 $stmt_admin = $conn->prepare("
     SELECT name 
     FROM person 
@@ -21,7 +21,7 @@ $stmt_admin = $conn->prepare("
 ");
 
 if (!$stmt_admin) {
-    // Sekiranya ada ralat, matikan skrip
+    
     die("Database Error in Admin fetch: " . $conn->error);
 }
 
@@ -34,13 +34,13 @@ if ($data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-// Pembolehubah untuk logging
+
 $admin_id_for_log = $person_id_session;
-$admin_name_for_log = $admin_data['name']; // Guna nama yang sah
+$admin_name_for_log = $admin_data['name']; 
 
 function safe_unlink($filepath) {
     if ($filepath && file_exists($filepath) && is_file($filepath)) {
-        @unlink($filepath); // @ untuk menyembunyikan amaran jika gagal
+        @unlink($filepath); 
     }
 }
 
@@ -59,13 +59,13 @@ if ($data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
-// Pembolehubah untuk logging
-$admin_id_for_log = $person_id_session;
-$admin_name_for_log = $admin_data['name']; // Guna nama yang sah
 
-// --------------------------------------------------------------------------
-// LOGIK POST REQUEST (Add/Edit/Delete Kategori) - Menggunakan Jadual: categories
-// --------------------------------------------------------------------------
+$admin_id_for_log = $person_id_session;
+$admin_name_for_log = $admin_data['name']; 
+
+
+
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
@@ -87,7 +87,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     if ($stmt->execute()) {
         $new_cat_id = $stmt->insert_id;
         
-        // Log Aktiviti
+        
         $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
         log_activity($conn, 'admin', $admin_id_for_log, 'ADD_CATEGORY', $log_details);
         
@@ -123,7 +123,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
             $stmt = $conn->prepare("UPDATE categories SET category_name = ?, image_url = ? WHERE category_id = ?");
             $stmt->bind_param("ssi", $category_name, $db_path, $category_id);
         } else {
-            // Jika upload gagal, hanya kemas kini nama sahaja
+            
             $stmt = $conn->prepare("UPDATE categories SET category_name = ? WHERE category_id = ?");
             $stmt->bind_param("si", $category_name, $category_id);
         }
@@ -135,7 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     if (isset($stmt)) {
         if ($stmt->execute()) {
             
-            // Log Aktiviti
+            
             $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
             log_activity($conn, 'admin', $admin_id_for_log, 'EDIT_CATEGORY', $log_details);
             
@@ -168,7 +168,7 @@ if (isset($_GET['delete_category_id'])) {
     
     if ($stmt->execute()) {
         
-        // Log Aktiviti
+        
         $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
         log_activity($conn, 'admin', $admin_id_for_log, 'DELETE_CATEGORY', $log_details);
         
@@ -181,9 +181,9 @@ if (isset($_GET['delete_category_id'])) {
     exit();
 }
 
-// --------------------------------------------------------------------------
-// LOGIK POST REQUEST (Add/Edit/Delete Item) - Menggunakan Jadual: item, assets, reservation_assets
-// --------------------------------------------------------------------------
+
+
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     $item_name = trim($_POST['item_name']);
@@ -235,7 +235,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         
         $conn->commit(); 
 
-        // Log Aktiviti
+        
         $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
         log_activity($conn, 'admin', $admin_id_for_log, 'ADD_ITEM_WITH_UNITS', $log_details);
 
@@ -302,7 +302,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
         $conn->commit();
 
-        // Log Aktiviti
+        
         $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
         log_activity($conn, 'admin', $admin_id_for_log, 'EDIT_ITEM_WITH_UNITS', $log_details);
 
@@ -331,7 +331,7 @@ if (isset($_GET['delete_item_id'])) {
 
     $conn->begin_transaction();
     try {
-        // Hapus rekod reservation_assets yang merujuk kepada unit aset ini
+        
         $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
         $asset_ids = [];
         while ($row = $assets_to_delete_res->fetch_assoc()) { 
@@ -340,14 +340,14 @@ if (isset($_GET['delete_item_id'])) {
         
         if (!empty($asset_ids)) {
             $asset_id_list = implode(',', $asset_ids);
-            // Delete dari reservation_assets terlebih dahulu kerana kekangan kunci asing (Foreign Key Constraint)
+            
             $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
         }
         
-        // Hapus unit aset fizikal
+        
         $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
         
-        // Hapus item type utama
+        
         $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
         $stmt->bind_param("i", $delete_id);
         $stmt->execute();
@@ -356,7 +356,7 @@ if (isset($_GET['delete_item_id'])) {
         $conn->commit(); 
 
 
-        // Log Aktiviti
+        
         $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
         log_activity($conn, 'admin', $admin_id_for_log, 'DELETE_ITEM_TYPE', $log_details);
 
@@ -372,9 +372,9 @@ if (isset($_GET['delete_item_id'])) {
     exit();
 }
 
-// --------------------------------------------------------------------------
-// FETCH DATA FOR DISPLAY
-// --------------------------------------------------------------------------
+
+
+
 
 $categories = $conn->query("SELECT * FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
 

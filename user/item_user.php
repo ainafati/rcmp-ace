@@ -1,7 +1,5 @@
 <?php
-// ====================================================================
-// BAHAGIAN 1: PHP INITIALIZATION DAN DATA FETCHING
-// ====================================================================
+
 session_start();
 include '../config.php'; 
 
@@ -9,16 +7,13 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// 1. Semak Sesi Pengguna
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php"); 
     exit();
 }
 
-// Gunakan person_id untuk semua query
 $person_id = (int) $_SESSION['person_id'];
 
-// 2. Dapatkan Butiran Pengguna (Kekal sama)
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("Error preparing statement: " . $conn->error);
@@ -35,9 +30,12 @@ if (!$user) {
     exit();
 }
 
-// 3. Dapatkan Kategori (Kekal sama)
+
+// =======================================================
+// PHP: 1. Mengambil Kategori untuk Filter Pill (Diperlukan)
+// =======================================================
 $categories = [];
-$res_cat = $conn->query("SELECT * FROM categories ORDER BY category_name");
+$res_cat = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name");
 if ($res_cat) {
     while ($row = $res_cat->fetch_assoc()) {
         $categories[] = $row;
@@ -45,11 +43,14 @@ if ($res_cat) {
     $res_cat->free(); 
 }
 
-// 4. Dapatkan Semua Item untuk Dropdown (Kekal sama)
+
+// =======================================================
+// PHP: 2. Mengambil Item untuk Dropdown (Diperlukan)
+// =======================================================
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
-        i.item_id, i.item_name, c.category_name, i.category_id
+        i.item_id, i.item_name, c.category_name, i.category_id, i.image_url 
     FROM item i
     JOIN categories c ON i.category_id = c.category_id
     ORDER BY c.category_name, i.item_name ASC
@@ -62,7 +63,32 @@ if ($res_items) {
     $res_items->free(); 
 }
 
-// 5. Dapatkan Peranan Pengguna (Kekal sama)
+// =======================================================
+// PHP: 3. Mengambil SEMUA ITEM untuk Dipaparkan di Bahagian Kanan
+// Logik ini menggantikan senarai ikon kategori
+// =======================================================
+$all_display_items = []; 
+$sql_all_display_items = "
+    SELECT 
+        i.item_id, 
+        i.item_name, 
+        c.category_name, 
+        i.image_url,
+        i.description
+    FROM item i
+    JOIN categories c ON i.category_id = c.category_id
+    ORDER BY c.category_name, i.item_name ASC
+";
+$res_items_display = $conn->query($sql_all_display_items);
+
+if ($res_items_display) {
+    while ($row = $res_items_display->fetch_assoc()) {
+        $all_display_items[] = $row;
+    }
+    $res_items_display->free(); 
+}
+
+
 $user_roles = [];
 $stmt_roles = $conn->prepare("
     SELECT r.role_name
@@ -80,6 +106,8 @@ $stmt_roles->close();
 
 $_SESSION['user_roles'] = $user_roles;
 
+// Fungsi getCategoryIcon telah dibuang kerana kita memaparkan Item sebenar.
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -94,142 +122,229 @@ $_SESSION['user_roles'] = $user_roles;
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* CSS STYLES (Kekal sama) */
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+        /* =========================================================================
+           1. VARIABLE & BASE STYLES
+           ========================================================================= */
         :root {
             --primary-color: #06b6d4; /* Cyan 600 */
+            --primary-light: #f0f9ff; /* Cyan 50 */
             --primary-hover: #0891b2; /* Cyan 700 */
             --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
             --text-dark: #1e293b;
             --text-muted: #64748b;
+            --shadow-light: 0 4px 10px rgba(0, 0, 0, 0.04);
         }
 
-        body { 
-            font-family: 'Inter', 'Segoe UI', sans-serif; 
-            background-color: var(--bg-light-gray); 
-            color: var(--text-dark); 
-            min-height: 100vh; 
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-light-gray);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
         }
-        .sidebar { 
-            width: 250px; 
-            position: fixed; 
-            top: 0; 
-            bottom: 0; 
-            left: 0; 
+
+        /* =========================================================================
+           2. LAYOUT: SIDEBAR & TOPBAR
+           ========================================================================= */
+
+        /* ➡️ SIDEBAR */
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
             background: var(--card-bg);
-            padding: 20px; 
-            border-right: 1px solid #e2e8f0; 
-            z-index: 1000; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            transition: transform 0.3s ease-in-out; 
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.3s ease-in-out;
         }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { 
-            width: 40px; 
-            height: 40px; 
-            background-color: var(--primary-color);
-            color: white; 
-            border-radius: 8px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 20px; 
+
+        .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
+        .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
+        .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+        .sidebar a {
+            display: flex; align-items: center; gap: 15px;
+            color: var(--text-muted); text-decoration: none;
+            padding: 14px 18px; margin-bottom: 6px;
+            border-radius: 10px; font-weight: 500; font-size: 15px;
+            transition: all 0.2s;
         }
-        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
-        .logo-text span { font-size: 12px; color: var(--text-muted); }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s; }
-        .sidebar a.active, .sidebar a:hover { 
-            background: var(--primary-color);
-            color: #fff; 
+        .sidebar a.active {
+            background: var(--primary-light);
+            color: var(--primary-color) !important;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
         }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease-in-out; }
-        .topbar { 
-            background: var(--card-bg); 
-            padding: 15px 30px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #e2e8f0; 
-            z-index: 999; 
-            position: sticky; 
-            top: 0; 
+        .sidebar a:hover:not(.active) {
+            background: #eef1f4;
+            color: var(--text-dark);
+        }
+        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: 20px; }
+        .sidebar a i { width: 20px; text-align: center; }
+
+
+        /* ➡️ CONTENT WRAPPER */
+        .main-content {
+            margin-left: 280px;
+            transition: margin-left 0.3s ease-in-out;
+        }
+        .container-fluid { padding: 30px; }
+
+        /* ➡️ TOPBAR */
+        .topbar {
+            background: var(--card-bg);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            z-index: 999;
+            position: sticky;
+            top: 0;
         }
         .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
         .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
         .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
-        .container-fluid { padding: 30px; }
-        .card { 
-            border-radius: 16px; 
-            padding: 25px; 
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); 
-            background: var(--card-bg); 
-            margin-bottom: 25px; 
-            border: 1px solid #e2e8f0; 
+        .profile-img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+
+
+        /* =========================================================================
+           3. FORMS & CARDS
+           ========================================================================= */
+        .card {
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: var(--shadow-light);
+            background: var(--card-bg);
+            margin-bottom: 25px;
+            border: 1px solid #e2e8f0;
         }
         .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
-        
+
         .text-primary { color: var(--primary-color) !important; }
-        .btn-primary { 
+
+        /* Buttons */
+        .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
+            font-weight: 600;
         }
-        .btn-primary:hover { 
+        .btn-primary:hover {
             background-color: var(--primary-hover);
             border-color: var(--primary-hover);
         }
-
-        .form-label { font-weight: 500; color: #334155; }
-        .form-control, .form-select { border-radius: 8px; }
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
         
-        .category-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
-        .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; }
-        .select2-container--default .select2-selection--single { border: 1px solid #dee2e6; border-radius: 8px; height: 44px; }
-        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 42px; padding-left: 12px; }
-        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 42px; }
-        .category-pills-container { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 12px; margin-bottom: 1rem; }
-        .category-pills-container .category-pill-filter { white-space: nowrap; padding: 6px 14px; font-size: 14px; }
-        .menu-toggle-btn { display: none; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
-
-        /* Tambahan untuk medan yang dikunci */
+        /* Form Controls */
+        .form-label { font-weight: 500; color: #334155; }
+        .form-control, .form-select {
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-height: 48px; 
+            border-color: #e2e8f0; 
+        }
         .form-control:disabled, .form-select:disabled, .form-control[readonly] {
-            background-color: #e9ecef !important; /* Warna kelabu yang lebih jelas */
-            opacity: 1; 
+            background-color: #e9ecef !important;
+            opacity: 1;
         }
 
+        /* Select2 Styling Fixes (PENTING untuk kotak kemas) */
+        .select2-container--bootstrap-5 .select2-selection {
+            border-radius: 8px !important;
+            padding: 0.375rem 0.75rem !important; 
+            min-height: 48px !important; 
+            border: 1px solid #e2e8f0 !important; 
+        }
+        .select2-container--bootstrap-5 .select2-selection--single {
+            height: 48px !important;
+        }
+        .select2-container--bootstrap-5 .select2-selection__rendered {
+            line-height: 46px !important; 
+        }
+        .select2-container--bootstrap-5 .select2-selection__arrow {
+            width: 30px !important;
+            height: 46px !important; 
+        }       
+        /* Category Pills */
+        .category-pills-container { 
+            display: flex; flex-wrap: nowrap; overflow-x: auto; 
+            -webkit-overflow-scrolling: touch; padding-bottom: 12px; 
+            margin-bottom: 1rem;
+        }
+        .category-pills-container .category-pill-filter { 
+            white-space: nowrap; padding: 6px 14px; font-size: 14px; 
+            margin-right: 8px; border-radius: 20px; font-weight: 600;
+        }
+        .btn-outline-secondary { /* Custom style untuk pill tak aktif */
+            background-color: #e2e8f0;
+            border-color: #e2e8f0;
+            color: var(--text-dark);
+        }
 
-        /* MOBILE STYLES START */
+        /* Item List Display - Imej */
+        .category-image-box { 
+            width: 50px; /* Saiz Imej Sedikit Besar */
+            height: 50px; 
+            border-radius: 6px; /* Sudut sedikit melengkung */
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            border: 1px solid #e2e8f0;
+            margin-right: 12px;
+            flex-shrink: 0; /* Pastikan ia tidak mengecil */
+        } 
+        .category-thumb-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Pastikan imej penuh kotak tanpa herot */
+        }
+
+        .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; border-color: #f1f5f9; }
+
+
+        /* =========================================================================
+           4. MOBILE STYLES
+           ========================================================================= */
+        .menu-toggle-btn { display: none; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1040; display: none; } 
+
         @media (max-width: 992px) {
-            /* ... (Kekal sama) ... */
-            .sidebar { 
-                transform: translateX(-250px); 
-                left: 0;
+            .sidebar {
+                transform: translateX(-280px);
             }
             .sidebar.active {
-                transform: translateX(0); 
+                transform: translateX(0);
             }
             .sidebar.active ~ #overlay {
-                display: block; 
+                display: block;
             }
-            .main-content { 
-                margin-left: 0; 
+            .main-content {
+                margin-left: 0;
                 width: 100%;
             }
-            .menu-toggle-btn { 
-                display: inline-block; 
-                order: -1; 
+            
+            .menu-toggle-btn {
+                display: inline-block;
+                order: -1;
                 font-size: 20px;
                 background: none;
                 border: none;
                 color: #1e293b;
                 padding: 0;
             }
+            
+            /* Topbar Mobile Layout */
             .topbar {
                 padding: 10px 15px;
                 display: grid;
@@ -239,12 +354,17 @@ $_SESSION['user_roles'] = $user_roles;
             }
             .topbar h3 {
                 font-size: 18px;
-                text-align: center;
+                text-align: left;
+            }
+            .topbar .user-profile {
+                order: 3;
+                justify-self: end;
             }
             .topbar .user-name {
                 display: none;
             }
 
+            /* Content Padding */
             .container-fluid {
                 padding: 15px;
             }
@@ -252,15 +372,13 @@ $_SESSION['user_roles'] = $user_roles;
                 padding: 15px;
             }
             
-            .col-lg-7, .col-lg-5 {
-                flex: 0 0 100%;
-                max-width: 100%;
+            /* Force full width on small screens */
+            .col-lg-8, .col-lg-4 {
+                 flex: 0 0 100% !important;
+                 max-width: 100% !important;
             }
             
-            .category-pills-container {
-                padding-bottom: 0;
-            }
-
+            /* Grid layout for buttons/divs */
             .d-grid {
                 display: grid !important;
                 grid-template-columns: 1fr;
@@ -305,19 +423,32 @@ $_SESSION['user_roles'] = $user_roles;
             
             <div class="col-lg-5 order-lg-2">
                 <div class="card">
-                    <h5><i class="fa-solid fa-layer-group me-2 text-primary"></i> Item Categories</h5>
-                    <p class="text-muted small">A visual guide of our main categories.</p>
-                    <div class="list-group list-group-flush">
-                        <?php foreach ($categories as $category): ?>
-                            <div class="list-group-item d-flex align-items-center p-2">
-                                <img src="../<?= htmlspecialchars(isset($category['image_url']) ? $category['image_url'] : 'https://via.placeholder.com/50') ?>" class="category-thumb" alt="<?= htmlspecialchars($category['category_name']) ?>">
-                                <div><strong><?= htmlspecialchars($category['category_name']) ?></strong></div>
-                            </div>
-                        <?php endforeach; ?>
+                    <h5><i class="fa-solid fa-boxes-stacked me-2 text-primary"></i> Available Item List</h5>
+                    <p class="text-muted small">View all available items and their categories.</p>
+                    
+                    <div class="list-group list-group-flush" style="max-height: 450px; overflow-y: auto;">
+                    
+                        <?php if (empty($all_display_items)): ?>
+                            <div class="text-center text-muted p-3">No items found in the database.</div>
+                        <?php else: ?>
+                            <?php foreach ($all_display_items as $item): ?>
+                                <div class="list-group-item d-flex align-items-center p-2">
+                                    <div class="category-image-box"> 
+                                        <img src="<?= htmlspecialchars(isset($item['image_url']) ? $item['image_url'] : '../assets/placeholder.png') ?>" 
+                                             alt="<?= htmlspecialchars($item['item_name']) ?>" 
+                                             class="category-thumb-img">
+                                    </div>
+                                    <div>
+                                        <strong><?= htmlspecialchars($item['item_name']) ?></strong><br>
+                                        <small class="text-muted"><?= htmlspecialchars($item['category_name']) ?></small>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-
+            
             <div class="col-lg-7 order-lg-1">
                 <div class="card">
                     <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> Request Form</h5>
@@ -335,7 +466,7 @@ $_SESSION['user_roles'] = $user_roles;
                                 </a>
                                 <?php foreach ($categories as $category): ?>
                                     <a href="#" class="btn btn-sm btn-outline-secondary ms-2 category-pill-filter" 
-                                       data-category="<?= htmlspecialchars($category['category_name']) ?>">
+                                        data-category="<?= htmlspecialchars($category['category_name']) ?>">
                                         <?= htmlspecialchars($category['category_name']) ?>
                                     </a>
                                 <?php endforeach; ?>
@@ -382,27 +513,30 @@ $_SESSION['user_roles'] = $user_roles;
                                 <input type="text" id="returnDate" class="form-control" name="return_date" placeholder="Select a date...">
                             </div>
                         </div>
-                                        
+                                                
                         <div class="mb-3">
-                            <label class="form-label" for="program_type">6. Program Type / Priority</label>
                             
-                            <div class="form-text text-muted mb-2">
-                                Please select <strong>a</strong> category that represents the main purpose of this booking, even if you are booking multiple items.
-                            </div>
-                            
-                            <select name="program_type" id="program_type" class="form-select" required>
-                                <option value="3" selected>Academic Project/Class</option>
-                                <option value="2">Club/Association Program</option>
-                                <option value="1">Official University Ceremony</option>
-                            </select>
-                        </div> 
-                        
-                        <div class="mb-3">
-                            <label class="form-label" for="reason">7. Purpose of Loan</label>
-                            <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
-                        </div>
+<div class="card bg-light border-info mb-4 p-3">
+    <h6 class="mb-2 text-primary"><i class="fa-solid fa-clipboard-question me-2"></i> Booking Context (Step 1)</h6>
+    <p class="text-muted small">This purpose applies to <strong>all items</strong> in your request list.</p>
 
-                        <div id="availability-status" class="mt-3"></div>
+    <div class="mb-3">
+        <label class="form-label" for="program_type">1. Program Type / Priority</label>
+        <select name="program_type" id="program_type" class="form-select" required>
+            <option value="3" selected>Academic Project/Class</option>
+            <option value="2">Club/Association Program</option>
+            <option value="1">Official University Ceremony</option>
+        </select>
+    </div>
+
+    <div class="mb-1">
+        <label class="form-label" for="reason">2. Purpose of Loan</label>
+        <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation" required></textarea>
+        <div id="reason-help-text" class="mt-2"></div>
+    </div>
+</div>
+</div>
+	<div id="availability-status" class="mt-3"></div>
                         
                         <div class="d-grid d-md-flex gap-2 mt-4">
                             <button type="button" class="btn btn-light border flex-grow-1" id="addMoreBtn" disabled><i class="fa-solid fa-plus me-2"></i> Add to List</button>
@@ -422,12 +556,12 @@ $_SESSION['user_roles'] = $user_roles;
                         <input class="form-check-input" type="checkbox" value="" id="agreeTerms" disabled>
                         <label class="form-check-label" for="agreeTerms">
                             I have read and agree to the 
-                            <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary **fw-bold**">Terms and Conditions</a>.
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary fw-bold">Terms and Conditions</a>.
                         </label>
                     </div>
 
                     <div class="d-grid mt-4">
-                           <button type="button" class="btn btn-primary" id="finalSubmitBtn" disabled><i class="fa-solid fa-paper-plane me-2"></i> Submit Request</button>
+                            <button type="button" class="btn btn-primary" id="finalSubmitBtn" disabled><i class="fa-solid fa-paper-plane me-2"></i> Submit Request</button>
                     </div>
                     </div>
                 </div>
@@ -439,39 +573,39 @@ $_SESSION['user_roles'] = $user_roles;
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
         <div class="modal-header">
-            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions of <strong>Equipment Usage</strong></h5>
+            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions of **Equipment Usage**</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 <div class="modal-body">
     <p>Please read the following terms carefully before submitting your **reservation** request:</p>
     <ol>
         <li>
-            <strong>Eligibility:</strong> All equipment is available for **reservation** only to registered students and staff of UniKL with a valid ID.
+            **Eligibility:** All equipment is available for **reservation** only to registered students and staff of UniKL with a valid ID.
         </li>
         <li>
-            <strong>Reservation Duration:</strong> The **duration** of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
+            **Reservation Duration:** The **duration** of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
         </li>
         <li>
-            <strong>Responsibility:</strong> The party making the reservation is fully responsible for the **reserved equipment** from the moment of collection until they are returned and checked in by a technician.
+            **Responsibility:** The party making the reservation is fully responsible for the **reserved equipment** from the moment of collection until they are returned and checked in by a technician.
         </li>
         <li>
-            <strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
+            **Condition of Items:** The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
         </li>
         <li>
-            <strong>Damage or Loss:</strong> The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
+            **Damage or Loss:** The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
         </li>
         <li>
-            <strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of **reservation** privileges.
+            **Late Returns:** Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of **reservation** privileges.
         </li>
         <li>
-            <strong>Purpose of Use:</strong> Items are to be used for academic or official university purposes only, as specified in the reservation form.
+            **Purpose of Use:** Items are to be used for academic or official university purposes only, as specified in the reservation form.
         </li>
         <li>
-            <strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
+            **Collection:** Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
         </li>
     </ol>
     <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
-</div>        <div class="modal-footer">
+</div>      <div class="modal-footer">
             <button type="button" class="btn btn-primary" id="agreeTermsBtn" data-bs-dismiss="modal">I Understand</button>
         </div>
         </div>
@@ -482,18 +616,18 @@ $_SESSION['user_roles'] = $user_roles;
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
 <script>
 $(document).ready(function() {
-    // 1. Konsistensi Pembolehubah PHP
+    
     const phpData = {
         user_id: '<?= isset($person_id) ? $person_id : '' ?>',
     };
 
-    // 2. Select2 Initialization (Kekal sama)
+    
     $('#item_select').select2({
+        theme: 'bootstrap-5', // <--- PENTING: Gunakan tema Bootstrap 5
         placeholder: "-- Search and select an item --",
-        allowClear: true
+        allowClear: true,
     });
 
     let allOptgroups = $('#item_select optgroup').clone();
@@ -502,8 +636,7 @@ $(document).ready(function() {
         allOptgroups = $('#item_select optgroup').clone(); 
     }
 
-
-    // 3. Category Filtering Logic (Kekal sama)
+    
     $(document).on('click', '.category-pill-filter', function(e) {
         e.preventDefault();
         const categoryName = $(this).data('category').toString().trim();
@@ -531,7 +664,7 @@ $(document).ready(function() {
         $select.val(null).trigger('change');
     });
     
-    // 4. Mobile Sidebar Toggling Logic (Kekal sama)
+    
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('overlay');
     const menuToggle = document.getElementById('menuToggle');
@@ -565,7 +698,7 @@ $(document).ready(function() {
     });
     
     
-    // 5. Availability Check Logic (Kekal sama)
+    
     let debounceTimer;
 
     function checkAvailability() {
@@ -642,7 +775,7 @@ $(document).ready(function() {
     $('#program_type').on('change', checkAvailability); 
 
     
-    // Flatpickr Date initialization (Kekal sama)
+    
     const returnDatepicker = flatpickr("#returnDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
@@ -661,25 +794,34 @@ $(document).ready(function() {
         onClose: checkAvailability 
     });
 
-    // 6. Reservation Item List Management
+    
     let reservationItems = []; 
     
-    // Fungsi untuk menguruskan status input Reason/Priority (DIKEMAS KINI)
-    function updateReasonAndPriorityStatus() {
-        const reasonField = $('#reason');
-        const programTypeField = $('#program_type');
+    
+// Kod JavaScript (dalam item_user.php)
+
+function updateReasonAndPriorityStatus() {
+    const reasonField = $('#reason');
+    const programTypeField = $('#program_type');
+    const reasonHelpText = $('#reason-help-text'); // Dapatkan elemen baru
+
+    if (reservationItems.length > 0) {
+        // Jika ADA ITEM dalam senarai, KUNCI borang ini
+        reasonField.prop('disabled', true).addClass('bg-light');
+        programTypeField.prop('disabled', true).addClass('bg-light');
         
-        if (reservationItems.length > 0) {
-            // Jika sudah ada item, kunci medan
-            reasonField.prop('disabled', true).addClass('bg-light');
-            programTypeField.prop('disabled', true).addClass('bg-light');
-        } else {
-            // Jika senarai kosong, buka semula medan
-            reasonField.prop('disabled', false).removeClass('bg-light');
-            programTypeField.prop('disabled', false).removeClass('bg-light');
-        }
-        checkAvailability(); 
+        // ** Mesej maklum balas yang jelas **
+        reasonHelpText.html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-lock me-2"></i> Locked: To change, please remove all items from the list first.</div>');
+        
+    } else {
+        // Jika TIADA ITEM, BENARKAN pengguna mengisi borang
+        reasonField.prop('disabled', false).removeClass('bg-light');
+        programTypeField.prop('disabled', false).removeClass('bg-light');
+        
+        reasonHelpText.empty(); 
     }
+    checkAvailability(); 
+}
 
 
     $('#addMoreBtn').on('click', () => {
@@ -688,7 +830,7 @@ $(document).ready(function() {
         const reserve = $('#reserveDate').val();
         const ret = $('#returnDate').val();
         
-        // Ambil reason dan program_type
+        
         const reason = $('#reason').val(); 
         const program_type = $('#program_type').val(); 
 
@@ -732,7 +874,7 @@ $(document).ready(function() {
         Toast.fire({ icon: 'success', title: 'Added to list!' });
 
         
-        // Reset form fields (kecuali reason dan program_type)
+        
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         reserveDatepicker.clear();
@@ -790,9 +932,9 @@ $(document).ready(function() {
         updateReasonAndPriorityStatus();
     });
     
-    // 7. Terms & Conditions and Submission Logic
     
-    // TOGGLE SUBMIT BUTTON BASED ON TERMS CHECKBOX AND ITEM LIST
+    
+    
     $('#agreeTerms').on('change', function() {
         const submitBtn = $('#finalSubmitBtn');
         if ($(this).is(':checked') && reservationItems.length > 0) {
@@ -802,14 +944,14 @@ $(document).ready(function() {
         }
     });
 
-    // AUTO-CHECK TERMS ON MODAL CLOSE (I UNDERSTAND)
+    
     $('#agreeTermsBtn').on('click', function() {
-        // Enable, check, and trigger change event
+        
         $('#agreeTerms').prop('disabled', false);
         $('#agreeTerms').prop('checked', true).trigger('change');
     });
 
-    // FINAL SUBMIT LOGIC 
+    
     $('#finalSubmitBtn').on('click', function (e) {
         e.preventDefault();
         const submitBtn = $(this);
@@ -844,7 +986,7 @@ $(document).ready(function() {
         
         $.ajax({
             type: 'POST',
-            url: 'submit_reservation.php', // Pastikan nama fail betul
+            url: 'submit_reservation.php', 
             data: submissionData, 
             dataType: 'json',
             success: function(response) {
@@ -860,12 +1002,12 @@ $(document).ready(function() {
                         window.location.href = 'history.php'; 
                     });
                 } else {
-                    // Ini akan menangkap ralat yang dikeluarkan oleh submit_reservation.php
+                    
                     Swal.fire("Submission Failed", response.message, "error");
                 }
             },
             error: function() {
-                // Ini akan menangkap kegagalan AJAX (cth: 404 Not Found, Server Error 500)
+                
                 Swal.fire("Submission Failed", "A server error occurred or file not found. Please try again.", "error");
             },
             complete: function() {
