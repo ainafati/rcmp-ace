@@ -6,105 +6,106 @@
     <style>
         /* General document styles */
         body { 
-            font-family: 'Arial', sans-serif; /* Cleaner, professional font */
+            font-family: 'Arial', sans-serif; 
             font-size: 10pt; 
             color: #333;
             line-height: 1.5;
+            /* **PERUBAHAN UTAMA:** Tetapkan Margin Atas Badan kepada Sifar */
+            margin-top: 0; 
         }
         
-/* Header section with logo and title */
-    .header {
-        text-align: center;
-        margin-bottom: 35px;
-        /* Corporate Navy Blue border */
-        border-bottom: 3px solid #003366; 
-        padding-bottom: 15px;
-    }
+        /* Header section with logo and title */
+        .header {
+            text-align: center;
+            margin-bottom: 20px; 
+            border-bottom: 3px solid #003366; 
+            padding-bottom: 10px; 
+            /* Tambah ini untuk memastikan tiada ruang atas dalam header */
+            padding-top: 0; 
+        }
 
-    .header img {
-        /* Perhatian: mPDF tidak boleh mengakses imej melalui URL luar atau path relatif biasa */
-        width: 120px; 
-        margin-bottom: 10px;
-    }
+        .header img {
+            /* Kurangkan margin bawah imej */
+            margin-bottom: 3px; 
+            /* Tambah sedikit margin atas untuk mengelakkan imej melekat pada pinggir */
+            margin-top: 15px; 
+        }
 
-    .header h1 {
-        margin: 0;
-        font-size: 20pt;
-        /* Corporate Blue for the main title */
-        color: #003366; 
-        font-weight: 700;
-    }
-    .header p {
-        margin: 5px 0 0;
-        font-size: 11pt;
-        color: #555;
-    }
+        .header h1 {
+            margin: 0;
+            font-size: 18pt; 
+            color: #003366; 
+            font-weight: 700;
+        }
+        .header p {
+            margin: 3px 0 0; 
+            font-size: 10pt; 
+            color: #555;
+        }
 
-    /* Data table styles */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
+        /* Data table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px; 
+        }
 
-    th, td {
-        border: 1px solid #c0c0c0; /* Softer border lines */
-        padding: 12px 10px; 
-        text-align: left;
-        vertical-align: top;
-        font-size: 10pt;
-    }
+        th, td {
+            border: 1px solid #c0c0c0; 
+            padding: 7px; 
+            text-align: left;
+            vertical-align: top;
+            font-size: 9pt; 
+        }
 
-    thead tr {
-        /* Gunakan Kelabu Arang (Dark Charcoal Gray) */
-        background-color: #343a40; 
-    }
-    th {
-        color: #ffffff; 
-        font-weight: bold;
-        font-size: 10pt;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    tbody tr:nth-child(even) {
-        background-color: #f7f7f7; /* Soft gray striping */
-    }
-    
-    /* Style for better item detail presentation */
-    .item-details strong {
-        display: block;
-        margin-bottom: 3px;
-        color: #003366;
-        font-size: 11pt; /* Jadikan nama item lebih menonjol */
-    }
-</style>
+        thead tr {
+            background-color: #343a40; 
+        }
+        th {
+            color: #ffffff; 
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f7f7f7; 
+        }
+        
+        /* Item Details */
+        .item-details strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #003366;
+            font-size: 9.5pt;
+        }
+    </style>
 </head>
 <body>
     
-<div class="header">
-    
-<img src="../assets/img/Logo-UniKL-PCM.png" alt="UniKL Logo">
-    <h1>EQUIPMENT RETURN REPORT</h1>
-    
-    <p>Report for the period: <strong>{{start_date}}</strong> to <strong>{{end_date}}</strong></p>
-</div>
+    <div class="header">
+        <img src="{{logo_path}}" alt="UniKL Logo" width="200">
+        <h1>EQUIPMENT RETURN REPORT</h1>
+        <p>Report for the period: <strong>{{start_date}}</strong> to <strong>{{end_date}}</strong></p>
+    </div>
 
-<table>
-    <thead>
-        <tr>
-            <th style="width: 5%;">No.</th>
-            <th style="width: 15%;">User Name</th>
-            <th style="width: 25%;">Item Details</th>
-            <th style="width: 10%;">Borrow Date</th>
-            <th style="width: 10%;">Return Date</th>
-            <th style="width: 10%;">Duration</th>
-            <th style="width: 15%;">Return Condition</th>
-            <th style="width: 10%;">Handled By</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{table_rows}}
-    </tbody>
-</table>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%;">No.</th>           
+                <th style="width: 15%;">User Name</th>     
+                <th style="width: 25%;">Item Details</th>  
+                <th style="width: 10%;">Borrow Date</th>   
+                <th style="width: 10%;">Return Date</th>   
+                <th style="width: 8%;">Duration</th>      
+                <th style="width: 17%;">Return Condition</th>
+                <th style="width: 10%;">Handled By</th>    
+            </tr>
+        </thead>
+        <tbody>
+            {{table_rows}}
+        </tbody>
+    </table>
+
 </body>
 </html>

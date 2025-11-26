@@ -1,35 +1,32 @@
 <?php
 
+define('ROOT_DIR', 'C:\\laragon\\www\\UniKL ACE\\');
 
 
+require ROOT_DIR . 'config.php';
 
-
-
-
-define('ROOT_DIR', 'C:/xampp/htdocs/UniKL ACE/'); 
-
-
-require ROOT_DIR . 'technician/config.php';
+require ROOT_DIR . 'config_email.php'; 
 
 
 require ROOT_DIR . 'PHPMailer-master/src/Exception.php';
 require ROOT_DIR . 'PHPMailer-master/src/PHPMailer.php';
 require ROOT_DIR . 'PHPMailer-master/src/SMTP.php';
 
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
 
-
-
-
+if ($conn->connect_error) {
+    error_log("CRON JOB FAILED: Database connection failed: " . $conn->connect_error);
+    echo "CRON JOB FAILED: Database connection error.\n";
+    exit();
+}
 
 
 function get_return_items_due($conn, $days_offset) {
-    
     $target_date_sql = $days_offset == 0 ? "CURDATE()" : "DATE_ADD(CURDATE(), INTERVAL $days_offset DAY)";
-    
     
     $sql = "SELECT
                 ri.id, ri.reserve_date, ri.return_date, ri.quantity,
@@ -37,7 +34,7 @@ function get_return_items_due($conn, $days_offset) {
                 i.item_name
             FROM reservation_items ri
             JOIN reservations r ON ri.reserve_id = r.reserve_id
-            JOIN user u ON r.user_id = u.user_id
+            JOIN person u ON r.person_id = u.person_id
             JOIN item i ON ri.item_id = i.item_id
             WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) = $target_date_sql";
             
@@ -45,16 +42,14 @@ function get_return_items_due($conn, $days_offset) {
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-
 function get_overdue_items($conn) {
-    
     $sql = "SELECT
                 ri.id, ri.reserve_date, ri.return_date, ri.quantity,
                 u.name AS user_name, u.email AS user_email, u.phoneNum AS user_phone,
                 i.item_name
             FROM reservation_items ri
             JOIN reservations r ON ri.reserve_id = r.reserve_id
-            JOIN user u ON r.user_id = u.user_id
+            JOIN person u ON r.person_id = u.person_id
             JOIN item i ON ri.item_id = i.item_id
             WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) < CURDATE()";
             
@@ -66,23 +61,29 @@ function get_overdue_items($conn) {
 
 
 
+
 function send_email_notification($recipient_email, $recipient_name, $items, $is_today, $is_overdue = false) {
     $mail = new PHPMailer(true);
     try {
         
+        
         $mail->isSMTP();
-        $mail->Host      = 'smtp.gmail.com';
+        $mail->Host      = SMTP_HOST;
         $mail->SMTPAuth  = true;
         
-        
-        $mail->Username  = 'ainafati12@gmail.com'; 
-        $mail->Password  = 'qyzjufqzxndihtae'; 
-        
-        $mail->SMTPSecure = 'tls';      
-        $mail->Port       = 587;        
+        $mail->Username  = SMTP_USER;
+        $mail->Password  = SMTP_PASS;
         
         
-        $mail->setFrom('ainafati12@gmail.com', 'UniKL Inventory System');
+        if (SMTP_SECURE == 'tls') {
+             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif (SMTP_SECURE == 'ssl') {
+             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        }
+        $mail->Port      = SMTP_PORT;
+        
+        
+        $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
         $mail->addAddress($recipient_email, $recipient_name);
         
         
@@ -128,6 +129,7 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
         return true;
         
     } catch (Exception $e) {
+        
         error_log("Failed to send email to $recipient_email. Mailer Error: {$mail->ErrorInfo}");
         return false;
     }
@@ -147,9 +149,10 @@ if (!empty($today_items)) {
         $users_due_today[$item['user_email']]['items'][] = $item;
     }
     foreach ($users_due_today as $email => $user_data) {
-        send_email_notification($email, $user_data['name'], $user_data['items'], true, false); 
+        send_email_notification($email, $user_data['name'], $user_data['items'], true, false);
     }
 }
+
 
 
 $tomorrow_items = get_return_items_due($conn, 1);
@@ -160,9 +163,10 @@ if (!empty($tomorrow_items)) {
         $users_due_tomorrow[$item['user_email']]['items'][] = $item;
     }
     foreach ($users_due_tomorrow as $email => $user_data) {
-        send_email_notification($email, $user_data['name'], $user_data['items'], false, false); 
+        send_email_notification($email, $user_data['name'], $user_data['items'], false, false);
     }
 }
+
 
 
 $overdue_items = get_overdue_items($conn);
@@ -173,13 +177,18 @@ if (!empty($overdue_items)) {
         $users_overdue[$item['user_email']]['items'][] = $item;
     }
     foreach ($users_overdue as $email => $user_data) {
-        send_email_notification($email, $user_data['name'], $user_data['items'], false, true); 
+        send_email_notification($email, $user_data['name'], $user_data['items'], false, true);
     }
 }
 
 
 
 echo "Script Reminder Complete. Found " . count($today_items) . " item(s) due today, " . count($tomorrow_items) . " item(s) due tomorrow, and " . count($overdue_items) . " item(s) overdue.\n";
+
+
+if (count($overdue_items) > 0) {
+    echo "ATTEMPTING TO SEND EMAIL TO: " . $overdue_items[0]['user_email'] . "\n";
+}
 
 $conn->close();
 ?>

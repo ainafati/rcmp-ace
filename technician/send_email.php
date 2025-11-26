@@ -3,6 +3,8 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\SMTP;
 
+// Pastikan fail konfigurasi e-mel anda di-'require' di sini atau sebelum fungsi ini dipanggil.
+
 require '../PHPMailer-master/src/Exception.php';
 require '../PHPMailer-master/src/PHPMailer.php';
 require '../PHPMailer-master/src/SMTP.php';
@@ -13,35 +15,45 @@ function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $
 
     try {
         
-        $mail->SMTPDebug = SMTP::DEBUG_SERVER; 
+        // 1. PENGGUNAAN KONFIGURASI GLOBAL
+        // Ambil nilai debug (0 untuk Live, 4 untuk Local) dari fail config
+        $mail->SMTPDebug = SMTP_DEBUG_LEVEL; 
         $mail->Debugoutput = 'error_log'; 
         
 
         $mail->isSMTP();
         
-        
+        // Tetapan SMTP dari fail konfigurasi
         $mail->Host      = SMTP_HOST;      
-        $mail->SMTPAuth  = true;
+        
+        // 2. PENGGUNAAN SMTP_AUTH DARI KONFIGURASI
+        // Ambil nilai (true/false) dari fail config
+        $mail->SMTPAuth  = SMTP_AUTH; 
+        
+        // Pengguna dan Kata Laluan kekal menggunakan pembolehubah yang dihantar ke fungsi
         $mail->Username  = $smtp_user;    
         $mail->Password  = $smtp_pass;
         
-        
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
+        // Sekuriti dan Port dari fail konfigurasi
+        // Perhatian: Jika LOCAL_MAIL_TEST=true, SMTP_SECURE akan menjadi 'false'
+        $mail->SMTPSecure = SMTP_SECURE; 
         $mail->Port      = SMTP_PORT;      
         
         
+        // Tetapan From
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
         $mail->addAddress($to_email, $user_name);
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation of Assigned Assets ' . $item_name;
         
+        // ... (Kandungan Body E-mel dikekalkan sama) ...
         
         $partial_notice = '';
         if ($partial_reason) {
             $partial_notice = "<p style='color: #e74c3c; font-weight: bold; border: 1px dashed #e74c3c; padding: 10px;'>
                                  <strong>Attention:</strong> The approved quantity is reduced. {$partial_reason}
-                               </p>";
+                                </p>";
         }
 
         $mail->Body = "

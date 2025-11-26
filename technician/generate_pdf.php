@@ -8,29 +8,18 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Mpdf\Mpdf;
 use Mpdf\MpdfException;
 
-// **********************************************
-// Pindaan Laluan Logo: Menggunakan realpath() untuk laluan mutlak sistem
-// **********************************************
 
-// Pastikan laluan relatif ini betul: /technician/ -> naik satu folder -> masuk folder img
-$relative_path_to_logo = __DIR__ . '/../img/Logo-UniKL-PCM.jpg'; // <--- TUKAR NAMA FAIL LOGO SEBENAR DI SINI (e.g., Logo-UiTM.png)
+$relative_path_to_logo = __DIR__ . '/../img/unikl_logo-removebg-preview.png';
 
-// Minta PHP berikan laluan mutlak penuh
+// Dapatkan laluan mutlak penuh sistem untuk mPDF
 $logo_file_path = realpath($relative_path_to_logo);
 
-// Semakan: Jika fail tiada, kita boleh set laluan ke laluan asal (sebagai fallback)
 if ($logo_file_path === false) {
-    // Jika realpath gagal, gunakan laluan relatif asal sebagai fallback
     $logo_file_path = $relative_path_to_logo; 
-    // Anda mungkin ingin menambah kod ralat yang jelas di sini jika anda mahu
-}
-if (!isset($_SESSION['tech_id']) && !isset($_SESSION['person_id'])) {
-    $mpdf = new Mpdf();
-    $mpdf->WriteHTML('<h1>Access Denied</h1><p>Your session has expired. Please log in again.</p>');
-    $mpdf->Output('error_access.pdf', 'I');
-    exit();
 }
 
+// Lakukan penggantian:
+$html = str_replace('{{logo_path}}', $logo_file_path, $html);
 // Template path check
 $template_path = 'pdf_template.html';
 if (!file_exists($template_path)) {
