@@ -24,10 +24,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     
     
-    // 1. Dapatkan Role ID
+    
     $roles_to_find = [$role];
     if (strtolower($role) === 'technician') {
-        // Technician juga adalah User
+        
         $roles_to_find[] = 'User';
     }
     
@@ -53,7 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     
     
-    // 2. Validasi Input
+    
     
     $needle = '@unikl.edu.my';
     
@@ -72,13 +72,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
     
-    // START OF FIX: MENGUBAH VALIDASI 12 DIGIT KEPADA 6-12 DIGIT
+    
     if (!preg_match('/^\d{6,12}$/', $id)) {
         $_SESSION['error_message'] = "Format Nombor Pengenalan (ID) tidak sah. Mesti antara 6 hingga 12 digit.";
         header("Location: manage_accounts.php");
         exit();
     }
-    // END OF FIX
+    
     
     if ($role !== 'Technician' && $role !== 'User' && $role !== 'Admin') { 
         $_SESSION['error_message'] = "Peranan tidak sah.";
@@ -98,12 +98,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     
     
-    // 3. Simpan ke Database (Transaction)
+    
     
     $conn->begin_transaction();
     try {
         
-        // INSERT ke jadual person
+        
         $sql_person = "INSERT INTO person (name, email, id, phoneNum, password, status) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt_person = $conn->prepare($sql_person);
         
@@ -126,13 +126,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt_person->close();
         
         
-        // INSERT ke jadual person_roles
+        
         $roles_to_insert = [$role_id_main];
         $role_message = $role;
 
         
         if (strtolower($role) === 'technician') {
-            // Tambah peranan 'User'
+            
             $roles_to_insert[] = $role_id_user;
             $role_message = "{$role} (dan User)"; 
         }
@@ -156,7 +156,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         
         $log_message = "Admin ID: {$admin_id_session} ({$admin_name_session}) telah menambah akaun baru (ID Person: {$new_person_id}, Role: {$role_message}).";
-        // Anda boleh tambah logging function di sini
+        
         
         
         $_SESSION['success_message'] = "{$role_message} account created successfully!";

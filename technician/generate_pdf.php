@@ -2,7 +2,7 @@
 session_start();
 include '../config.php';
 
-// Ensure the vendor path is correct
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Mpdf\Mpdf;
@@ -11,16 +11,16 @@ use Mpdf\MpdfException;
 
 $relative_path_to_logo = __DIR__ . '/../img/unikl_logo-removebg-preview.png';
 
-// Dapatkan laluan mutlak penuh sistem untuk mPDF
+
 $logo_file_path = realpath($relative_path_to_logo);
 
 if ($logo_file_path === false) {
     $logo_file_path = $relative_path_to_logo; 
 }
 
-// Lakukan penggantian:
+
 $html = str_replace('{{logo_path}}', $logo_file_path, $html);
-// Template path check
+
 $template_path = 'pdf_template.html';
 if (!file_exists($template_path)) {
     $mpdf = new Mpdf();
@@ -29,12 +29,12 @@ if (!file_exists($template_path)) {
     exit();
 }
 
-// Use isset for compatibility with older PHP versions
+
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 
 
-// SQL Query to fetch returned items within the date range
+
 $sql = "SELECT 
             u.name AS user_name, i.item_name, a.asset_code, 
             ri.reserve_date, ri.return_date, ri.return_condition,
@@ -66,18 +66,18 @@ $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 
-// Load HTML template content
+
 $html = file_get_contents($template_path);
 $tableRows = '';
 
 if (empty($records)) {
     
-    // English Message for No Records Found
+    
     $tableRows = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #CC0000;">No returned items found for this period.</td></tr>';
 } else {
     $count = 1;
     foreach ($records as $record) {
-        // Calculate duration in days
+        
         $reserve_date_obj = new DateTime($record['reserve_date']); 
         $return_date_obj = new DateTime($record['return_date']);
         $duration = $return_date_obj->diff($reserve_date_obj)->days + 1;
@@ -87,11 +87,11 @@ if (empty($records)) {
         $technician_name = !empty($record['technician_name']) ? htmlspecialchars($record['technician_name']) : 'N/A';
 
         
-        // **FIX IMPLEMENTED HERE:** Inserting colon, <br> tag for line break and cleaning space
+        
         $item_details = '<div class="item-details">' . 
-                            '<strong>' . htmlspecialchars($record['item_name']) . ':</strong>' . // <--- ADDED COLON
-                            '<br>' . // Line break added
-                            'Asset Code: ' . $asset_code . // <--- REMOVED LEADING SPACE
+                            '<strong>' . htmlspecialchars($record['item_name']) . ':</strong>' . 
+                            '<br>' . 
+                            'Asset Code: ' . $asset_code . 
                             '</div>';
 
         $tableRows .= '<tr>
@@ -107,7 +107,7 @@ if (empty($records)) {
     }
 }
 
-// **PERUBAHAN PENTING:** Menggantikan {{logo_path}} dengan laluan logo sebenar
+
 $html = str_replace('{{logo_path}}', $logo_file_path, $html); 
 $html = str_replace('{{start_date}}', date("d M Y", strtotime($start_date)), $html);
 $html = str_replace('{{end_date}}', date("d M Y", strtotime($end_date)), $html);

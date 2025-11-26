@@ -18,12 +18,6 @@ $result_tech = $stmt_tech->get_result();
 $tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
 $stmt_tech->close();
 
-/**
- * Function to get the count of reservation items by status for the sidebar badge.
- * @param mysqli $conn Database connection object.
- * @param string $status The status to count.
- * @return int Count of records.
- */
 function get_reservation_item_count($conn, $status) {
     $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
     

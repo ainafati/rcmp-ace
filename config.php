@@ -2,8 +2,8 @@
 
 
 $host = "localhost";
-$user = "root";
-$pass = ""; 
+$user = "nexcheck_dbuser";
+$pass = "nexcheck_dbuser"; 
 $db = "inventory";
 
 
@@ -30,3 +30,4 @@ if ($conn->connect_error) {
     
     exit(); 
 }
+

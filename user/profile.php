@@ -1,10 +1,9 @@
 <?php
 session_start();
 
-// Gantikan dengan laluan fail config.php anda yang sebenar
 include '../config.php'; 
 
-// Pastikan pengguna log masuk
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -12,7 +11,7 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int) $_SESSION['person_id'];
 
-// Ambil data pengguna
+
 $user = null; 
 $stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 
@@ -32,7 +31,7 @@ if (!$user) {
     exit();
 }
 
-// Menutup sambungan DB pada akhir fail PHP
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -320,7 +319,7 @@ $conn->close();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // --- Profile Edit/View Toggle ---
+    
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
@@ -338,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Mobile Sidebar Toggle ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');

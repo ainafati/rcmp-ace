@@ -1,10 +1,10 @@
 <?php
 
 session_start();
-// Pastikan fail config.php wujud dan mengandungi sambungan $conn
+
 include '../config.php';
 
-// --- PHP: Security Check and Data Retrieval ---
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -13,15 +13,15 @@ if (!isset($_SESSION['person_id'])) {
 $person_id = (int)$_SESSION['person_id'];
 $tech_id = $person_id;
 
-// Sambungan ke database ($conn dari config.php)
-// Semak sama ada sambungan terbuka, jika tidak, buka semula jika perlu (Bergantung pada config.php)
+
+
 if (!isset($conn) || $conn->connect_error) {
-    // Jika $conn tidak wujud atau ada ralat, matikan skrip
+    
     die("Database Connection Error.");
 }
 
 
-// Ambil data Juruteknik
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -30,7 +30,7 @@ if ($stmt === false) {
 $stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
-$tech = $result->fetch_assoc(); // Gunakan $tech secara konsisten
+$tech = $result->fetch_assoc(); 
 $stmt->close();
 
 if (!$tech) {
@@ -39,7 +39,7 @@ if (!$tech) {
     exit();
 }
 
-// Tutup sambungan di sini, sebelum output HTML
+
 $conn->close(); 
 ?>
 <!DOCTYPE html>
@@ -361,14 +361,14 @@ $conn->close();
     const backdrop = document.getElementById('sidebar-backdrop');
     const body = document.body;
 
-    // Toggle between View and Edit mode
+    
     editBtn.addEventListener('click', () => {
         viewMode.style.display = 'none';
         editMode.style.display = 'block';
     });
 
     cancelBtn.addEventListener('click', () => {
-        // Clear password fields on cancel for security
+        
         document.querySelector('input[name="new_password"]').value = '';
         document.querySelector('input[name="confirm_password"]').value = '';
         
@@ -376,7 +376,7 @@ $conn->close();
         viewMode.style.display = 'block';
     });
 
-    // Sidebar Toggle for Mobile
+    
     function toggleSidebar() {
         if (sidebar.style.transform === 'translateX(0px)' || window.getComputedStyle(sidebar).transform === 'matrix(1, 0, 0, 1, 0, 0)') {
             sidebar.style.transform = 'translateX(-280px)';
@@ -397,7 +397,7 @@ $conn->close();
         backdrop.addEventListener('click', toggleSidebar);
     }
 
-    // Initialize sidebar state on page load for large screens
+    
     window.addEventListener('load', () => {
         if (window.innerWidth >= 992) {
             sidebar.style.transform = 'translateX(0px)';
@@ -406,7 +406,7 @@ $conn->close();
         }
     });
 
-    // Handle resize
+    
     window.addEventListener('resize', () => {
         if (window.innerWidth >= 992) {
             sidebar.style.transform = 'translateX(0px)';

@@ -1,10 +1,10 @@
 <?php
 session_start();
 
-// Gantikan dengan laluan fail config.php anda yang sebenar
+
 include '../config.php';
 
-// Pastikan pengguna log masuk
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -12,7 +12,7 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int) $_SESSION['person_id'];
 
-// Ambil data pengguna
+
 $user = null; 
 $stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 
@@ -23,7 +23,7 @@ if ($stmt_user) {
     $user = $result_user->fetch_assoc(); 
     $stmt_user->close();
 } else {
-    // Log ralat (penting untuk debugging)
+    
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
@@ -33,9 +33,9 @@ if (!$user) {
     exit();
 }
 
-// -----------------------------------------------------------
-// LOGIK PAGINATION DAN DATA HISTORY
-// -----------------------------------------------------------
+
+
+
 
 $rowsPerPage = 10;
 $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -44,7 +44,7 @@ $offset = ($currentPage - 1) * $rowsPerPage;
 $totalRows = 0;
 $totalPages = 0;
 
-// Kira Jumlah Baris (menggunakan SQL yang lebih selamat)
+
 $sql_count = "SELECT COUNT(ri.id)
               FROM reservations r
               JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
@@ -57,7 +57,7 @@ if ($stmt_count = $conn->prepare($sql_count)) {
     $stmt_count->close();
     $totalPages = ceil($totalRows / $rowsPerPage);
     
-    // Pembetulan jika pengguna melawat halaman yang tiada
+    
     if ($currentPage > $totalPages && $totalRows > 0) {
         $currentPage = $totalPages;
         $offset = ($currentPage - 1) * $rowsPerPage; 
@@ -66,7 +66,7 @@ if ($stmt_count = $conn->prepare($sql_count)) {
     error_log("Failed to prepare count statement: " . $conn->error);
 }
 
-// Ambil Data History
+
 $history = [];
 $sql = "SELECT ri.id AS reservation_item_id, i.item_name, ri.reserve_date, ri.return_date, ri.reason, ri.status, ri.quantity
         FROM reservations r
@@ -89,7 +89,7 @@ if ($stmt = $conn->prepare($sql)) {
     error_log("Failed to prepare history statement: " . $conn->error);
 }
 
-// Ambil Tempahan Akan Datang (Untuk Sidebar/Card Kanan)
+
 $upcoming_bookings_all = [];
 $sql_upcoming = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
                  FROM reservations r
@@ -110,8 +110,8 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
     error_log("Failed to prepare upcoming bookings statement: " . $conn->error);
 }
 
-// TIDAK MENUTUP SAMBUNGAN DB DI SINI KERANA IA AKAN DITUTUP DI AKHIR FAIL.
-// $conn->close(); 
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -470,7 +470,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
                                             $badgeClass = ''; 
                                             $statusIcon = 'fa-solid fa-circle-info';
                                             
-                                            // Tetapkan kelas badge dan ikon berdasarkan status
+                                            
                                             if ($status == 'approved') {
                                                 $badgeClass = 'text-bg-success';
                                                 $statusIcon = 'fa-solid fa-circle-check';
@@ -531,7 +531,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
                                 <?php endif; ?>
 
                                 <?php
-                                 // Logic untuk link nombor halaman (Dikekalkan)
+                                 
                                  $maxPagesToShow = 5; 
                                  $startPage = max(1, $currentPage - floor($maxPagesToShow / 2));
                                  $endPage = min($totalPages, $startPage + $maxPagesToShow - 1);
@@ -635,7 +635,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
 </div>
 
 <?php 
-// Menutup sambungan DB pada akhir fail PHP
+
 if (isset($conn)) {
     $conn->close();
 }
@@ -645,14 +645,14 @@ if (isset($conn)) {
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Mobile Sidebar Toggle ---
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     const body = document.body;
 
     if (toggleBtn) {
-        // Logik untuk offcanvas hanya berfungsi pada saiz skrin kecil (max-width: 992px)
+        
         toggleBtn.addEventListener('click', () => {
             if (window.innerWidth <= 992) {
                 const isHidden = sidebar.style.transform === 'translateX(-280px)' || sidebar.style.transform === '';
@@ -678,7 +678,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- View Toggle (Table vs Calendar) ---
+    
     const tableViewBtn = document.getElementById('tableViewBtn');
     const calendarViewBtn = document.getElementById('calendarViewBtn');
     const tableView = document.getElementById('tableView');
@@ -694,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         calendar = new FullCalendar.Calendar(calendarView, {
             initialView: 'dayGridMonth',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
-            // PERHATIAN: Pastikan fail ini wujud dan menyediakan JSON yang betul!
+            
             events: 'get_bookings.php?person_id=<?= $person_id ?>', 
             height: 'auto',
             eventClick: function(info) {
@@ -728,16 +728,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Client-Side Filtering & Search ---
+    
     const historyTable = document.getElementById('historyTable');
     if (historyTable) {
         const tableBody = historyTable.querySelector('tbody');
-        // Hanya ambil baris yang ada data, abaikan baris "No history records"
+        
         const initialRows = Array.from(tableBody.querySelectorAll('tr')).filter(row => !row.querySelector('td[colspan="6"]')); 
         const searchInput = document.getElementById('searchInput');
         const statusFilter = document.getElementById('statusFilter');
         
-        // Simpan HTML "No records found" asal jika tiada data langsung
+        
         const originalNoDataRow = tableBody.querySelector('td[colspan="6"]') ? tableBody.innerHTML : null;
         
         function applyClientSideFilters() {
@@ -745,11 +745,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const status = statusFilter.value;
             let visibleCount = 0;
             
-            // Buang row "No matching records" yang mungkin ada dari carian/filter sebelum ini
+            
             const existingNoMatchRow = tableBody.querySelector('.no-filter-match');
             if (existingNoMatchRow) existingNoMatchRow.remove();
             
-            // Jika tiada data langsung, jangan cuba filter
+            
             if (initialRows.length === 0 && originalNoDataRow) {
                 return; 
             }
@@ -757,14 +757,14 @@ document.addEventListener('DOMContentLoaded', function() {
             let allHidden = true;
 
             initialRows.forEach(row => {
-                // Ambil data untuk penapisan
+                
                 const item = row.cells[0].innerText.toLowerCase();
-                // Ambil teks kecil (small) di dalam cell 'Reason'
+                
                 const reasonElement = row.cells[5].querySelector('small');
                 const reason = reasonElement ? reasonElement.innerText.toLowerCase() : '';
                 
                 const rowStatusBadge = row.cells[3].querySelector('.loan-status-badge');
-                // Guna data-status untuk mendapatkan status sebenar (cth: 'checked out')
+                
                 const rowStatus = rowStatusBadge ? rowStatusBadge.dataset.status : ''; 
 
                 const matchesSearch = item.includes(query) || reason.includes(query);
@@ -779,9 +779,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // Paparkan notis jika tiada padanan ditemui
+            
             if (visibleCount === 0) {
-                 // Pastikan kita tidak menambah notis jika tiada data langsung
+                 
                 if (initialRows.length > 0) {
                     const tr = document.createElement('tr');
                     tr.className = 'no-filter-match';

@@ -535,51 +535,51 @@ echo "<tr id='row-{$row['reservation_item_id']}'
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
-// PENTING: Pastikan variable ini wujud dan diisi dari PHP di Bahagian 1
+
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
 
-// =========================================================================================
-// 1. FUNGSI APPROVAL DAN VALIDASI ASET
-// =========================================================================================
+
+
+
 
 function openApproveModal(id) {
     const row = document.getElementById('row-' + id);
     if (!row) return;
 
-    // 1. Dapatkan data asal dari data-attributes
+    
     const originalQty = parseInt(row.dataset.qty);
     const itemId = row.dataset.itemId;
-    const reservationReason = row.dataset.reason; // MESTI ADA
+    const reservationReason = row.dataset.reason; 
     
     const assets = availableAssets[itemId] || [];
     const availableCount = assets.length;
 
-    // 2. Dapatkan elemen modal
+    
     const $approveBtn = $('#confirmApproveBtn');
     const $assetContainer = $('#assetListContainer');
     const $approveQtyInput = $('#approve_actual_qty');
     const $partialRejectContainer = $('#partialRejectionReasonContainer');
     const $partialRejectReason = $('#partial_reject_reason');
     
-    // 3. Isi maklumat asas dan Reason
+    
     $('#userName').text(row.dataset.userName);
     $('#itemName').text(row.dataset.itemname);
     $('#userPhone').text(row.dataset.phone);
-    // PENTING: Inject data Reason ke dalam modal
+    
     $('#reservationReasonText').text(reservationReason || 'N/A'); 
     $('#approve_reservation_item_id').val(id);
     $('#requestedQtyText').text(originalQty);
     $('#approve_original_qty').val(originalQty);
     
-    // Set kuantiti lalai
+    
     let qtyToApprove = (availableCount >= originalQty) ? originalQty : availableCount;
     $approveQtyInput.val(qtyToApprove);
     $approveQtyInput.attr('max', availableCount); 
 
-    // --- LOGIK: Tunjuk atau sembunyikan kotak sebab (untuk Partial Rejection / Full Reject) ---
+    
     function updatePartialReasonDisplay(currentQty) {
-        // Paparkan kotak sebab jika Kuantiti Diluluskan < Kuantiti Diminta (termasuk 0)
+        
         if (currentQty < originalQty) {
             $partialRejectContainer.slideDown();
             $partialRejectReason.attr('required', true); 
@@ -589,25 +589,25 @@ function openApproveModal(id) {
         }
     }
 
-    // 5. FUNGSI BARU (1): Validasi butang 'Approve'
+    
     function validateApproveButton() {
         const currentQtyToApprove = parseInt($approveQtyInput.val());
         const checkedCount = $('.asset-checkbox:checked').length;
         
         let isReasonValid = true;
-        // SEMAK SEBAB JIKA PARTIAL/FULL REJECT (Qty Diluluskan < Qty Diminta)
+        
         if (currentQtyToApprove < originalQty) {
-              isReasonValid = $partialRejectReason.val().trim().length >= 5; // Min 5 aksara
+              isReasonValid = $partialRejectReason.val().trim().length >= 5; 
         }
         
         if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0 || !isReasonValid) {
               $approveBtn.prop('disabled', true);
               
-        // LOGIK UTAMA: JIKA Qty > 0, aset mesti dipilih
+        
         } else if (currentQtyToApprove > 0) {
             $approveBtn.prop('disabled', checkedCount !== currentQtyToApprove);
             
-        // LOGIK KRITIKAL: JIKA Qty == 0, dan SEBAB VALID, BENARKAN
+        
         } else if (currentQtyToApprove === 0) {
             $approveBtn.prop('disabled', !isReasonValid);
             
@@ -616,7 +616,7 @@ function openApproveModal(id) {
         }
     }
 
-    // 6. FUNGSI BARU (2): Hanya untuk bina senarai checkbox (atau tunjuk ralat)
+    
     function buildAssetCheckboxes() {
         const currentQtyToApprove = parseInt($approveQtyInput.val());
 
@@ -624,7 +624,7 @@ function openApproveModal(id) {
             $assetContainer.html('<div class="alert alert-warning">Please enter a valid quantity (0 or more) to approve.</div>');
             
         } else if (currentQtyToApprove === 0) {
-             // JIKA KUANTITI 0: Abaikan senarai aset
+             
              $assetContainer.html('<div class="alert alert-info mb-0">Quantity to Approve is 0. This request will be processed as a **Full Rejection**. Please provide a reason above.</div>');
             
         } else if (availableCount < currentQtyToApprove) {
@@ -634,7 +634,7 @@ function openApproveModal(id) {
              $assetContainer.html("<div class='alert alert-danger mb-0'>❌ No available assets found for this item. Please **Reject** the request (or enter 0 above with a reason).</div>");
             
         } else {
-            // Kuantiti > 0 dan aset mencukupi
+            
             let html = `<h6>Select exactly ${currentQtyToApprove} asset(s) to assign:</h6>`;
             html += assets.map(a =>
                 `<div class='form-check'><input class='form-check-input asset-checkbox' value='${a.asset_id}' type='checkbox' id='asset-${a.asset_id}'><label class='form-check-label' for='asset-${a.asset_id}'>${a.asset_code}</label></div>`
@@ -645,7 +645,7 @@ function openApproveModal(id) {
         validateApproveButton();
     }
 
-    // 7. Event Listeners: Padam yang lama & pasang yang baru
+    
     $approveQtyInput.off('change keyup');
     $assetContainer.off('change.assetcheck');
     $partialRejectReason.off('change keyup'); 
@@ -659,15 +659,15 @@ function openApproveModal(id) {
     
     $assetContainer.on('change.assetcheck', '.asset-checkbox', validateApproveButton); 
 
-    // 8. Panggil sekali untuk 'initialize' modal
+    
     buildAssetCheckboxes();
     updatePartialReasonDisplay(qtyToApprove);
 
-    // 9. Buka modal
+    
     new bootstrap.Modal('#approveDetailsModal').show();
 }
 
-// Tindakan AJAX Approve
+
 $('#confirmApproveBtn').on('click', function() {
     const reservation_item_id = $('#approve_reservation_item_id').val();
     const selected = $('.asset-checkbox:checked').map(function() { return $(this).val(); }).get();
@@ -676,7 +676,7 @@ $('#confirmApproveBtn').on('click', function() {
     const originalQty = parseInt($('#approve_original_qty').val());
     const reasonForPartialReject = $('#partial_reject_reason').val().trim();
 
-    // Validasi Front-End tambahan untuk memastikan kuantiti sepadan (Hanya jika Qty > 0)
+    
     if (actualApprovedQty > 0 && selected.length !== actualApprovedQty) {
         Swal.fire('Selection Error', `You must select exactly ${actualApprovedQty} asset(s).`, 'warning');
         return;
@@ -740,9 +740,9 @@ $('#confirmRejectBtn').on('click', function() {
 });
 
 
-// =========================================================================================
-// 3. FUNGSI CHECKOUT (Approve -> Checked Out)
-// =========================================================================================
+
+
+
 
 function checkOutItem(id) {
     Swal.fire({
@@ -768,9 +768,9 @@ function checkOutItem(id) {
 }
 
 
-// =========================================================================================
-// 4. FUNGSI CHECK-IN (Checked Out -> Returned)
-// =========================================================================================
+
+
+
 
 function checkInItem(id) {
     const row = document.getElementById('row-' + id);

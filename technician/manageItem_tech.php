@@ -1,18 +1,18 @@
 <?php
-// ----------------------------------------------------------------------
-// DIAGNOSTIK: Paparan Ralat (Dikekalkan)
+
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-// ----------------------------------------------------------------------
+
 
 session_start();
-// Pastikan anda mempunyai fail config.php di direktori induk (../config.php)
+
 include '../config.php'; 
 
-// ----------------------------------------------------------------------
-// 1. ACCESS CONTROL & SESSION CHECK
-// ----------------------------------------------------------------------
+
+
+
 
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
@@ -35,32 +35,28 @@ $stmt_tech->close();
 $tech_name = $tech_data ? htmlspecialchars($tech_data['name']) : 'Technician Unknown'; 
 
 
-// ----------------------------------------------------------------------
-// 2. HELPER FUNCTIONS
-// ----------------------------------------------------------------------
+
+
+
 
 /**
  * Memadam fail fizikal dari server, menggunakan path dari DB (cth: uploads/category/file.png).
  */
 function safe_unlink($db_filepath) {
     if (!$db_filepath) return;
-    // Path Server Relatif: naik satu tahap dari teknisi/
+    
     $server_path = '../' . $db_filepath; 
     if (file_exists($server_path) && is_file($server_path)) {
         @unlink($server_path);
     }
 }
-
-/**
- * Mengendalikan muat naik imej ke subdirektori (cth: uploads/category/).
- */
 function handleImageUpload($fileInputName, $dbSubDir) {
     global $conn;
     
     if (empty($dbSubDir)) $dbSubDir = 'uploads/';
     if (substr($dbSubDir, -1) !== '/') { $dbSubDir .= '/'; }
 
-    // Target directory relatif kepada manageItem_tech.php (di teknisi/)
+    
     $targetDir = '../' . $dbSubDir;
 
     if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] != UPLOAD_ERR_OK) {
@@ -70,15 +66,15 @@ function handleImageUpload($fileInputName, $dbSubDir) {
     $file = $_FILES[$fileInputName];
     $fileExt = strtolower(pathinfo(basename($file["name"]), PATHINFO_EXTENSION));
     
-    // Validasi
+    
     if ($file["size"] > 5000000) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Image size is too large (max 5MB).']; return NULL; }
     if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Only JPG, JPEG, PNG, & WEBP files are allowed.']; return NULL; }
 
     $newFileName = uniqid('img_', true) . "." . $fileExt;
     $server_path = $targetDir . $newFileName; 
-    $db_path = $dbSubDir . $newFileName; // Path yang disimpan dalam DB: uploads/item/file.png
+    $db_path = $dbSubDir . $newFileName; 
 
-    // Pastikan direktori wujud
+    
     if (!is_dir($targetDir)) {
         if (!mkdir($targetDir, 0777, true)) {
              $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat mencipta direktori muat naik atau kebenaran tidak mencukupi.'];
@@ -94,40 +90,34 @@ function handleImageUpload($fileInputName, $dbSubDir) {
     }
 }
 
-/**
- * Menjana akronim ringkas dari nama item.
- * Contoh: "Portable Speaker" -> "PS"
- * @param string $itemName Nama penuh item.
- * @return string Akronim ringkas (huruf besar).
- */
 function generateItemAcronym($itemName) {
-    // 1. Bersihkan nama: Buang karakter yang bukan huruf atau ruang.
+    
     $cleanedName = preg_replace('/[^a-zA-Z\s]/', '', $itemName);
     
-    // 2. Pecahkan nama kepada perkataan.
+    
     $words = explode(' ', $cleanedName);
     $acronym = '';
     
-    // 3. Ambil huruf pertama setiap perkataan.
+    
     foreach ($words as $word) {
         if (!empty($word)) {
             $acronym .= strtoupper($word[0]);
         }
     }
     
-    // Fallback jika nama item terlalu pendek.
+    
     if (empty($acronym) && strlen($cleanedName) >= 2) {
         $acronym = strtoupper(substr($cleanedName, 0, 2));
     } elseif (empty($acronym)) {
-        $acronym = 'XX'; // Placeholder jika nama kosong
+        $acronym = 'XX'; 
     }
 
-    // Hadkan akronim kepada 3 huruf untuk menjaga format kod aset
+    
     return substr($acronym, 0, 3);
 }
 
 
-// FUNGSI PENGESAHAN call_user_func_array untuk PHP lama
+
 function refValues($arr){
     if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
         $refs = array();
@@ -138,13 +128,13 @@ function refValues($arr){
     return $arr;
 }
 
-// ----------------------------------------------------------------------
-// 3. DATA FETCHING AWAL
-// ----------------------------------------------------------------------
 
-// 1. Fetch Pending Requests Count for Badge
+
+
+
+
 $pending_count_for_badge = 0; 
-// Menggunakan reservation_items dan mengira DISTINCT reserve_id untuk permintaan tertunda
+
 $stmt_badge = $conn->prepare("SELECT COUNT(DISTINCT reserve_id) FROM reservation_items WHERE status = 'Pending'");
 
 if ($stmt_badge) {
@@ -155,10 +145,10 @@ if ($stmt_badge) {
 }
 
 
-// 2. Fetch All Categories (PREFIX DIBUANG)
+
 $categories = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
 
-// 3. Fetch Item Type Summary (PREFIX DIBUANG)
+
 $item_details_query = "
     SELECT 
         i.item_id,
@@ -181,15 +171,15 @@ if ($result) {
     $item_details = $result->fetch_all(MYSQLI_ASSOC);
 } 
 
-// ----------------------------------------------------------------------
-// 4. LOGIC FOR CATEGORIES (TANPA PREFIX)
-// ----------------------------------------------------------------------
+
+
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
     
     if (!empty($category_name)) {
-        // SQL TANPA prefix
+        
         $stmt = $conn->prepare("INSERT INTO categories (category_name) VALUES (?)");
         
         if ($stmt === FALSE) {
@@ -220,7 +210,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $update_params = [$category_name];
     $types = "s";
     
-    // Semua logik berkaitan imej DIBUANG
+    
 
     $update_params[] = $category_id;
     $types .= "i";
@@ -248,7 +238,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
 if (isset($_GET['delete_category_id'])) {
     $delete_id = (int)$_GET['delete_category_id'];
     
-    // SQL DIBUANG: image_url dan prefix
+    
     $stmt_info = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?"); 
     $stmt_info->bind_param("i", $delete_id);
     $stmt_info->execute();
@@ -280,9 +270,9 @@ if (isset($_GET['delete_category_id'])) {
 }
 
 
-// ----------------------------------------------------------------------
-// 5. LOGIC FOR ITEM TYPES AND UNITS (DENGAN KOD ASET BARU)
-// ----------------------------------------------------------------------
+
+
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     
@@ -297,11 +287,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
 
     $conn->begin_transaction();
     try {
-        // A. Insert Item Type (dengan image_url)
+        
         $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
         if ($stmt_item === FALSE) throw new Exception("SQL Prepare Error (Add Item): " . $conn->error);
         
-        // PEMBETULAN SINTAKS LAMA (Baris 287 asal)
+        
         $image_path_to_bind = isset($image_path) ? $image_path : '';          
         $stmt_item->bind_param("siss", $item_name, $category_id, $description, $image_path_to_bind);
         if (!$stmt_item->execute()) throw new Exception("Error adding item type: " . $stmt_item->error);
@@ -310,22 +300,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         
         if ($new_item_id > 0 && $quantity > 0) {
             
-            // B. JANA AKRONIM dari NAMA ITEM BARU
+            
             $akronim = generateItemAcronym($item_name); 
 
-            // C. Insert Units (Assets)
+            
             $asset_status = 'Available';
             $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
             if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Add Asset): " . $conn->error);
             
-            // Mula mengira dari 1 kerana item_id ini baru
+            
             $start_count = 0; 
             $first_code = '';
             $last_code = '';
 
             for ($i = 1; $i <= $quantity; $i++) {
                 $asset_number = $start_count + $i;
-                // Format kod aset: [AKRONIM]-[NOMBOR TURUTAN 4 DIGIT]
+                
                 $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
 
                 if ($i == 1) $first_code = $asset_code;
@@ -405,11 +395,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
         if ($quantity_to_add > 0) {
             
-            // 1. JANA AKRONIM BARU (sekiranya nama item telah diubah)
+            
             $akronim = generateItemAcronym($item_name); 
 
-            // 2. DAPATKAN KIRAAN UNIT SEDIA ADA UNTUK ITEM_ID INI
-            // Query hanya mengira unit dalam item_id ini
+            
+            
             $asset_stmt = $conn->prepare("SELECT COUNT(*) AS max_num FROM assets WHERE item_id = ?");
             if ($asset_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Asset Max Count): " . $conn->error);
             
@@ -419,15 +409,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
             $asset_stmt->fetch();
             $asset_stmt->close();
             
-            $start_count = intval($max_num); // Jumlah unit sedia ada (e.g. 5)
+            $start_count = intval($max_num); 
 
-            // 3. MASUKKAN UNIT BARU
+            
             $asset_status = 'Available';
             $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
             if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Add Asset): " . $conn->error);
             
             for ($i = 1; $i <= $quantity_to_add; $i++) {
-                // Nombor baru akan bermula dari (start_count + 1)
+                
                 $asset_number = $start_count + $i;
                 $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
 
@@ -472,14 +462,14 @@ if (isset($_GET['delete_item_id'])) {
         while ($row = $assets_to_delete_res->fetch_assoc()) { $asset_ids[] = $row['asset_id']; }
         if (!empty($asset_ids)) {
             $asset_id_list = implode(',', $asset_ids);
-            // Padam dari reservation_assets dahulu
+            
             $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
         }
         
-        // Padam dari assets
+        
         $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
         
-        // Padam dari item
+        
         $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
         $stmt->bind_param("i", $delete_id);
         $stmt->execute();
@@ -498,9 +488,9 @@ if (isset($_GET['delete_item_id'])) {
 }
 
 
-// ----------------------------------------------------------------------
-// 6. HTML/PRESENTATION START
-// ----------------------------------------------------------------------
+
+
+
 ?>
 
 
@@ -514,11 +504,10 @@ if (isset($_GET['delete_item_id'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- THEME COLOR DEFINITIONS (ROOT VARIABLES) --- */
         :root {
-            --primary-color: #06b6d4; /* Cyan 600 (Dark Teal Blue) */
-            --primary-hover: #0891b2; /* Cyan 700 (Hover/Darker Color) */
-            --danger-color: #ef4444; /* Red */
+            --primary-color: #06b6d4; 
+            --primary-hover: #0891b2; 
+            --danger-color: #ef4444; 
             
             --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
@@ -697,20 +686,20 @@ if (isset($_GET['delete_item_id'])) {
 </head>
 <body>
 <?php 
-// 7. MESSAGE DISPLAY
+
 if (isset($_SESSION['message'])):
     $message = $_SESSION['message'];
     $type = $message['type'] === 'success' ? 'success' : 'error';
     $text = $message['text'];
-    // Clear message from session to prevent repeated display
+    
     unset($_SESSION['message']);
-    // Inject SweetAlert2 script
+    
     echo "<script>
         document.addEventListener('DOMContentLoaded', function() {
             Swal.fire({
                 icon: '{$type}',
-                title: 'Operation Status', // Modal title
-                text: '{$text}', // Modal text content
+                title: 'Operation Status', 
+                text: '{$text}', 
                 showConfirmButton: true
             });
         });
@@ -970,7 +959,7 @@ endif;
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Sidebar Toggle Logic for Mobile View
+        
         const sidebar = document.getElementById('offcanvasSidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
 
@@ -980,7 +969,7 @@ endif;
             });
         }
         
-        // Close sidebar if clicking outside on mobile (optional, but good)
+        
         document.querySelector('.main-content').addEventListener('click', function(e) {
             if (window.innerWidth <= 992 && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
                 sidebar.classList.remove('active');
@@ -996,7 +985,7 @@ endif;
     function openEditCategoryModal(category) {
         document.getElementById('edit_category_id').value = category.category_id;
         document.getElementById('edit_category_name').value = category.category_name;
-        // Prefix field removed from modal
+        
         
         var editCategoryModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
         editCategoryModal.show();
@@ -1011,10 +1000,10 @@ endif;
         document.getElementById('edit_item_name').value = item.item_name;
         document.getElementById('edit_description').value = item.description;
         
-        // Set Category Select value
+        
         document.getElementById('edit_category_id_select').value = item.category_id;
 
-        // Reset Add More Units fields
+        
         document.getElementById('edit_item_quantity').value = 0;
         document.getElementById('edit_item_brand').value = '';
         document.getElementById('edit_item_model').value = '';
@@ -1022,12 +1011,6 @@ endif;
         var editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
         editItemModal.show();
     }
-
-    /**
-     * Function for Category deletion confirmation.
-     * @param {number} id - Category ID.
-     * @param {string} name - Category name.
-     */
     function deleteCategory(id, name) {
         Swal.fire({
             title: 'Are you sure?',
@@ -1044,11 +1027,6 @@ endif;
         });
     }
 
-    /**
-     * Function for Item Type deletion confirmation.
-     * @param {number} id - Item ID.
-     * @param {string} name - Item name.
-     */
     function deleteItem(id, name) {
         Swal.fire({
             title: 'Are you sure?',

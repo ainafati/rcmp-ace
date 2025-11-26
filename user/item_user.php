@@ -1,7 +1,7 @@
 <?php
-// ====================================================================
-// BAHAGIAN 1: PHP INITIALIZATION DAN DATA FETCHING
-// ====================================================================
+
+
+
 session_start();
 include '../config.php'; 
 
@@ -9,16 +9,16 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
-// 1. Semak Sesi Pengguna
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php"); 
     exit();
 }
 
-// Gunakan person_id untuk semua query
+
 $person_id = (int) $_SESSION['person_id'];
 
-// 2. Dapatkan Butiran Pengguna (Kekal sama)
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("Error preparing statement: " . $conn->error);
@@ -45,9 +45,9 @@ if ($res_cat) {
 }
 
 
-// =======================================================
-// PHP: 2. Mengambil Item untuk Dropdown (Diperlukan)
-// =======================================================
+
+
+
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
@@ -64,10 +64,10 @@ if ($res_items) {
     $res_items->free(); 
 }
 
-// =======================================================
-// PHP: 3. Mengambil SEMUA ITEM untuk Dipaparkan di Bahagian Kanan
-// Logik ini menggantikan senarai ikon kategori
-// =======================================================
+
+
+
+
 $all_display_items = []; 
 $sql_all_display_items = "
     SELECT 
@@ -107,7 +107,7 @@ $stmt_roles->close();
 
 $_SESSION['user_roles'] = $user_roles;
 
-// Fungsi getCategoryIcon telah dibuang kerana kita memaparkan Item sebenar.
+
 
 ?>
 <!DOCTYPE html>
@@ -626,7 +626,7 @@ $(document).ready(function() {
 
     
     $('#item_select').select2({
-        theme: 'bootstrap-5', // <--- PENTING: Gunakan tema Bootstrap 5
+        theme: 'bootstrap-5', 
         placeholder: "-- Search and select an item --",
         allowClear: true,
     });
@@ -799,23 +799,23 @@ $(document).ready(function() {
     let reservationItems = []; 
     
     
-// Kod JavaScript (dalam item_user.php)
+
 
 function updateReasonAndPriorityStatus() {
     const reasonField = $('#reason');
     const programTypeField = $('#program_type');
-    const reasonHelpText = $('#reason-help-text'); // Dapatkan elemen baru
+    const reasonHelpText = $('#reason-help-text'); 
 
     if (reservationItems.length > 0) {
-        // Jika ADA ITEM dalam senarai, KUNCI borang ini
+        
         reasonField.prop('disabled', true).addClass('bg-light');
         programTypeField.prop('disabled', true).addClass('bg-light');
         
-        // ** Mesej maklum balas yang jelas **
+        
         reasonHelpText.html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-lock me-2"></i> Locked: To change, please remove all items from the list first.</div>');
         
     } else {
-        // Jika TIADA ITEM, BENARKAN pengguna mengisi borang
+        
         reasonField.prop('disabled', false).removeClass('bg-light');
         programTypeField.prop('disabled', false).removeClass('bg-light');
         

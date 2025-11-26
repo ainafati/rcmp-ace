@@ -285,9 +285,6 @@ $events_json = json_encode($events);
     .text-red { color: #ef4444; }
     .text-amber { color: #f59e0b; }
 
-    /* ---------------------------------- */
-    /* --- SIDEBAR STYLES (UPDATED) --- */
-    /* ---------------------------------- */
     .sidebar { 
         width: 250px; 
         position: fixed; 

@@ -3,16 +3,16 @@
 session_start();
 include '../config.php';
 
-// 1. SEMAK AUTENTIKASI
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
-// Ambil person_id dari sesi.
+
 $person_id = (int)$_SESSION['person_id'];
 
-// 2. AMBIL DATA PENGGUNA (ADMIN/TECH) DARI DB
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -21,19 +21,19 @@ if ($stmt === false) {
 $stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
-// *** PEMBETULAN: Menggunakan $admin sebagai nama variabel untuk konsistensi. ***
+
 $admin = $result->fetch_assoc(); 
 $stmt->close();
 
-// 3. SEMAK KEWUJUDAN DATA
+
 if (!$admin) {
     session_destroy();
     header("Location: ../login.php"); 
     exit();
 }
 
-// Tidak perlu menutup $conn di sini kerana mungkin diperlukan oleh include lain (walaupun dalam kes ini, ia ditutup di bawah).
-// $conn->close(); // Pindahkan ke penghujung fail jika ada kod PHP lain yang mungkin menggunakan $conn
+
+
 
 ?>
 <!DOCTYPE html>
