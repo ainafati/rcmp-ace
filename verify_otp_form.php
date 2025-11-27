@@ -163,7 +163,7 @@ if (isset($_GET['email'])) {
         const newPasswordInput = document.getElementById('new_password');
         const confirmPasswordInput = document.getElementById('confirm_password');
 
-        // Elemen toggle yang dikembalikan
+        
         const toggleNewPasswordButton = document.getElementById('toggleNewPassword');
         const toggleConfirmPasswordButton = document.getElementById('toggleConfirmPassword');
         const newPasswordIcon = document.getElementById('newPasswordIcon');
@@ -266,7 +266,7 @@ if (isset($_GET['email'])) {
             const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
             inputField.setAttribute('type', type);
             
-            // Toggle the icon classes
+            
             if (type === 'text') {
                 iconElement.classList.remove('fa-eye-slash');
                 iconElement.classList.add('fa-eye');
@@ -276,7 +276,7 @@ if (isset($_GET['email'])) {
             }
         }
 
-        // Initialize on page load
+        
         document.addEventListener('DOMContentLoaded', () => {
             const params = getUrlParams();
             if (params.email) {
@@ -291,7 +291,7 @@ if (isset($_GET['email'])) {
             }
         });
         
-        // Event listener for New Password toggle (DIKEMBALIKAN)
+        
         if (toggleNewPasswordButton) {
             toggleNewPasswordButton.addEventListener('click', (e) => {
                 e.preventDefault(); 
@@ -299,7 +299,7 @@ if (isset($_GET['email'])) {
             });
         }
         
-        // Event listener for Confirm Password toggle (DIKEKALKAN)
+        
         if (toggleConfirmPasswordButton) {
             toggleConfirmPasswordButton.addEventListener('click', (e) => {
                 e.preventDefault(); 

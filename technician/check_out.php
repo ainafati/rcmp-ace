@@ -469,8 +469,14 @@ echo "<tr id='row-{$row['reservation_item_id']}'
             <div class="modal-body">
                 <p><strong>User:</strong> <span id="userName"></span> (<span id="userPhone"></span>)</p>
                 <p><strong>Item:</strong> <span id="itemName"></span></p>
-                <p><strong>Quantity Requested:</strong> <span id="requestedQtyText" class="badge text-bg-warning"></span></p>
-				<p><strong>Reason:</strong> <span id="reservationReasonText" class="badge text-bg-warning"></span></p>				
+<p>
+    <strong>Quantity Requested:</strong> 
+    <span id="requestedQtyText"></span> 
+</p>
+<p>
+    <strong>Reason:</strong> 
+    <span id="reservationReasonText" ></span>
+</p>
 				<hr>
 
                 <div class="mb-3">

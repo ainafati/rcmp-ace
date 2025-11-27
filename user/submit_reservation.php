@@ -3,6 +3,9 @@ session_start();
 
 
 include '../config.php'; 
+include '../technician/config_email.php'; 
+require '../technician/send_email.php';
+
 header('Content-Type: application/json');
 
 function send_error($message) {
@@ -113,7 +116,30 @@ try {
     }
 
     $conn->commit();
-    echo json_encode(['status' => 'success', 'message' => 'Tempahan berjaya dihantar!']);
+	$technician_email = TECHNICIAN_GROUP_EMAIL; 
+$stmt_user_name = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+ $stmt_user_name->bind_param("i", $user_id);
+ $stmt_user_name->execute();
+ $user_data = $stmt_user_name->get_result()->fetch_assoc();
+ $user_name = $user_data['name'] ?? 'User Unknown';
+ $stmt_user_name->close();
+ $first_item_name = $items_to_reserve[0]['item_name'] ?? 'Multiple Items';
+ $reserve_date_str = $items_to_reserve[0]['reserve_date'] ?? date('Y-m-d');
+ $link_to_approval = BASE_URL . 'index.php?page=approvals&reserve_id=' . $reserve_id; 
+ $email_sent = false;
+    
+    if (defined('TECHNICIAN_GROUP_EMAIL') && defined('BASE_URL')) {
+        $email_sent = sendNewReservationNotification(
+            $technician_email, 
+            $reserve_id, 
+            $user_name, 
+            $first_item_name, 
+            $reserve_date_str, 
+            $link_to_approval
+        );
+    }
+ $email_message = $email_sent ? ' Notifikasi juruteknik dihantar.' : ' Amaran: Gagal hantar notifikasi e-mel juruteknik. Sila semak log ralat.';
+ echo json_encode(['status' => 'success', 'message' => 'Tempahan berjaya dihantar!' . $email_message]);
 
 } catch (Exception $e) {
     $conn->rollback();

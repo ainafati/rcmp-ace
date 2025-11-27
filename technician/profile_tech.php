@@ -3,7 +3,7 @@ session_start();
 
 include '../config.php';
 
-// --- PHP INITIATION & DATA FETCH ---
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -16,7 +16,7 @@ if (!isset($conn) || $conn->connect_error) {
     die("Database Connection Error.");
 }
 
-// Fetch Technician Data
+
 $stmt = $conn->prepare("SELECT id AS staff_id, name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -34,11 +34,11 @@ if (!$tech) {
     exit();
 }
 
-// === LOGIK UNTUK MENGURUS MESEJ DAN MOD EDIT ===
+
 $keep_edit_mode = false;
 if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) {
     $keep_edit_mode = true;
-    unset($_SESSION['keep_edit_mode']); // Clear flag immediately
+    unset($_SESSION['keep_edit_mode']); 
 }
 ?>
 <!DOCTYPE html>
@@ -419,7 +419,7 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Ambil penanda status mod edit dari PHP
+    
     const shouldKeepEditMode = <?= json_encode($keep_edit_mode) ?>;
 
     const viewMode = document.getElementById('viewMode');
@@ -437,7 +437,7 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     }
 
     function switchToViewMode() {
-        // Reset medan kata laluan apabila Batal
+        
         document.querySelector('input[name="new_password"]').value = '';
         document.querySelector('input[name="confirm_password"]').value = '';
         
@@ -449,7 +449,7 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     cancelBtn.addEventListener('click', switchToViewMode);
 
 
-    // Logik Sidebar
+    
     function toggleSidebar() {
         if (sidebar.style.transform === 'translateX(0px)' || window.getComputedStyle(sidebar).transform === 'matrix(1, 0, 0, 1, 0, 0)') {
             sidebar.style.transform = 'translateX(-280px)';
@@ -471,21 +471,21 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     }
 
     window.addEventListener('load', () => {
-        // Logik sidebar untuk load
+        
         if (window.innerWidth >= 992) {
             sidebar.style.transform = 'translateX(0px)';
         } else {
             sidebar.style.transform = 'translateX(-280px)';
         }
 
-        // === LOGIK KEKAL DALAM MOD EDIT ===
-        // Jika terdapat ralat, shouldKeepEditMode akan menjadi true
+        
+        
         if (shouldKeepEditMode) {
-            // Pastikan mod edit dipaparkan
+            
             viewMode.style.display = 'none';
             editMode.style.display = 'block';
         }
-        // === AKHIR LOGIK KEKAL DALAM MOD EDIT ===
+        
     });
 
     window.addEventListener('resize', () => {

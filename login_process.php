@@ -1,14 +1,15 @@
 <?php
 session_start();
-include 'config.php'; 
-
+include 'config.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     
     $email = isset($_POST['email']) ? $_POST['email'] : '';
     $password = isset($_POST['password']) ? $_POST['password'] : '';
-    $selected_role = isset($_POST['role']) ? $_POST['role'] : ''; 
+    $selected_role = isset($_POST['role']) ? $_POST['role'] : '';
+    // Dapatkan status checkbox 'Remember Me'
+    $remember_me = isset($_POST['remember_me']) && $_POST['remember_me'] == '1';
     
     
     $_SESSION['login_attempt_role'] = $selected_role;
@@ -34,7 +35,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->close();
         
         
-        if (password_verify($password, $person['password'])) { 
+        if (password_verify($password, $person['password'])) {
         
             
             
@@ -44,12 +45,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 exit();
             }
 
+            // --- START: LOGIK REMEMBER ME ---
+            if ($remember_me) {
+                // Tetapkan cookie untuk 30 hari (86400 saat * 30 hari)
+                $cookie_expiry = time() + (86400 * 30);
+                setcookie("remember_email", $email, $cookie_expiry, "/");
+            } else {
+                // Jika tidak ditanda, pastikan cookie dipadam jika ia wujud
+                if (isset($_COOKIE['remember_email'])) {
+                    setcookie("remember_email", "", time() - 3600, "/");
+                }
+            }
+            // --- END: LOGIK REMEMBER ME ---
 
+            // Semak Peranan Pengguna
             $stmt_roles = $conn->prepare("
-                SELECT r.role_name 
-                FROM person_roles pr 
-                JOIN roles r ON pr.role_id = r.role_id 
-                WHERE pr.person_id = ? 
+                SELECT r.role_name
+                FROM person_roles pr
+                JOIN roles r ON pr.role_id = r.role_id
+                WHERE pr.person_id = ?
             ");
 
             
@@ -65,6 +79,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $roles_result = $stmt_roles->get_result();
             
             
+            $roles_db = [];
             while ($row = $roles_result->fetch_assoc()) {
                 $roles_db[] = $row['role_name'];
             }
@@ -77,10 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             
             
-            
-            
-            
-            
+            // Peta Peranan Borang ke Peranan DB
             $mapped_role = null;
             switch ($selected_role) {
                 case 'admin':
@@ -96,24 +108,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $mapped_role = null;
             }
 
-            
+            // Sahkan pengguna mempunyai peranan yang dipilih
             if (is_null($mapped_role) || !in_array($mapped_role, $roles_db)) {
                 $_SESSION['error'] = "The selected role is not valid for this account, or you do not have permission.";
                 header("Location: login.php");
                 exit();
             }
 
-            
+            // PENETAPAN SESI BERJAYA
             $_SESSION['person_id'] = $person['person_id'];
             $_SESSION['name'] = $person['name'];
+            $_SESSION['logged_in_role'] = $mapped_role;
+            $_SESSION['all_roles'] = $roles_db;
             
             
-            $_SESSION['logged_in_role'] = $mapped_role; 
-            
-            
-            $_SESSION['all_roles'] = $roles_db; 
-            
-            
+            // PENGALIHAN (REDIRECT)
             switch ($mapped_role) {
                 case 'Admin':
                     header("Location: admin/manageItem_admin.php");
@@ -126,7 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     break;
                 default:
                     $_SESSION['error'] = "Role selected is valid but dashboard path is missing.";
-                    header("Location: login.php"); 
+                    header("Location: login.php");
             }
             exit();
 

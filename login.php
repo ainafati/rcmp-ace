@@ -3,10 +3,8 @@ session_start();
 include 'config.php';
 
 
-
 if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     $role = $_SESSION['logged_in_role'];
-    
     
     switch ($role) {
         case 'Admin':
@@ -22,6 +20,7 @@ if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
 }
 
 
+
 $login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
 $login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
 
@@ -30,6 +29,15 @@ unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 $errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 $successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
 unset($_SESSION['error'], $_SESSION['success']);
+
+
+
+$remembered_email = isset($_COOKIE['remember_email']) ? $_COOKIE['remember_email'] : '';
+
+
+if (empty($login_attempt_email) && !empty($remembered_email)) {
+    $login_attempt_email = $remembered_email;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -50,12 +58,12 @@ unset($_SESSION['error'], $_SESSION['success']);
     /* GLOBAL & STRUCTURE (Centered Design) */
     /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147;      /* Dark Blue (Main Button, Text) */
-        --accent-cyan: #00A3C9;        /* Light Blue/Cyan (Main Accent) */
-        --accent-green: #A7D737;       /* Lime Green (Input Focus) */
-        --light-bg: #f5f8ff;           /* Light background */
+        --primary-color: #002147;
+        --accent-cyan: #00A3C9;
+        --accent-green: #A7D737;
+        --light-bg: #f5f8ff;
         --border-color: #e2e8f0;
-        --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15); /* Stronger shadow for card */
+        --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15);
     }
 
     body, html { 
@@ -64,13 +72,13 @@ unset($_SESSION['error'], $_SESSION['success']);
         font-family: 'Inter', sans-serif; 
         height: 100%; 
         background-color: var(--light-bg); 
-        display: flex; /* Use flex to center content */
+        display: flex;
         align-items: center;
         justify-content: center;
         min-height: 100vh;
     }
     .form-wrapper { 
-        max-width: 450px; /* Max width of login card */
+        max-width: 450px;
         width: 90%; 
         background: #fff; 
         padding: 40px; 
@@ -133,12 +141,12 @@ unset($_SESSION['error'], $_SESSION['success']);
         cursor: pointer; 
         transition: all 0.3s ease-in-out;
         background-color: #ffffff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Lighter shadow */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     .role-content i { 
         font-size: 24px; 
         margin-bottom: 8px; 
-        color: var(--accent-cyan); /* Icon Color: Cyan */
+        color: var(--accent-cyan);
     }
     .role-content span { 
         display: block; 
@@ -169,7 +177,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     #login-details-step.visible { 
         opacity: 1; 
         height: auto;
-        margin-top: 25px; /* Reduce top margin */
+        margin-top: 25px;
     }
     .input-group { 
         margin-bottom: 18px; 
@@ -192,12 +200,10 @@ unset($_SESSION['error'], $_SESSION['success']);
         box-sizing: border-box; 
         font-size: 16px;
         transition: border-color 0.3s, box-shadow 0.3s;
-        /* Padding lebih besar untuk ikon toggle */
         padding-right: 50px; 
     }
     
-    /* ********** PEMBETULAN UTAMA: HILANGKAN IKON LALAI PELAYAR ********** */
-    /* Sembunyikan ikon Reveal Password lalai dari Chrome/Edge/Safari/IE/Edge */
+    /* Sembunyikan ikon Reveal Password lalai dari pelayar */
     input[type=password]::-ms-reveal,
     input[type=password]::-ms-clear {
         display: none !important;
@@ -211,8 +217,7 @@ unset($_SESSION['error'], $_SESSION['success']);
         position: absolute;
         right: 0;
     }
-    /* ********************************************************** */
-
+    
     .input-group input:focus {
         border-color: var(--accent-green);
         box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
@@ -223,14 +228,12 @@ unset($_SESSION['error'], $_SESSION['success']);
         right: 8px; 
         top: 50%;
         transform: translateY(-50%);
-        margin-top: 14px; /* Approx. half the label height + margin */
+        margin-top: 14px;
         cursor: pointer; 
         color: #94a3b8; 
         font-size: 16px; 
-        /* Pastikan ikon anda berada di atas segalanya */
         z-index: 100; 
     }
-    /* Fix 'top' position if no label */
     .input-group input:placeholder-shown + .toggle-password {
         top: 50%;
         margin-top: 0;
@@ -281,6 +284,45 @@ unset($_SESSION['error'], $_SESSION['success']);
     .instruction #role-title { color: var(--accent-cyan) !important; }
 
     /* -------------------------------------------------------------------------- */
+    /* REMEMBER ME CHECKBOX (KOD BARU) */
+    /* -------------------------------------------------------------------------- */
+    .remember-me-group {
+        margin-bottom: 25px; 
+        text-align: left;
+    }
+    .remember-me-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #475569;
+    }
+    .remember-me-label input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin-right: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        appearance: none;
+        background-color: #fff;
+        transition: all 0.2s;
+    }
+    .remember-me-label input[type="checkbox"]:checked {
+        background-color: var(--accent-cyan);
+        border-color: var(--accent-cyan);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3l6-6'/%3e%3c/svg%3e");
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+    .remember-me-label input[type="checkbox"]:focus {
+        outline: 2px solid var(--accent-green);
+        outline-offset: 2px;
+    }
+    /* -------------------------------------------------------------------------- */
+
+    /* -------------------------------------------------------------------------- */
     /* RESPONSIVE DESIGN (MOBILE) */
     /* -------------------------------------------------------------------------- */
     @media (max-width: 550px) {
@@ -299,12 +341,12 @@ unset($_SESSION['error'], $_SESSION['success']);
         .header-branding {
             margin-top: 15px;
         }
-        /* Adjust toggle icon position on mobile if needed */
         .toggle-password {
             margin-top: 13px;
         }
     }
-</style></head>
+</style>
+</head>
 <body>
 
 <div class="form-wrapper">
@@ -322,7 +364,7 @@ unset($_SESSION['error'], $_SESSION['success']);
             <div class="roles">
                 <label class="role-card"><input type="radio" name="role" value="admin" data-title="Admin"><div class="role-content"><i class="fa-solid fa-user-shield"></i><span>Admin</span></div></label>
                 <label class="role-card"><input type="radio" name="role" value="tech" data-title="Technician"><div class="role-content"><i class="fa-solid fa-screwdriver-wrench"></i><span>Technician</span></div></label>
-                <label class="role-card"><input type="radio" name="role" value="user" data-title="User"><div class="role-content"><i class="fa-solid fa-user"></i><span>User/Staff</span></div></label>
+                <label class="role-card"><input type="radio" name="role" value="user" data-title="User/Staff"><div class="role-content"><i class="fa-solid fa-user"></i><span>User/Staff</span></div></label>
             </div>
         </div>
 
@@ -351,6 +393,12 @@ unset($_SESSION['error'], $_SESSION['success']);
                     <i class="fa-solid toggle-password" id="togglePassword"></i>
                 </div>
                 
+                <div class="remember-me-group">
+                    <label class="remember-me-label">
+                        <input type="checkbox" name="remember_me" value="1" <?= !empty($login_attempt_email) && !empty($remembered_email) ? 'checked' : '' ?>>
+                        Remember Me
+                    </label>
+                </div>
                 <button type="submit" class="login-btn">Log In</button>
             </form>
 
@@ -386,10 +434,9 @@ unset($_SESSION['error'], $_SESSION['success']);
                     setTimeout(() => {
                         message.style.display = 'none';
                     }, 500);
-                }, 5000); 
+                }, 5000);
             });
         }
-        
         
         
         function showLoginDetails(role, title) {
@@ -410,7 +457,6 @@ unset($_SESSION['error'], $_SESSION['success']);
             if (emailInput.value === '') {
                 emailInput.focus();
             } else {
-                
                 passwordField.focus();
             }
         }
@@ -422,29 +468,18 @@ unset($_SESSION['error'], $_SESSION['success']);
         });
         
         
-        
-        
-        
         if (togglePassword && passwordField) {
-            
-            
-            
             togglePassword.classList.add("fa-eye-slash"); 
             
             togglePassword.addEventListener("click", function () {
-                
                 const isPassword = passwordField.type === "password";
                 
                 if (isPassword) {
-                    
                     passwordField.type = "text";
-                    
                     this.classList.remove("fa-eye-slash");
                     this.classList.add("fa-eye");
                 } else {
-                    
                     passwordField.type = "password";
-                    
                     this.classList.remove("fa-eye");
                     this.classList.add("fa-eye-slash");
                 }
@@ -452,19 +487,15 @@ unset($_SESSION['error'], $_SESSION['success']);
         }
         
         
-        
-        
         const attemptedRole = '<?= $login_attempt_role ?>';
         if (attemptedRole) {
             const radio = document.querySelector(`input[name="role"][value="${attemptedRole}"]`);
             if (radio) {
-                
                 radio.checked = true;
-                
                 
                 setTimeout(() => {
                     showLoginDetails(attemptedRole, radio.dataset.title);
-                }, 100); 
+                }, 100);
             }
         }
     });

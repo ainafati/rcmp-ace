@@ -276,7 +276,7 @@ if (isset($_GET['delete_category_id'])) {
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     
-    $item_name = trim($_POST['item_name']);
+    $item_name = ucwords (trim($_POST['item_name']));
     $category_id = (int)$_POST['category_id'];
     $description = trim($_POST['description']);
     $quantity = (int)$_POST['quantity'];
@@ -343,7 +343,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     
     $item_id = (int)$_POST['edit_item_id'];
-    $item_name = trim($_POST['edit_item_name']);
+    $item_name = ucwords(trim($_POST['edit_item_name']));
     $category_id = (int)$_POST['edit_category_id'];
     $description = trim($_POST['edit_description']);
     $quantity_to_add = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
@@ -723,7 +723,7 @@ endif;
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
-    <a href="../logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
 <div class="main-content">
@@ -814,7 +814,7 @@ endif;
                                         <?php if (!empty($item['image_url'])): ?>
                                             <img src="<?= htmlspecialchars('../' . $item['image_url']) ?>" class="item-img-sm" alt="Item Image">
                                         <?php endif; ?>
-                                        <strong><?= htmlspecialchars($item['item_name']) ?></strong>
+                                        <strong><?= ucwords (htmlspecialchars($item['item_name'])) ?></strong>
                                     </td>
                                     <td><?= htmlspecialchars($item['category_name']) ?></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>

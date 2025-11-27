@@ -3,6 +3,7 @@ session_start();
 
 include '../config.php';
 
+// --- PHP STARTS HERE ---
 
 if (!$conn) {
     $_SESSION['error'] = "Database connection error.";
@@ -21,6 +22,7 @@ $person_id = (int) $_SESSION['person_id'];
 $user = null;
 
 
+// Fetch user details using prepared statement for security
 $stmt_user = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
 
 if ($stmt_user) {
@@ -30,17 +32,19 @@ if ($stmt_user) {
     $user = $result_user->fetch_assoc();
     $stmt_user->close();
 } else {
+    // Log the error for technical staff, not the user
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
 if (!$user) {
+    // If user record is not found, destroy session and redirect to login
     session_destroy();
     header("Location: ../login.php");
     exit();
 }
 
 
-
+// Add person_id back to user array for use in the update form
 $user['person_id'] = $person_id; 
 
 $conn->close();
@@ -107,10 +111,39 @@ $conn->close();
     .sidebar a i { width: 20px; text-align: center; }
 
     .main-content { margin-left: 280px; }
-    .topbar { background: var(--card-bg); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eef1f4; z-index: 999; position: sticky; top: 0; }
+    .topbar { 
+        background: var(--card-bg); 
+        padding: 18px 30px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        border-bottom: 1px solid #eef1f4; 
+        z-index: 999; 
+        position: sticky; 
+        top: 0; 
+    }
     .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
     .container-fluid { padding: 30px; }
+    
+    /* === CSS PENTING UNTUK CENTER & BOLD NAMA PENGGUNA === */
+    .user-profile {
+        display: flex;
+        align-items: center;
+        /* Tambah ini jika anda mahu ia berpusat di antara elemen dalam div ini. */
+        justify-content: center; 
+    }
+    .user-profile .user-name {
+        font-weight: 700 !important; /* Force BOLD */
+        color: var(--text-dark);
+        /* Flexbox sudah handle vertical centering. */
+        /* Kita hanya perlu adjust margin. */
+        margin-right: 10px; 
         
+        /* Untuk memastikan ia berpusat secara mendatar jika ia dalam bekas yang lebih besar,
+           tetapi dalam topbar ini, flexbox memastikan penjajaran yang baik. */
+    }
+    /* ============================================== */
+    
     .card {
         border-radius: 12px; box-shadow: var(--shadow-light);
         background: var(--card-bg); margin-bottom: 25px;
@@ -217,10 +250,10 @@ $conn->close();
 
         <h3>My Profile</h3>
         <div class="user-profile">
-             <span class="user-name d-none d-md-inline"><?= htmlspecialchars($user['name']) ?></span>
-             <a href="profile.php" title="My Profile" style="color: inherit; text-decoration: none;">
-                 <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
-             </a>
+            <span class="user-name d-none d-md-inline"><?= htmlspecialchars($user['name']) ?></span>
+            <a href="profile.php" title="My Profile" style="color: inherit; text-decoration: none;">
+                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
+            </a>
         </div>
     </div>
 
@@ -317,8 +350,20 @@ $conn->close();
                                         </div>
                                     </div>
                                     
-                                    <hr class="mt-4">
+                                   <hr class="mt-4">
                                     <p class="text-muted fw-bold">Change Password (optional)</p>
+                                    
+                                    <div class="alert alert-info py-2" role="alert">
+                                        <h6 class="alert-heading fw-bold mb-1"><i class="fa-solid fa-key me-2"></i>Password Requirements:</h6>
+                                        <ul class="list-unstyled mb-0" style="margin-left: -5px; font-size: 0.95rem;">
+                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must be at least <strong>8 characters</strong> long.</li>
+                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>number</strong> (0-9).</li>
+                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>uppercase letter</strong> (A-Z).</li>
+                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>lowercase letter</strong> (a-z).</li>
+                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>special character</strong> (!@#$%..).</li>
+                                        </ul>
+                                    </div>
+                                    
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="new_password" class="form-label">New Password</label>
@@ -351,6 +396,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
 
+    // === JS untuk Kekalkan Mod Edit Selepas Penghantaran Borang Gagal/Berjaya ===
+    // Semak jika terdapat sebarang alert sesi (message atau error)
+    const hasSessionAlert = <?php echo (isset($_SESSION['error']) || isset($_SESSION['message'])) ? 'true' : 'false'; ?>;
+
+    if (hasSessionAlert) {
+        // Jika terdapat mesej ralat atau kejayaan, kekalkan mod edit dipaparkan
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
+        // Skrol ke atas untuk memastikan mesej dipaparkan
+        window.scrollTo(0, 0); 
+    }
+    // =========================================================================
+
+
     if (editBtn && cancelBtn) {
         editBtn.addEventListener('click', () => {
             viewMode.style.display = 'none';
@@ -364,11 +423,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
+    // --- Logik Sidebar Offcanvas untuk Mobile ---
     
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
-    const body = document.body;
+    
+    // Set initial position for mobile view
+    if (window.innerWidth <= 992) {
+        sidebar.style.transform = 'translateX(-280px)';
+    }
 
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
@@ -394,6 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+    // --- End Sidebar Logic ---
 });
 </script>
 
