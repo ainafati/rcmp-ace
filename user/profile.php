@@ -1,8 +1,14 @@
 <?php
 session_start();
 
-include '../config.php'; 
+include '../config.php';
 
+
+if (!$conn) {
+    $_SESSION['error'] = "Database connection error.";
+    header("Location: ../login.php");
+    exit();
+}
 
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
@@ -12,25 +18,30 @@ if (!isset($_SESSION['person_id'])) {
 $person_id = (int) $_SESSION['person_id'];
 
 
-$user = null; 
-$stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+$user = null;
+
+
+$stmt_user = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
 
 if ($stmt_user) {
     $stmt_user->bind_param("i", $person_id);
     $stmt_user->execute();
     $result_user = $stmt_user->get_result();
-    $user = $result_user->fetch_assoc(); 
+    $user = $result_user->fetch_assoc();
     $stmt_user->close();
 } else {
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
-if (!$user) { 
+if (!$user) {
     session_destroy();
-    header("Location: ../login.php"); 
+    header("Location: ../login.php");
     exit();
 }
 
+
+
+$user['person_id'] = $person_id; 
 
 $conn->close();
 ?>
@@ -46,85 +57,81 @@ $conn->close();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    /* --- CSS STYLES DISASARKAN DARI HISTORY.PHP --- */
+    /* --- CSS STYLES (Dikekalkan) --- */
     :root {
         --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
         --primary-light: #f0f9ff; /* Biru Sangat Muda untuk Latar Belakang Aktif */
         --primary-hover: #0891b2; /* Cyan 700 */
         --bg-light-gray: #f4f7f9; /* Latar belakang luar */
         --card-bg: #ffffff; /* Latar belakang Sidebar/Topbar/Card */
-        --text-dark: #1e293b; 
-        --text-muted: #64748b; 
-        --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05); 
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
         --danger-color: #ef4444; /* Merah untuk Logout */
     }
     
-    body {  
-        font-family: 'Inter', sans-serif;   
-        background-color: var(--bg-light-gray);   
-        color: var(--text-dark);    
-        min-height: 100vh;  
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-light-gray);
+        color: var(--text-dark);
+        min-height: 100vh;
     }
     
-    /* --- Sidebar Styles (Kekal Sama) --- */
-    .sidebar {  
-        width: 280px; position: fixed; top: 0; bottom: 0; left: 0;    
-        background: var(--card-bg); padding: 20px;  
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1000;  
-        display: flex; flex-direction: column; justify-content: space-between; 
-        transition: transform 0.3s ease-in-out; 
+    /* Sidebar, Topbar, dll CSS dikekalkan... */
+    .sidebar {
+        width: 280px; position: fixed; top: 0; bottom: 0; left: 0;
+        background: var(--card-bg); padding: 20px;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1000;
+        display: flex; flex-direction: column; justify-content: space-between;
+        transition: transform 0.3s ease-in-out;
     }
     .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
     .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
     .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-    .sidebar a {   
-        display: flex; align-items: center; gap: 15px;  
-        color: var(--text-muted); text-decoration: none;    
-        padding: 14px 18px; margin-bottom: 6px; 
-        border-radius: 10px; font-weight: 500; font-size: 15px; 
-        transition: all 0.2s;   
+    .sidebar a {
+        display: flex; align-items: center; gap: 15px;
+        color: var(--text-muted); text-decoration: none;
+        padding: 14px 18px; margin-bottom: 6px;
+        border-radius: 10px; font-weight: 500; font-size: 15px;
+        transition: all 0.2s;
     }
-    .sidebar a.active { 
-        background: var(--primary-light);    
-        color: var(--primary-color);    
-        font-weight: 700;    
+    .sidebar a.active {
+        background: var(--primary-light);
+        color: var(--primary-color);
+        font-weight: 700;
         box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
     }
     .sidebar a:hover:not(.active) { background: #eef1f4; color: var(--text-dark); }
     .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: 20px; }
     .sidebar a i { width: 20px; text-align: center; }
 
-    /* --- Content & Topbar Styles (Kekal Sama) --- */
     .main-content { margin-left: 280px; }
     .topbar { background: var(--card-bg); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eef1f4; z-index: 999; position: sticky; top: 0; }
     .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
     .container-fluid { padding: 30px; }
         
-    .card { 
-        border-radius: 12px; box-shadow: var(--shadow-light);     
-        background: var(--card-bg); margin-bottom: 25px;     
-        border: none; padding: 25px; 
+    .card {
+        border-radius: 12px; box-shadow: var(--shadow-light);
+        background: var(--card-bg); margin-bottom: 25px;
+        border: none; padding: 25px;
     }
     .card h5 { font-weight: 600; color: var(--text-dark); }
     
-    /* --- NEW PROFILE CARD DESIGN --- */
-    .profile-header-card { text-align: center; padding: 40px 25px; } /* Padding lebih besar */
+    .profile-header-card { text-align: center; padding: 40px 25px; }
     .avatar {
         width: 120px; height: 120px; border-radius: 50%;
-        background: var(--primary-light); /* Latar belakang cerah */
-        color: var(--primary-color); /* Teks/ikon warna utama */
+        background: var(--primary-light);
+        color: var(--primary-color);
         display: flex; align-items: center; justify-content: center;
         margin: 0 auto 20px auto;
         font-size: 55px; font-weight: 600;
-        border: 4px solid var(--primary-color); /* Border warna utama */
+        border: 4px solid var(--primary-color);
     }
 
-    /* Maklumat Asas Nama & Email */
     .basic-info strong { font-size: 1.5rem; font-weight: 700; display: block; margin-bottom: 5px; }
     .basic-info span { color: var(--text-muted); font-size: 0.95rem; }
 
-    /* Reka Bentuk Maklumat Dalam View Mode (Cards Pinned) */
     .info-card-container { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
     .info-card {
         padding: 15px 20px;
@@ -147,6 +154,10 @@ $conn->close();
         font-size: 18px;
         flex-shrink: 0;
     }
+    .info-icon-wrapper.id-wrapper {
+        background-color: var(--text-muted);
+    }
+
     .info-details strong {
         display: block;
         font-size: 13px;
@@ -160,20 +171,18 @@ $conn->close();
         font-size: 16px;
     }
 
-    /* Form Styles */
     .form-control:focus {
         border-color: var(--primary-color);
         box-shadow: 0 0 0 0.25rem rgba(6, 182, 212, 0.25);
     }
     .btn { border-radius: 8px; padding: 10px 20px; font-weight: 600; }
-    .btn-primary { 
-        background-color: var(--primary-color); 
+    .btn-primary {
+        background-color: var(--primary-color);
         border: none;
         transition: background-color 0.2s;
     }
     .btn-primary:hover { background-color: var(--primary-hover); }
 
-    /* Mobile Optimizations */
     @media (max-width: 992px) {
         .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
         .main-content { margin-left: 0; width: 100%; }
@@ -248,6 +257,13 @@ $conn->close();
                                 
                                 <div class="info-card-container">
                                     <div class="info-card">
+                                        <div class="info-icon-wrapper id-wrapper"><i class="fa-solid fa-hashtag"></i></div>
+                                        <div class="info-details">
+                                            <strong>ID</strong>
+                                            <span><?= htmlspecialchars($user['id']) ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="info-card">
                                         <div class="info-icon-wrapper"><i class="fa-solid fa-envelope"></i></div>
                                         <div class="info-details">
                                             <strong>Email Address</strong>
@@ -275,10 +291,20 @@ $conn->close();
                                 <h5><i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Update Your Details</h5>
                                 <hr>
                                 <form action="update_profile.php" method="POST">
-                                    <div class="mb-3">
-                                        <label for="name" class="form-label">Full Name</label>
-                                        <input type="text" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" readonly>
-                                        <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> Full name cannot be changed.</small>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="id" class="form-label">ID</label>
+                                            <input type="text" class="form-control" name="id" value="<?= htmlspecialchars($user['id']) ?>" readonly>
+                                            <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> ID (Staff/Student ID) cannot be changed.</small>
+                                        </div>
+                                        
+                                        <input type="hidden" name="person_id" value="<?= htmlspecialchars($user['person_id']) ?>">
+
+                                        <div class="col-md-6 mb-3">
+                                            <label for="name" class="form-label">Full Name</label>
+                                            <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($user['name']) ?>" readonly>
+                                            <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> Full name cannot be changed.</small>
+                                        </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -338,6 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
+    
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -351,11 +378,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (isHidden) {
                     sidebar.style.transform = 'translateX(0px)';
                     backdrop.style.display = 'block';
-                    body.classList.add('offcanvas-open');
                 } else {
                     sidebar.style.transform = 'translateX(-280px)';
                     backdrop.style.display = 'none';
-                    body.classList.remove('offcanvas-open');
                 }
             }
         });
@@ -365,7 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (window.innerWidth <= 992) {
                     sidebar.style.transform = 'translateX(-280px)';
                     backdrop.style.display = 'none';
-                    body.classList.remove('offcanvas-open');
                 }
             });
         }

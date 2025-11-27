@@ -1,6 +1,6 @@
 <?php
 session_start();
-include '../config.php'; 
+include '../config.php';
 
 if (!$conn) {
     $_SESSION['error'] = "Database connection error.";
@@ -23,21 +23,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $user_id = (int) $_SESSION['person_id'];
 
 
-$name = trim($_POST['name']); 
+// Hanya mengambil email, phoneNum, dan data password. Nama diabaikan.
 $email = trim($_POST['email']);
 $phoneNum = trim($_POST['phoneNum']);
-$new_password = $_POST['new_password']; 
+$new_password = $_POST['new_password'];
 $confirm_password = $_POST['confirm_password'];
 
 
-
-if (empty($name) || empty($email) || empty($phoneNum)) {
-    $_SESSION['error'] = "Name, email, and phone number cannot be empty.";
+// Semakan kosong: hanya email dan phoneNum diperlukan
+if (empty($email) || empty($phoneNum)) {
+    $_SESSION['error'] = "Email and phone number cannot be empty.";
     header("Location: profile.php");
     exit();
 }
 
 
+// Semakan format email
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $_SESSION['error'] = "Invalid email format.";
     header("Location: profile.php");
@@ -45,6 +46,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 }
 
 
+// Semakan format phoneNum
 if (!preg_match('/^[0-9\-\+\s\(\)]+$/', $phoneNum)) {
     $_SESSION['error'] = "Invalid phone number format. Only numbers and basic symbols (+-()) are allowed.";
     header("Location: profile.php");
@@ -52,10 +54,9 @@ if (!preg_match('/^[0-9\-\+\s\(\)]+$/', $phoneNum)) {
 }
 
 
-
-
+// Semak jika email sudah digunakan oleh pengguna lain
 $stmt_check = $conn->prepare("SELECT person_id FROM person WHERE email = ? AND person_id != ?");
-$stmt_check->bind_param("si", $email, $user_id); 
+$stmt_check->bind_param("si", $email, $user_id);
 $stmt_check->execute();
 if ($stmt_check->get_result()->num_rows > 0) {
     $_SESSION['error'] = "This email is already in use by another account.";
@@ -68,18 +69,19 @@ $stmt_check->close();
 
 $stmt = null;
 if (!empty($new_password)) {
-    
+
+    // Semak padanan kata laluan
     if ($new_password !== $confirm_password) {
         $_SESSION['error'] = "New passwords do not match.";
         header("Location: profile.php");
         exit();
     }
     
-    
+    // Semakan kekuatan kata laluan
     $uppercase = preg_match('@[A-Z]@', $new_password);
     $lowercase = preg_match('@[a-z]@', $new_password);
     $number    = preg_match('@[0-9]@', $new_password);
-    $specialChars = preg_match('@[\W_]@', $new_password); 
+    $specialChars = preg_match('@[\W_]@', $new_password);
 
     if (!$uppercase || !$lowercase || !$number || !$specialChars || strlen($new_password) < 8) {
         $_SESSION['error'] = 'New password does not meet the requirements. Please ensure it has 8+ characters, uppercase, lowercase, number, and a special character.';
@@ -89,20 +91,20 @@ if (!empty($new_password)) {
     
     $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
     
-    
-    $sql = "UPDATE person SET name = ?, email = ?, phoneNum = ?, password = ? WHERE person_id = ?";
+    // KEMASKINI dengan password dan password_updated_at (menggunakan NOW())
+    $sql = "UPDATE person SET email = ?, phoneNum = ?, password = ?, password_updated_at = NOW() WHERE person_id = ?";
     $stmt = $conn->prepare($sql);
     
-    $stmt->bind_param("ssssi", $name, $email, $phoneNum, $hashed_password, $user_id); 
+    $stmt->bind_param("sssi", $email, $phoneNum, $hashed_password, $user_id);
     
 
 } else {
     
-    
-    $sql = "UPDATE person SET name = ?, email = ?, phoneNum = ? WHERE person_id = ?";
+    // KEMASKINI tanpa password dan password_updated_at (Hanya email dan phoneNum)
+    $sql = "UPDATE person SET email = ?, phoneNum = ? WHERE person_id = ?";
     $stmt = $conn->prepare($sql);
     
-    $stmt->bind_param("sssi", $name, $email, $phoneNum, $user_id);
+    $stmt->bind_param("ssi", $email, $phoneNum, $user_id);
 }
 
 

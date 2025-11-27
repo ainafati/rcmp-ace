@@ -2,8 +2,8 @@
 
 
 $host = "localhost";
-$user = "nexcheck_dbuser";
-$pass = "nexcheck_dbuser"; 
+$user = "root";
+$pass = ""; 
 $db = "inventory";
 
 
@@ -11,10 +11,6 @@ $conn = new mysqli($host, $user, $pass, $db);
 
 
 if ($conn->connect_error) {
-    
-    
-    
-    
     
     if (!headers_sent()) {
         header('Content-Type: application/json');
@@ -30,4 +26,3 @@ if ($conn->connect_error) {
     
     exit(); 
 }
-
