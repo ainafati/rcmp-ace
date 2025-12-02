@@ -982,7 +982,7 @@ $(document).ready(function() {
                     <li class="list-group-item d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center flex-grow-1">
                             <div class="category-image-box">
-							<img src="../uploads/default-image.jpg" alt="Default Image">
+							<img src="../assets/default-image.jpg" alt="Default Image">
                             </div>
                             <div>
                                 <strong class="d-block">${item.item_name}</strong>

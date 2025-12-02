@@ -11,9 +11,6 @@ session_start();
 include '../config.php'; 
 
 
-
-
-
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
@@ -35,29 +32,35 @@ $stmt_tech->close();
 $tech_name = $tech_data ? htmlspecialchars($tech_data['name']) : 'Technician Unknown'; 
 
 
-
-
-
-
 /**
- * Memadam fail fizikal dari server, menggunakan path dari DB (cth: uploads/category/file.png).
+ * FUNGSI UNTUK MEMADAM FAIL DARI SERVER DENGAN SELAMAT
  */
 function safe_unlink($db_filepath) {
     if (!$db_filepath) return;
     
+    // safe_unlink menggunakan laluan DB untuk membina laluan server
     $server_path = '../' . $db_filepath; 
     if (file_exists($server_path) && is_file($server_path)) {
         @unlink($server_path);
     }
 }
+
+/**
+ * FUNGSI UNTUK MENGENDALIKAN MUAT NAIK IMEJ
+ * Memindahkan fail ke targetDir dan mengembalikan laluan DB (tanpa '../')
+ * @param string $fileInputName Nama input fail (e.g., 'item_image')
+ * @param string $dbSubDir Subdirektori relatif untuk DB (e.g., 'assets/item_images')
+ * @return string|NULL Laluan untuk DB jika berjaya, atau NULL jika gagal
+ */
 function handleImageUpload($fileInputName, $dbSubDir) {
     global $conn;
     
-    if (empty($dbSubDir)) $dbSubDir = 'uploads/';
+    // Pastikan subdirektori DB berakhir dengan '/'
+    if (empty($dbSubDir)) $dbSubDir = 'assets/'; 
     if (substr($dbSubDir, -1) !== '/') { $dbSubDir .= '/'; }
 
-    
-    $targetDir = '../' . $dbSubDir;
+    // Laluan Server (Memerlukan '../' untuk keluar dari folder semasa, mis. /admin/)
+    $targetDir = '../' . $dbSubDir; // Contoh: ../assets/item_images/
 
     if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] != UPLOAD_ERR_OK) {
         return NULL; 
@@ -71,8 +74,8 @@ function handleImageUpload($fileInputName, $dbSubDir) {
     if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Only JPG, JPEG, PNG, & WEBP files are allowed.']; return NULL; }
 
     $newFileName = uniqid('img_', true) . "." . $fileExt;
-    $server_path = $targetDir . $newFileName; 
-    $db_path = $dbSubDir . $newFileName; 
+    $server_path = $targetDir . $newFileName; // Laluan penuh server: ../assets/item_images/img_x.png
+    $db_path = $dbSubDir . $newFileName;     // Laluan DB: assets/item_images/img_x.png
 
     
     if (!is_dir($targetDir)) {
@@ -174,7 +177,6 @@ if ($result) {
 
 
 
-
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
     
@@ -211,7 +213,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $types = "s";
     
     
-
     $update_params[] = $category_id;
     $types .= "i";
     
@@ -270,10 +271,7 @@ if (isset($_GET['delete_category_id'])) {
 }
 
 
-
-
-
-
+// --- POST: TAMBAH ITEM BARU ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     
     $item_name = ucwords (trim($_POST['item_name']));
@@ -283,7 +281,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
     
-    $image_path = handleImageUpload('item_image', 'uploads/item'); 
+    // 🔥 PERUBAHAN UTAMA: Tukar laluan muat naik ke assets/item_images
+    $image_path = handleImageUpload('item_image', 'assets/item_images'); 
 
     $conn->begin_transaction();
     try {
@@ -303,6 +302,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
             
             $akronim = generateItemAcronym($item_name); 
 
+            
             
             $asset_status = 'Available';
             $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
@@ -340,6 +340,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     exit();
 }
 
+// --- POST: EDIT ITEM SEDIA ADA ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     
     $item_id = (int)$_POST['edit_item_id'];
@@ -362,7 +363,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
         $update_params = [$item_name, $category_id, $description];
         $types = "sis";
         $old_image_path = NULL;
-        $new_image_path = handleImageUpload('edit_item_image', 'uploads/item');
+        
+        // 🔥 PERUBAHAN UTAMA: Tukar laluan muat naik ke assets/item_images
+        $new_image_path = handleImageUpload('edit_item_image', 'assets/item_images');
 
         $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
         $old_img_stmt->bind_param("i", $item_id);
@@ -400,6 +403,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
             
             
+            
             $asset_stmt = $conn->prepare("SELECT COUNT(*) AS max_num FROM assets WHERE item_id = ?");
             if ($asset_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Asset Max Count): " . $conn->error);
             
@@ -411,6 +415,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
             
             $start_count = intval($max_num); 
 
+            
             
             $asset_status = 'Available';
             $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
@@ -486,9 +491,6 @@ if (isset($_GET['delete_item_id'])) {
     }
     header("Location: manageItem_tech.php"); exit();
 }
-
-
-
 
 
 ?>

@@ -10,24 +10,20 @@
             font-size: 10pt; 
             color: #333;
             line-height: 1.5;
-            /* **PERUBAHAN UTAMA:** Tetapkan Margin Atas Badan kepada Sifar */
             margin-top: 0; 
         }
         
         /* Header section with logo and title */
         .header {
-            text-align: center;
+            text-align: center; /* PASTIKAN SEMUA KANDUNGAN DALAM DIV INI TERPUSAT */
             margin-bottom: 20px; 
             border-bottom: 3px solid #003366; 
             padding-bottom: 10px; 
-            /* Tambah ini untuk memastikan tiada ruang atas dalam header */
             padding-top: 0; 
         }
 
         .header img {
-            /* Kurangkan margin bawah imej */
             margin-bottom: 3px; 
-            /* Tambah sedikit margin atas untuk mengelakkan imej melekat pada pinggir */
             margin-top: 15px; 
         }
 
@@ -92,15 +88,15 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 5%;">No.</th>           
-                <th style="width: 15%;">User Name</th>     
-                <th style="width: 25%;">Item Details</th>  
-                <th style="width: 10%;">Borrow Date</th>   
-                <th style="width: 10%;">Return Date</th>   
-                <th style="width: 8%;">Duration</th>      
-                <th style="width: 17%;">Return Condition</th>
-                <th style="width: 10%;">Handled By</th>    
-            </tr>
+                <th style="width: 1%;">No</th>            
+                <th style="width: 15%;">Borrower's Name</th>      
+                <th style="width: 25%;">Asset Code & Item Type</th>  
+                <th style="width: 10%;">Asset Issuance Date</th>    
+                <th style="width: 10%;">Asset Return Date</th>    
+                <th style="width: 8%;">Loan Duration</th>        
+                <th style="width: 10%;">Return Condition</th>
+                <th style="width: 17%;">Responsible Officer</th> 
+                </tr>
         </thead>
         <tbody>
             {{table_rows}}

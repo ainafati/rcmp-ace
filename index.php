@@ -412,7 +412,7 @@
         <div class="modal-content">
             <div class="icon"><i class="fas fa-bullhorn"></i></div>
             <h3>Important Notice for Borrowers</h3>
-            <p><strong>All borrowed items must be collected and returned personally at the UniKL IT Department office.</strong></p>
+            <p><strong>All borrowed items must be collected and returned personally at the UniKL RCMP IT Department office.</strong></p>
             <button onclick="closeModal()">I Understand</button>
         </div>
     </div>

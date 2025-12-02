@@ -95,7 +95,8 @@ header('Content-Disposition: attachment; filename="' . $filename . '"');
 $output = fopen('php://output', 'w'); 
 
 
-fputcsv($output, array('Person', 'Item Name', 'Asset Code', 'Category', 'Borrow Date', 'Return Date', 'Return Condition', 'Handled By'));
+fputcsv($output, array('Borrower Name', 'Item Name', 'Asset Code', 'Item Type', 'Asset Issuance Date', 'Asset Return Date', 'Return Condition', 'Responsible Officer'));
+
 
 
 while ($row = $result->fetch_assoc()) {

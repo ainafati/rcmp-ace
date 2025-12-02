@@ -21,7 +21,6 @@ $filename_prefix = "";
 $header_row = array();
 
 
-
 if ($export_type === 'returns') {
     
     $filename_prefix = "returned_items";
@@ -29,7 +28,7 @@ if ($export_type === 'returns') {
     $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
     $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-    $header_row = array('User Name', 'Item Name', 'Asset Code', 'Category', 'Borrow Date', 'Return Date', 'Return Condition', 'Handled By');
+    $header_row = array('Borrower Name', 'Item Name', 'Asset Code', 'Item Type', 'Asset Issuance Date', 'Asset Return Date', 'Return Condition', 'Responsible Officer');
 
     $sql_select = "u.name AS user_name, i.item_name, a.asset_code, c.category_name, ri.reserve_date, ri.return_date, ri.return_condition, handler.name AS handled_by_name";
     

@@ -90,18 +90,20 @@ $stmt_item->close();
 $sql_assets = "
     SELECT 
         a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name,
-        CASE 
+        -- Menggunakan MAX() untuk memastikan hanya satu nama peminjam diambil sekiranya berlaku duplikasi JOIN
+        MAX(CASE 
             WHEN a.status IN ('Checked Out') THEN u.name 
             ELSE NULL 
-        END AS borrower_name 
+        END) AS borrower_name 
     FROM assets a
     JOIN item i ON a.item_id = i.item_id
+    -- Untuk tujuan paparan senarai aset, kita hanya perlu tahu tempahan Checked Out terkini
     LEFT JOIN reservation_assets ra ON a.asset_id = ra.asset_id
-    LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id 
-            AND ri.status = 'Checked Out' 
+    LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id AND ri.status = 'Checked Out'
     LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
     LEFT JOIN person u ON r.person_id = u.person_id
     WHERE " . implode(' AND ', $where_clauses) . "
+    GROUP BY a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name
     ORDER BY a.asset_code ASC
 ";
 
@@ -114,6 +116,7 @@ $stmt_assets->close();
 $available_statuses = ['Available', 'Checked Out', 'Maintenance', 'Damaged'];
 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
