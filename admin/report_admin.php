@@ -214,7 +214,7 @@ if ($stmt_count_log) {
 
 
 
-$sql_log = "SELECT log_id, timestamp, user_type, user_id, action, details, ip_address
+$sql_log = "SELECT log_id, timestamp, user_type, person_id, action, details, ip_address
     " . $sql_base_log . $sql_where_log . "
     ORDER BY timestamp DESC
     LIMIT ? OFFSET ?";
@@ -623,7 +623,7 @@ $conn->close();
                                             if ($user_type == 'tech') $badge_class = 'bg-info text-dark';
                                             ?>
                                             <span class="badge <?= $badge_class ?>"><?= ucfirst($user_type) ?></span>
-                                            <small class="d-block text-muted">ID: <?= htmlspecialchars($log['user_id'] ?: 'N/A') ?></small>
+                                            <small class="d-block text-muted">ID: <?= htmlspecialchars($log['person_id'] ?: 'N/A') ?></small>
                                         </td>
                                         <td>
                                             <strong class="text-primary"><?= htmlspecialchars($log['action']) ?></strong>

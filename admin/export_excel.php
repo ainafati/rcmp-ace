@@ -68,7 +68,7 @@ if ($export_type === 'returns') {
     
     $header_row = array('Timestamp', 'User Type', 'User ID', 'Action', 'Details', 'IP Address');
 
-    $sql_select = "timestamp, user_type, user_id, action, details, ip_address";
+    $sql_select = "timestamp, user_type, person_id, action, details, ip_address";
     $sql_from_where = "FROM activity_logs";
     
     $where_clauses = array("timestamp BETWEEN ? AND ?");
@@ -145,7 +145,7 @@ while ($row = $result->fetch_assoc()) {
         fputcsv($output, array(
             date("Y-m-d H:i:s", strtotime($row['timestamp'])), 
             $row['user_type'],
-            $row['user_id'],
+            $row['person_id'],
             $row['action'],
             $row['details'],
             $row['ip_address']

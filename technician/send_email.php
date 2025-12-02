@@ -59,33 +59,46 @@ function fetch_reservation_items_by_id($conn, $reserve_id) {
     return $result;
 }
 
+/**
+ * FUNGSI FINAL DIBETULKAN: Log aktiviti ke dalam jadual activity_logs.
+ * MENGGUNAKAN nilai $person_id yang dibekalkan sebagai data untuk lajur DB 'user_id'.
+ */
 function logActivity($conn, $person_id, $action_type, $description, $related_id = NULL) {
-    // Kami mengabaikan $related_id di sini kerana skema DB anda tidak mempunyainya.
-    // Kami menggunakan user_id, action, dan details.
-
-    $person_id = (int)$person_id;
-    $action = strtoupper($action_type); // Pastikan ACTION dalam huruf besar
-    $details = (string)$description; 
     
-    // Asingkan IP Address dari $_SERVER untuk maklumat tambahan (Pilihan)
+    // 1. Dapatkan role & ID pengguna.
+    // user_type diambil dari sesi. Jika hilang, set 'system' (kerana DB anda NOT NULL).
+    $user_type = $_SESSION['user_type'] ?? 'system'; 
+    $user_id_for_db = (int)$person_id; // Nilai person_id dihantar ke lajur user_id
+    
+    // Pilihan: Semak ENUM jika anda mahu lebih ketat (jika nilai sesi salah ejaan)
+    $valid_types = ['admin', 'user', 'tech', 'system'];
+    if (!in_array($user_type, $valid_types)) {
+        $user_type = 'system'; 
+    }
+
+    $action = strtoupper($action_type); // Contoh: CHECKOUT, APPROVE
+    $details = (string)$description; 
     $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
     
-    // Gunakan user_id, action, details, dan ip_address
+    // 2. QUERY: Memasukkan data ke dalam lajur user_id, user_type, action, details, ip_address
     $stmt = $conn->prepare("
-        INSERT INTO activity_logs (user_id, action, details, ip_address) 
-        VALUES (?, ?, ?, ?)
+        INSERT INTO activity_logs (user_id, user_type, action, details, ip_address) 
+        VALUES (?, ?, ?, ?, ?)
     ");
 
     if (!$stmt) {
+        // Log ralat persediaan SQL
         error_log("Logging Prepare Error: " . $conn->error);
         return false;
     }
     
-    // Jenis param: i (user_id), s (action), s (details), s (ip_address)
-    $stmt->bind_param("isss", $person_id, $action, $details, $ip_address);
+    // 3. BIND PARAMETER: 
+    // i (user_id/person_id), s (user_type), s (action), s (details), s (ip_address)
+    $stmt->bind_param("issss", $user_id_for_db, $user_type, $action, $details, $ip_address);
     
     if (!$stmt->execute()) {
-        error_log("Logging Execute Error: " . $stmt->error);
+        // Log ralat pelaksanaan (mungkin user_type bukan nilai ENUM)
+        error_log("Logging Execute Error (user_id: {$user_id_for_db}, type: {$user_type}): " . $stmt->error);
         $stmt->close();
         return false;
     }
@@ -93,6 +106,7 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
     $stmt->close();
     return true;
 }
+
 
 function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
     
@@ -113,7 +127,7 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
         $mail->addAddress($to_email, $user_name);
 
-
+		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation: Reservation ID ' . $reserve_id . ' Has Been Processed';
@@ -300,6 +314,8 @@ function sendNewReservationNotification($technician_email, $reserve_id, $user_na
         
         $mail->addAddress($technician_email, 'Inventory Technician'); 
 
+		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
+
         $mail->isHTML(true);
         $mail->Subject = "NEW RESERVATION: Item - {$item_name} by {$user_name}";
         
@@ -379,10 +395,10 @@ function sendRejectionEmail($to_email, $user_name, $item_name, $rejection_reason
                         " . nl2br(htmlspecialchars($rejection_reason)) . "
                     </p>
                     
-                    <p>If you require further clarification, please contact the inventory technician.</p>
+                    <p>If you require further clarification, please contact the it department UniKL RCMP.</p>
                     
                     <hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;'>
-                    <p style='font-size: 12px; color: #999;'>This is an automated email from the UniKL Inventory System.</p>
+                    <p style='font-size: 12px; color: #999;'>This is an automated email from the UniKL RCMP IT Department.</p>
                 </div>
             </body>
             </html>
@@ -475,7 +491,7 @@ function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_ar
                     <p style='margin-top: 20px;'>
                         Please check the system for the rejection reasons for the items marked 'Rejected'.
                     </p>
-                    <p>If you have any further questions, please contact the inventory counter.</p>
+                    <p>If you have any further questions, please contact the UniKL RCMP IT Department .</p>
 
                     <hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;'>
                     <p style='font-size: 12px; color: #999;'>This is an automated email from the UniKL Inventory System.</p>
