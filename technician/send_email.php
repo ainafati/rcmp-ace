@@ -11,36 +11,87 @@ require '../PHPMailer-master/src/PHPMailer.php';
 require '../PHPMailer-master/src/SMTP.php';
 
 function fetch_reservation_items_by_id($conn, $reserve_id) {
-    $items = [];
+    // Perhatikan penggunaan LEFT JOIN dengan reservation_assets dan GROUP_CONCAT
     $stmt = $conn->prepare("
-        SELECT 
-            ri.id AS reservation_item_id, 
-            ri.quantity, 
-            ri.status, 
-            ri.reserve_date, 
-            ri.return_date, 
+        SELECT
+            ri.id,
+            ri.quantity,
+            ri.reserve_date,
+            ri.return_date,
+            ri.status,
             i.item_name,
+            p.email AS user_email,
             p.name AS user_name,
-            p.email AS user_email
-        FROM reservation_items ri
-        JOIN reservations r ON ri.reserve_id = r.reserve_id
-        JOIN person p ON r.person_id = p.person_id
-        JOIN item i ON ri.item_id = i.item_id
-        WHERE ri.reserve_id = ?
+            
+            -- *** KUNCI PENYELESAIAN MASALAH ANDA: Menggunakan GROUP_CONCAT ***
+            GROUP_CONCAT(a.asset_code SEPARATOR ', ') AS assigned_assets
+            
+        FROM
+            reservation_items ri
+        JOIN
+            reservations r ON ri.reserve_id = r.reserve_id
+        JOIN
+            person p ON r.person_id = p.person_id
+        JOIN
+            item i ON ri.item_id = i.item_id
+        LEFT JOIN 
+            reservation_assets ra ON ri.id = ra.reservation_item_id -- JOIN ke jadual aset
+        LEFT JOIN
+            assets a ON ra.asset_id = a.asset_id                  -- JOIN ke jadual aset untuk mendapatkan kod
+        WHERE
+            ri.reserve_id = ?
+        GROUP BY
+            ri.id, ri.quantity, ri.reserve_date, ri.return_date, ri.status, i.item_name, p.email, p.name
+        ORDER BY
+            ri.id
     ");
-    if (!$stmt) {
-        error_log("DB Prepare Failed in fetch_reservation_items_by_id: " . $conn->error);
-        return false;
-    }
 
+    if (!$stmt) {
+        error_log("DB Prepare Error in fetch_reservation_items_by_id: " . $conn->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $reserve_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $items[] = $row;
-    }
+    $result = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
-    return $items;
+    
+    return $result;
+}
+
+function logActivity($conn, $person_id, $action_type, $description, $related_id = NULL) {
+    // Kami mengabaikan $related_id di sini kerana skema DB anda tidak mempunyainya.
+    // Kami menggunakan user_id, action, dan details.
+
+    $person_id = (int)$person_id;
+    $action = strtoupper($action_type); // Pastikan ACTION dalam huruf besar
+    $details = (string)$description; 
+    
+    // Asingkan IP Address dari $_SERVER untuk maklumat tambahan (Pilihan)
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
+    
+    // Gunakan user_id, action, details, dan ip_address
+    $stmt = $conn->prepare("
+        INSERT INTO activity_logs (user_id, action, details, ip_address) 
+        VALUES (?, ?, ?, ?)
+    ");
+
+    if (!$stmt) {
+        error_log("Logging Prepare Error: " . $conn->error);
+        return false;
+    }
+    
+    // Jenis param: i (user_id), s (action), s (details), s (ip_address)
+    $stmt->bind_param("isss", $person_id, $action, $details, $ip_address);
+    
+    if (!$stmt->execute()) {
+        error_log("Logging Execute Error: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    
+    $stmt->close();
+    return true;
 }
 
 function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
@@ -62,7 +113,7 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
         $mail->addAddress($to_email, $user_name);
 
-        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring');
+
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation: Reservation ID ' . $reserve_id . ' Has Been Processed';
@@ -112,7 +163,7 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
                     <h2 style='color: #27ae60;'>Reservation Processed (ID: {$reserve_id})</h2>
                     <p>Hello <strong>{$user_name}</strong>,</p>
                     {$partial_notice}
-                    <p>Your reservation request containing multiple items has been fully processed by the technician. Please see the status of all requested items below. **Aset Ditugaskan (Assigned Assets) diperlukan semasa mengambil item.**</p>
+                    <p>Your reservation request containing multiple items has been fully processed by the technician. Please see the status of all requested items below.</p>
                     
                     <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; margin: 15px 0; border-collapse: collapse; border: 1px solid #ddd;'>
                         <thead>
@@ -170,7 +221,6 @@ function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME); 
         $mail->addAddress($to_email, $user_name);
 
-        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation of Assigned Assets ' . $item_name;
@@ -308,7 +358,6 @@ function sendRejectionEmail($to_email, $user_name, $item_name, $rejection_reason
         $mail->addAddress($to_email, $user_name);
 
         
-        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring'); 
 
         $mail->isHTML(true);
         $mail->Subject = 'IMPORTANT: Your Reservation Request for ' . $item_name . ' has been Rejected';
@@ -372,8 +421,6 @@ function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_ar
         
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
         $mail->addAddress($to_email, $user_name);
-
-        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = 'IMPORTANT: Update on Your Reservation ID ' . $reserve_id . ' (Processed)';

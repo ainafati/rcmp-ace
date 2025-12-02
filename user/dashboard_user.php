@@ -697,10 +697,10 @@ $stmt_notif_list->close();
         .menu-toggle-btn { display: none; }
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
 
-        /* FullCalendar Customization */
-        .fc { 
-            font-size: 14px;
-        }
+.fc { 
+    font-size: 14px;
+    height: 100%; /* 🔥 TAMBAH INI: Paksa kalendar mengambil keseluruhan ketinggian kontena */
+}
         .fc .fc-toolbar-title {
             font-size: 1.5em; 
             font-weight: 700;
@@ -923,15 +923,13 @@ $stmt_notif_list->close();
         </div>
         
         <div class="row mb-5">
-            <div class="col-lg-6 mb-4">
-                <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-calendar-alt me-2 text-primary"></i> Reservation Calendar</h5>
-                    <div id="fullCalendarContainer" class="p-3 border rounded-3 h-100">
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6 mb-4">
+<div class="col-lg-6 mb-4">
+    <div class="card p-4 h-100 d-flex flex-column"> 
+        <h5 class="fw-bold mb-3"><i class="fa-solid fa-calendar-alt me-2 text-primary"></i> Reservation Calendar</h5>
+        <div id="fullCalendarContainer" class="p-3 border rounded-3 flex-grow-1"> 
+        </div>
+    </div>
+</div>            <div class="col-lg-6 mb-4">
                 <div class="card p-4 h-100 action-center-card">
                     <h5 class="fw-bold mb-3"><i class="fa-solid fa-bell me-2 text-danger"></i> Timely Action Center</h5>
                     <p class="text-muted small">Upcoming returns and newly approved items requiring action.</p>

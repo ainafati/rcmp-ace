@@ -88,7 +88,7 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 1%;">No</th>            
+                <th style="width: 4%;">No</th>            
                 <th style="width: 15%;">Borrower's Name</th>      
                 <th style="width: 25%;">Asset Code & Item Type</th>  
                 <th style="width: 10%;">Asset Issuance Date</th>    

@@ -647,7 +647,7 @@ $(document).ready(function() {
     // --- 1. Initial Setup and Handlers ---
 
     // Initialize Flatpickr for Date Selection
-    flatpickr("#reserveDate", {
+    const reserveDatePicker = flatpickr("#reserveDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
         altInput: true,
@@ -754,9 +754,21 @@ $(document).ready(function() {
         $('#overlay').hide();
     });
     
-    // Handle 'I Understand' button click in Terms Modal
+    // LOGIK KESELAMATAN: KAWALAN PERSETUJUAN TERMA
+    
+    // 1. Apabila modal T&C dibuka, benarkan pengguna untuk mencentang (enable checkbox)
+    $('#termsModal').on('shown.bs.modal', function () {
+        // Hanya enable jika REQUEST_ITEMS > 0
+        if (REQUEST_ITEMS.length > 0) {
+            $('#agreeTerms').prop('disabled', false);
+        }
+    });
+
+    // 2. Handle 'I Understand' button click in Terms Modal: Centang kotak jika enabled
     $('#agreeTermsBtn').on('click', function() {
-        $('#agreeTerms').prop('checked', true).trigger('change');
+        if (!$('#agreeTerms').prop('disabled')) {
+            $('#agreeTerms').prop('checked', true).trigger('change');
+        }
     });
 
 
@@ -802,9 +814,9 @@ $(document).ready(function() {
     // Validation check for Step 1 fields
     function checkContextInputs() {
         return $('#reserveDate').val() && 
-               $('#returnDate').val() && 
-               $('#program_type').val() && 
-               $('#reason').val();
+                $('#returnDate').val() && 
+                $('#program_type').val() && 
+                $('#reason').val();
     }
 
 
@@ -838,7 +850,8 @@ $(document).ready(function() {
                     ${itemName}: <strong>${requestedQty} unit(s) is AVAILABLE</strong> from ${availableQty} total unit(s).
                 </div>
             `);
-            $('#addMoreBtn').prop('disabled', false);
+            // Label butang yang lebih jelas (Continue Shopping)
+            $('#addMoreBtn').prop('disabled', false).html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item and Continue Shopping</strong>');
         } else if (availableQty > 0) {
             // Partially available
             statusDiv.append(`
@@ -852,7 +865,7 @@ $(document).ready(function() {
                 $('#addMoreBtn').prop('disabled', true);
                 statusDiv.append('<p class="small text-danger mb-0 mt-1">Please reduce the quantity to match the available stock.</p>');
             } else {
-                $('#addMoreBtn').prop('disabled', false);
+                $('#addMoreBtn').prop('disabled', false).html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item and Continue Shopping</strong>');
             }
         } else {
             // Not available
@@ -900,12 +913,11 @@ $(document).ready(function() {
                     $('#availability-status').html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-exclamation-triangle me-2"></i> Error checking availability.</div>');
                     $('#addMoreBtn').prop('disabled', true);
                 }
-                $('#addMoreBtn').html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong>');
+                // Label butang dikemaskini oleh displayAvailability()
             },
             error: function() {
                 $('#availability-status').html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-exclamation-triangle me-2"></i> Server error. Please try again.</div>');
-                $('#addMoreBtn').prop('disabled', true);
-                $('#addMoreBtn').html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong>');
+                $('#addMoreBtn').prop('disabled', true).html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong>');
             }
         });
     }
@@ -946,7 +958,7 @@ $(document).ready(function() {
         $('#availability-status').empty();
         $('#addMoreBtn').prop('disabled', true);
 
-        // Enable Review tab and update summary
+        // Update Review tab (enables the tab and updates the summary)
         updateReviewTab();
     });
 
@@ -974,15 +986,22 @@ $(document).ready(function() {
         let itemsHtml = '';
         if (REQUEST_ITEMS.length === 0) {
             itemsHtml = '<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p class="mb-0">Your request list is currently empty.</p></div>';
+            
+            // Jika tiada item, kotak semak MESTI disabled dan un-checked.
             $('#agreeTerms').prop('disabled', true).prop('checked', false).trigger('change');
+            
         } else {
             itemsHtml = '<ul class="list-group list-group-flush">';
             REQUEST_ITEMS.forEach((item, index) => {
+                
+                // Menentukan laluan imej
+                const imagePath = item.image_url ? `../${item.image_url}` : '../assets/default-image.jpg'; 
+                
                 itemsHtml += `
                     <li class="list-group-item d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center flex-grow-1">
                             <div class="category-image-box">
-							<img src="../assets/default-image.jpg" alt="Default Image">
+                                <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img">
                             </div>
                             <div>
                                 <strong class="d-block">${item.item_name}</strong>
@@ -999,10 +1018,24 @@ $(document).ready(function() {
                 `;
             });
             itemsHtml += '</ul>';
-            $('#agreeTerms').prop('disabled', false); // Enable checkbox if list is not empty
+            
+            // Jika ada item, tetapkan kotak semak ke unchecked dan disabled.
+            $('#agreeTerms').prop('checked', false).prop('disabled', true); 
         }
         $('#itemsList').html(itemsHtml);
         
+        // C. AKTIFKAN TAB REVIEW & UPDATE STATUS ITEMS (User Friendly)
+        const reviewTabElement = $('#review-tab');
+        
+        if (REQUEST_ITEMS.length > 0) {
+            reviewTabElement.removeClass('disabled'); 
+            // Tambah badge kiraan item
+            reviewTabElement.html(`<i class="fa-solid fa-list-check me-2"></i> 3. Review & Submit <span class="badge text-bg-success ms-2">${REQUEST_ITEMS.length} Items</span>`);
+        } else {
+            reviewTabElement.addClass('disabled');
+            reviewTabElement.html('<i class="fa-solid fa-list-check me-2"></i> 3. Review & Submit');
+        }
+
         // Update total items hidden input for form submission
         $('input#allItems').val(JSON.stringify(REQUEST_ITEMS));
 
@@ -1036,7 +1069,7 @@ $(document).ready(function() {
         $('#finalSubmitBtn').prop('disabled', !$(this).is(':checked'));
     });
 
-    // Final Submission Handler
+    // Final Submission Handler (The critical part for submission)
     $('#finalSubmitBtn').on('click', function() {
         if (REQUEST_ITEMS.length === 0) {
             Swal.fire('Error', 'Your request list is empty. Please add items in Step 2.', 'error');
@@ -1058,28 +1091,77 @@ $(document).ready(function() {
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-2"></i> Submitting...');
 
         $.ajax({
-            url: 'submit_reservation.php', // You must create this file
+            url: 'submit_reservation.php', 
             type: 'POST',
             dataType: 'json',
-            contentType: 'application/json', // Tell server we're sending JSON
+            contentType: 'application/json', 
             data: JSON.stringify(submissionData),
+            
             success: function(response) {
-                if (response.success) {
+                if (response && response.status === 'success') {
                     Swal.fire({
                         title: 'Success!',
                         text: response.message,
                         icon: 'success'
                     }).then(() => {
-                        window.location.href = 'history.php'; // Redirect to history page
+                        window.location.href = 'history.php';
                     });
+                } else if (response && response.status === 'error') {
+                    // Jika PHP berjaya menghantar respons, tetapi ia adalah ralat logik
+                    Swal.fire('Submission Failed (Logic Error)', response.message, 'error');
                 } else {
-                    Swal.fire('Submission Failed', response.message, 'error');
+                    Swal.fire('Submission Failed', 'Unexpected successful response format.', 'error');
                 }
             },
+            
             error: function(xhr, status, error) {
-                console.error("Submission Error:", error);
-                Swal.fire('Server Error', 'Could not process the submission. Please check the network connection or try again later.', 'error');
+                // Ini menangani Ralat Server (500) atau kegagalan parsing JSON (output kotor)
+                let errorMessage = 'Could not process the submission.';
+                let responseText = xhr.responseText.trim();
+
+                try {
+                    // Cuba parse respons untuk mesej ralat logik
+                    const jsonResponse = JSON.parse(responseText);
+                    errorMessage = jsonResponse.message;
+                    
+                    // Jika ralat ini mengandungi mesej kejayaan, ia adalah "False Error" (Kotoran Output)
+                    if (errorMessage.includes("Tempahan berjaya dihantar") || jsonResponse.status === 'success') {
+                         Swal.fire({
+                            title: 'Success (Resolved)',
+                            text: "Tempahan berjaya dihantar. Ralat output kotor telah diselesaikan.",
+                            icon: 'success'
+                        }).then(() => {
+                            window.location.href = 'history.php';
+                        });
+                        return; 
+                    }
+                } catch (e) {
+                    // Gagal parse JSON (kemungkinan besar output PHP yang kotor)
+                    if (responseText.includes("Tempahan berjaya dihantar")) {
+                         Swal.fire({
+                            title: 'Success (Resolved)',
+                            text: "Tempahan berjaya dihantar!.",
+                            icon: 'success'
+                        }).then(() => {
+                            window.location.href = 'history.php';
+                        });
+                        return; 
+                    }
+                    
+                    // Ralat Server atau kegagalan lain
+                    if (xhr.status === 0 || xhr.status === 404) {
+                        errorMessage = 'Network connection failed or Server file not found (404).';
+                    } else if (xhr.status >= 500) {
+                        errorMessage = `Server Error (${xhr.status}). Please check PHP logs for ${xhr.status}.`;
+                    } else {
+                        // Tunjukkan sebahagian kecil output yang kotor
+                        errorMessage = `JSON Parsing Error. Server response starts with: "${responseText.substring(0, 50)}..."`;
+                    }
+                }
+
+                Swal.fire('Submission Failed', errorMessage, 'error');
             },
+            
             complete: function() {
                 // Re-enable button
                 $btn.prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-2"></i> <strong>Submit Final Request</strong>');
@@ -1103,26 +1185,24 @@ $(document).ready(function() {
             return;
         }
 
-filteredItems.forEach(item => {
-    // Tentukan laluan imej yang betul.
-    // Menambah '../' untuk naik satu direktori, mengandaikan skrip ini di dalam subfolder (cth: /user/)
-    // dan folder 'uploads/' berada di akar projek.
-    const imagePath = item.image_url ? `../${item.image_url}` : '../path/to/default-image.jpg';
-    
-    const itemHtml = `
-        <a href="#" class="list-group-item list-group-item-action d-flex align-items-center py-3" onclick="selectItemFromList(${item.item_id}); return false;">
-            <div class="category-image-box">
-                <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img">
-            </div>
-            <div>
-                <strong class="d-block">${item.item_name}</strong>
-                <span class="text-muted small">${item.category_name}</span>
-            </div>
-            <i class="fa-solid fa-chevron-right ms-auto text-muted small"></i>
-        </a>
-    `;
-    displayList.append(itemHtml);
-});
+    filteredItems.forEach(item => {
+        // Tentukan laluan imej yang betul.
+        const imagePath = item.image_url ? `../${item.image_url}` : '../assets/default-image.jpg';
+        
+        const itemHtml = `
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center py-3" onclick="selectItemFromList(${item.item_id}); return false;">
+                <div class="category-image-box">
+                    <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img">
+                </div>
+                <div>
+                    <strong class="d-block">${item.item_name}</strong>
+                    <span class="text-muted small">${item.category_name}</span>
+                </div>
+                <i class="fa-solid fa-chevron-right ms-auto text-muted small"></i>
+            </a>
+        `;
+        displayList.append(itemHtml);
+    });
     }
 
     // Expose selectItemFromList globally so the onclick handler works
