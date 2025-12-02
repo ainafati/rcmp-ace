@@ -10,9 +10,146 @@ require '../PHPMailer-master/src/Exception.php';
 require '../PHPMailer-master/src/PHPMailer.php';
 require '../PHPMailer-master/src/SMTP.php';
 
+function fetch_reservation_items_by_id($conn, $reserve_id) {
+    $items = [];
+    $stmt = $conn->prepare("
+        SELECT 
+            ri.id AS reservation_item_id, 
+            ri.quantity, 
+            ri.status, 
+            ri.reserve_date, 
+            ri.return_date, 
+            i.item_name,
+            p.name AS user_name,
+            p.email AS user_email
+        FROM reservation_items ri
+        JOIN reservations r ON ri.reserve_id = r.reserve_id
+        JOIN person p ON r.person_id = p.person_id
+        JOIN item i ON ri.item_id = i.item_id
+        WHERE ri.reserve_id = ?
+    ");
+    if (!$stmt) {
+        error_log("DB Prepare Failed in fetch_reservation_items_by_id: " . $conn->error);
+        return false;
+    }
 
+    $stmt->bind_param("i", $reserve_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $items[] = $row;
+    }
+    $stmt->close();
+    return $items;
+}
 
+function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
+    
+    $mail = new PHPMailer(true);
 
+    try {
+        $mail->SMTPDebug = SMTP_DEBUG_LEVEL;
+        $mail->Debugoutput = 'error_log';
+        
+        $mail->isSMTP();
+        $mail->Host      = SMTP_HOST;
+        $mail->SMTPAuth  = SMTP_AUTH;
+        $mail->Username  = $smtp_user;
+        $mail->Password  = $smtp_pass;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port      = SMTP_PORT;
+        
+        $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
+        $mail->addAddress($to_email, $user_name);
+
+        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring');
+
+        $mail->isHTML(true);
+        $mail->Subject = 'Confirmation: Reservation ID ' . $reserve_id . ' Has Been Processed';
+        
+        $item_list_html = '';
+        $partial_notice = '';
+        
+        // 1. Bina senarai item
+        foreach ($items_array as $item) {
+            $item_name = htmlspecialchars($item['item_name']);
+            $quantity = $item['quantity'];
+            // Ambil Assigned Assets, jika tiada, guna string kosong
+            $assigned_assets = isset($item['assigned_assets']) ? htmlspecialchars($item['assigned_assets']) : 'N/A';
+            $reserve_date = date('d M Y', strtotime($item['reserve_date']));
+            // $return_date = date('d M Y', strtotime($item['return_date'])); // Tidak digunakan dalam jadual
+            $status = $item['status'];
+            
+            $status_color = (strtolower($status) === 'approved') ? '#27ae60' : '#e74c3c';
+            $status_text = (strtolower($status) === 'approved') ? 'Approved' : 'Rejected';
+
+            if (strtolower($status) === 'rejected') {
+                // Jika Rejected, Assigned Assets adalah NA
+                $assigned_assets = 'N/A';
+                 // Kumpul notis penolakan sebahagian, jika ada
+                 $partial_notice = "<p style='color: #e74c3c; font-weight: bold;'>
+                                    Perhatian: Sesetengah item mungkin telah ditolak atau diubah suai. Sila semak status setiap item di bawah.</p>";
+            } else if (strtolower($status) === 'approved' && empty($assigned_assets)) {
+                // Jika Approved tapi tiada aset (sepatutnya tidak berlaku), beri amaran
+                $assigned_assets = 'Error: No Asset Codes!';
+            }
+
+            $item_list_html .= "
+                <tr>
+                    <td style='border: 1px solid #ddd; padding: 8px;'>{$item_name}</td>
+                    <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{$quantity}</td>
+                    <td style='border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;'>{$assigned_assets}</td>
+                    <td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{$reserve_date}</td>
+                    <td style='border: 1px solid #ddd; padding: 8px; text-align: center; color: {$status_color};'><strong>{$status_text}</strong></td>
+                </tr>
+            ";
+        }
+        
+        $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                <div style='max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 20px;'>
+                    <h2 style='color: #27ae60;'>Reservation Processed (ID: {$reserve_id})</h2>
+                    <p>Hello <strong>{$user_name}</strong>,</p>
+                    {$partial_notice}
+                    <p>Your reservation request containing multiple items has been fully processed by the technician. Please see the status of all requested items below. **Aset Ditugaskan (Assigned Assets) diperlukan semasa mengambil item.**</p>
+                    
+                    <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; margin: 15px 0; border-collapse: collapse; border: 1px solid #ddd;'>
+                        <thead>
+                            <tr style='background-color: #f2f2f2;'>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: left;'>Item</th>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: center;'>Approved Qty</th>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: left;'>Assigned Assets</th>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: center;'>Collect Date</th>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: center;'>Final Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {$item_list_html}
+                        </tbody>
+                    </table>
+                    
+                    <p style='margin-top: 20px;'>
+                        <strong>Action Required:</strong> Please proceed to the inventory counter to collect the **Approved** item(s).
+                    </p>
+                    <p>Kindly contact the IT staff if you have any questions.</p>
+
+                    <hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;'>
+                    <p style='font-size: 12px; color: #999;'>This is an automated email. Please do not reply to this message.</p>
+                </div>
+            </body>
+            </html>
+        ";
+        
+        $mail->AltBody = "Your reservation (ID: {$reserve_id}) has been processed. Please check the system for the status of all items in your booking. Remember to bring the assigned asset codes when collecting the items.";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("PHPMailer Grouped Approval Error: {$mail->ErrorInfo}");
+        return false;
+    }
+}
 
 function sendNotificationEmail($to_email, $user_name, $item_name, $asset_code, $reserve_date, $return_date, $smtp_user, $smtp_pass, $partial_reason = null) {
     
@@ -210,5 +347,104 @@ function sendRejectionEmail($to_email, $user_name, $item_name, $rejection_reason
         error_log("PHPMailer Rejection Error: {$mail->ErrorInfo}"); 
         return false; 
     }
+	
+	// --- Tambah fungsi ini dalam fail e-mel anda (`send_email.php`) ---
+
+/**
+ * Menghantar satu e-mel tolakan kepada pengguna dengan senarai semua item dalam satu reserve_id.
+ * Dicetuskan apabila SEMUA item dalam tempahan telah diproses (Rejected atau Approved).
+ */
+function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
+    
+    $mail = new PHPMailer(true);
+
+    try {
+        $mail->SMTPDebug = SMTP_DEBUG_LEVEL; 
+        $mail->Debugoutput = 'error_log'; 
+        
+        $mail->isSMTP();
+        $mail->Host      = SMTP_HOST;
+        $mail->SMTPAuth    = SMTP_AUTH;
+        $mail->Username    = $smtp_user; 
+        $mail->Password    = $smtp_pass;
+        $mail->SMTPSecure = SMTP_SECURE; 
+        $mail->Port      = SMTP_PORT; 
+        
+        $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
+        $mail->addAddress($to_email, $user_name);
+
+        $mail->addBCC('it.rcmp@unikl.edu.my', 'IT Monitoring');
+
+        $mail->isHTML(true);
+        $mail->Subject = 'IMPORTANT: Update on Your Reservation ID ' . $reserve_id . ' (Processed)';
+        
+        $item_list_html = '';
+        $rejected_count = 0;
+        
+        // 1. Bina senarai item
+        foreach ($items_array as $item) {
+            $item_name = htmlspecialchars($item['item_name']);
+            $status = $item['status'];
+            
+            $status_color = (strtolower($status) === 'rejected') ? '#e74c3c' : '#27ae60';
+            $status_text = (strtolower($status) === 'rejected') ? 'Rejected' : 'Approved';
+
+            if (strtolower($status) === 'rejected') {
+                 $rejected_count++;
+            }
+
+            $item_list_html .= "
+                <tr>
+                    <td style='border: 1px solid #ddd; padding: 8px;'>{$item_name}</td>
+                    <td style='border: 1px solid #ddd; padding: 8px; text-align: center; color: {$status_color};'><strong>{$status_text}</strong></td>
+                </tr>
+            ";
+        }
+        
+        $header_text = ($rejected_count === count($items_array)) 
+                       ? "Your entire reservation has been **REJECTED**." 
+                       : "Your reservation has been processed. Some item(s) were rejected.";
+                       
+        $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                <div style='max-width: 700px; margin: 0 auto; border: 1px solid #ddd; padding: 20px;'>
+                    <h2 style='color: #e74c3c;'>Reservation Update (ID: {$reserve_id})</h2>
+                    <p>Hello <strong>{$user_name}</strong>,</p>
+                    <p>{$header_text}</p>
+                    
+                    <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; margin: 15px 0; border-collapse: collapse; border: 1px solid #ddd;'>
+                        <thead>
+                            <tr style='background-color: #f2f2f2;'>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: left;'>Item</th>
+                                <th style='border: 1px solid #ddd; padding: 10px; text-align: center;'>Final Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {$item_list_html}
+                        </tbody>
+                    </table>
+                    
+                    <p style='margin-top: 20px;'>
+                        Please check the system for the rejection reasons for the items marked 'Rejected'.
+                    </p>
+                    <p>If you have any further questions, please contact the inventory counter.</p>
+
+                    <hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;'>
+                    <p style='font-size: 12px; color: #999;'>This is an automated email from the UniKL Inventory System.</p>
+                </div>
+            </body>
+            </html>
+        ";
+        
+        $mail->AltBody = "Your reservation (ID: {$reserve_id}) has been processed. Please check the system for the status of all items in your booking.";
+
+        $mail->send();
+        return true; 
+    } catch (Exception $e) {
+        error_log("PHPMailer Grouped Rejection Error: {$mail->ErrorInfo}"); 
+        return false; 
+    }
+}
 }
 ?>

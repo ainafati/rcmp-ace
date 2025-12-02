@@ -79,302 +79,309 @@ $conn->close();
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
-        /* =========================================================================
-            1. VARIABLE & BASE STYLES
-            ========================================================================= */
-        :root {
-            --primary-color: #06b6d4; 
-            --primary-light: #f0f9ff; 
-            --primary-hover: #0891b2; 
-            --bg-light-gray: #f8fafc;
-            --card-bg: #ffffff;
-            --text-dark: #1e293b;
-            --text-muted: #64748b;
-            --shadow-light: 0 4px 10px rgba(0, 0, 0, 0.04);
-        }
+    /* =========================================================================
+       1. VARIABLE & BASE STYLES
+       ========================================================================= */
+    :root {
+        --primary-color: #06b6d4; 
+        --primary-light: #f0f9ff; 
+        --primary-hover: #0891b2; 
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --shadow-light: 0 4px 10px rgba(0, 0, 0, 0.04);
+    }
 
-        body {
-            font-family: 'Inter', 'Segoe UI', sans-serif;
-            background-color: var(--bg-light-gray);
-            color: var(--text-dark);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+    body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background-color: var(--bg-light-gray);
+        color: var(--text-dark);
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
 
-        /* =========================================================================
-            2. LAYOUT: SIDEBAR & TOPBAR
-            ========================================================================= */
-        
-        /* ➡️ SIDEBAR */
+    /* =========================================================================
+       2. LAYOUT: SIDEBAR & TOPBAR
+       ========================================================================= */
+    
+    /* ➡️ SIDEBAR */
+    .sidebar {
+        width: 280px;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: var(--card-bg);
+        padding: 20px;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+        z-index: 1050;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.3s ease-in-out;
+        overflow-y: auto;
+    }
+
+    .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
+    .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
+    .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+    .sidebar a {
+        display: flex; align-items: center; gap: 15px;
+        color: var(--text-muted); text-decoration: none;
+        padding: 14px 18px; margin-bottom: 6px;
+        border-radius: 10px; font-weight: 500; font-size: 15px;
+        transition: all 0.2s;
+    }
+    .sidebar a.active {
+        background: var(--primary-light);
+        color: var(--primary-color) !important;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
+    }
+    .sidebar a:hover:not(.active) {
+        background: #eef1f4;
+        color: var(--text-dark);
+    }
+    .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: 20px; }
+    .sidebar a i { width: 20px; text-align: center; }
+
+
+    /* ➡️ KATEGORI FILTER STYLES (Sub-Menu) */
+    .category-submenu {
+        padding-left: 15px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-in-out;
+    }
+    .category-submenu.show {
+        max-height: 500px;
+    }
+    .category-submenu .category-filter-link {
+        padding: 8px 18px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+    .category-submenu .active-category-filter {
+        background: var(--primary-light);
+        color: var(--primary-color) !important;
+        font-weight: 700;
+    }
+    .category-submenu .category-filter-link:hover:not(.active-category-filter) {
+          background: #eef1f4;
+          color: var(--text-dark);
+    }
+    .sidebar .item-availability-link i.fa-angle-down {
+        transition: transform 0.3s;
+    }
+    /* Ikon panah ke bawah (tertutup) */
+    .sidebar .item-availability-link.collapsed i.fa-angle-down {
+        transform: rotate(-90deg);
+    }
+
+
+    /* ➡️ CONTENT WRAPPER */
+    .main-content {
+        margin-left: 280px;
+        transition: margin-left 0.3s ease-in-out;
+    }
+    .container-fluid { padding: 30px; }
+
+    /* ➡️ TOPBAR */
+    .topbar {
+        background: var(--card-bg);
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+        z-index: 999;
+        position: sticky;
+        top: 0;
+    }
+    .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
+    .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
+    .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
+    .profile-img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+
+
+    /* =========================================================================
+       3. FORMS & CARDS
+       ========================================================================= */
+    .card {
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: var(--shadow-light);
+        background: var(--card-bg);
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+    .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
+    .text-primary { color: var(--primary-color) !important; }
+    .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: var(--primary-hover);
+        border-color: var(--primary-hover);
+    }
+    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
+    .form-label { font-weight: 500; color: #334155; }
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-height: 48px; 
+        border-color: #e2e8f0; 
+    }
+
+    /* Nav Tabs Styling for Steps */
+    .nav-tabs { 
+        border-bottom: none; 
+        margin-bottom: 25px;
+        padding: 0;
+    }
+    .nav-tabs .nav-link {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        margin-right: 8px;
+        color: var(--text-muted);
+        background-color: var(--card-bg);
+        padding: 10px 15px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .nav-tabs .nav-link.active {
+        border-color: var(--primary-color) !important;
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+    }
+    .nav-tabs .nav-link.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: #f1f5f9;
+    }
+
+    /* Select2 Styling Fixes */
+    .select2-container--bootstrap-5 .select2-selection {
+        border-radius: 8px !important;
+        padding: 0.375rem 0.75rem !important; 
+        min-height: 48px !important; 
+        border: 1px solid #e2e8f0 !important; 
+    }
+    .select2-container--bootstrap-5 .select2-selection--single {
+        height: 48px !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection__rendered {
+        line-height: 46px !important; 
+    }
+    .select2-container--bootstrap-5 .select2-selection__arrow {
+        width: 30px !important;
+        height: 46px !important; 
+    } 
+    
+    /* Item List Display - Imej (DIPERBAIKI) */
+    .category-image-box { 
+        width: 80px; /* DIBESARKAN DARI 50px */
+        height: 80px; /* DIBESARKAN DARI 50px */
+        border-radius: 8px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0;
+        margin-right: 15px; /* DITAMBAH MARGIN */
+        flex-shrink: 0; 
+    } 
+    .category-thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; 
+    }
+
+    /* Padding untuk setiap item dalam senarai (DIPERBAIKI) */
+    /* Ini memastikan elemen 'a' mempunyai padding yang cukup */
+    .list-group-item {
+        padding-top: 15px !important; 
+        padding-bottom: 15px !important;
+    }
+
+    .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; border-color: #f1f5f9; }
+
+
+    /* =========================================================================
+       4. MOBILE STYLES
+       ========================================================================= */
+    .menu-toggle-btn { display: none; }
+    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1040; display: none; } 
+
+    @media (max-width: 992px) {
         .sidebar {
-            width: 280px;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: var(--card-bg);
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-            z-index: 1050;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: transform 0.3s ease-in-out;
-            overflow-y: auto;
+            transform: translateX(-280px);
         }
-
-        .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
-        .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-        .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
-        .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-
-        .sidebar a {
-            display: flex; align-items: center; gap: 15px;
-            color: var(--text-muted); text-decoration: none;
-            padding: 14px 18px; margin-bottom: 6px;
-            border-radius: 10px; font-weight: 500; font-size: 15px;
-            transition: all 0.2s;
+        .sidebar.active {
+            transform: translateX(0);
         }
-        .sidebar a.active {
-            background: var(--primary-light);
-            color: var(--primary-color) !important;
-            font-weight: 700;
-            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
+        .sidebar.active ~ #overlay {
+            display: block;
         }
-        .sidebar a:hover:not(.active) {
-            background: #eef1f4;
-            color: var(--text-dark);
-        }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: 20px; }
-        .sidebar a i { width: 20px; text-align: center; }
-
-
-        /* ➡️ KATEGORI FILTER STYLES (Sub-Menu) */
-        .category-submenu {
-            padding-left: 15px;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-in-out;
-        }
-        .category-submenu.show {
-            max-height: 500px;
-        }
-        .category-submenu .category-filter-link {
-            padding: 8px 18px;
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 2px;
-        }
-        .category-submenu .active-category-filter {
-            background: var(--primary-light);
-            color: var(--primary-color) !important;
-            font-weight: 700;
-        }
-        .category-submenu .category-filter-link:hover:not(.active-category-filter) {
-              background: #eef1f4;
-              color: var(--text-dark);
-        }
-        .sidebar .item-availability-link i.fa-angle-down {
-            transition: transform 0.3s;
-        }
-        /* Ikon panah ke bawah (tertutup) */
-        .sidebar .item-availability-link.collapsed i.fa-angle-down {
-            transform: rotate(-90deg);
-        }
-
-
-        /* ➡️ CONTENT WRAPPER */
         .main-content {
-            margin-left: 280px;
-            transition: margin-left 0.3s ease-in-out;
+            margin-left: 0;
+            width: 100%;
         }
-        .container-fluid { padding: 30px; }
-
-        /* ➡️ TOPBAR */
-        .topbar {
-            background: var(--card-bg);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #e2e8f0;
-            z-index: 999;
-            position: sticky;
-            top: 0;
-        }
-        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
-        .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
-        .profile-img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
-
-
-        /* =========================================================================
-            3. FORMS & CARDS
-            ========================================================================= */
-        .card {
-            border-radius: 16px;
-            padding: 25px;
-            box-shadow: var(--shadow-light);
-            background: var(--card-bg);
-            margin-bottom: 25px;
-            border: 1px solid #e2e8f0;
-        }
-        .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
-        .text-primary { color: var(--primary-color) !important; }
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-            font-weight: 600;
-        }
-        .btn-primary:hover {
-            background-color: var(--primary-hover);
-            border-color: var(--primary-hover);
-        }
-        .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-        .form-label { font-weight: 500; color: #334155; }
-        .form-control, .form-select {
-            border-radius: 8px;
-            padding: 10px 12px;
-            min-height: 48px; 
-            border-color: #e2e8f0; 
-        }
-
-        /* Nav Tabs Styling for Steps */
-        .nav-tabs { 
-            border-bottom: none; 
-            margin-bottom: 25px;
+        
+        .menu-toggle-btn {
+            display: inline-block;
+            order: -1;
+            font-size: 20px;
+            background: none;
+            border: none;
+            color: #1e293b;
             padding: 0;
         }
-        .nav-tabs .nav-link {
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            margin-right: 8px;
-            color: var(--text-muted);
-            background-color: var(--card-bg);
-            padding: 10px 15px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .nav-tabs .nav-link.active {
-            border-color: var(--primary-color) !important;
-            background-color: var(--primary-light);
-            color: var(--primary-color);
-        }
-        .nav-tabs .nav-link.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background-color: #f1f5f9;
-        }
-
-        /* Select2 Styling Fixes */
-        .select2-container--bootstrap-5 .select2-selection {
-            border-radius: 8px !important;
-            padding: 0.375rem 0.75rem !important; 
-            min-height: 48px !important; 
-            border: 1px solid #e2e8f0 !important; 
-        }
-        .select2-container--bootstrap-5 .select2-selection--single {
-            height: 48px !important;
-        }
-        .select2-container--bootstrap-5 .select2-selection__rendered {
-            line-height: 46px !important; 
-        }
-        .select2-container--bootstrap-5 .select2-selection__arrow {
-            width: 30px !important;
-            height: 46px !important; 
-        } 
         
-        /* Item List Display - Imej */
-        .category-image-box { 
-            width: 50px; 
-            height: 50px; 
-            border-radius: 6px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            overflow: hidden; 
-            border: 1px solid #e2e8f0;
-            margin-right: 12px;
-            flex-shrink: 0; 
-        } 
-        .category-thumb-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; 
+        .topbar {
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 15px;
         }
-
-        .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; border-color: #f1f5f9; }
-
-
-        /* =========================================================================
-            4. MOBILE STYLES
-            ========================================================================= */
-        .menu-toggle-btn { display: none; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1040; display: none; } 
-
-        @media (max-width: 992px) {
-            .sidebar {
-                transform: translateX(-280px);
-            }
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            .sidebar.active ~ #overlay {
-                display: block;
-            }
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-            }
-            
-            .menu-toggle-btn {
-                display: inline-block;
-                order: -1;
-                font-size: 20px;
-                background: none;
-                border: none;
-                color: #1e293b;
-                padding: 0;
-            }
-            
-            .topbar {
-                padding: 10px 15px;
-                display: grid;
-                grid-template-columns: auto 1fr auto;
-                align-items: center;
-                gap: 15px;
-            }
-            .topbar h3 {
-                font-size: 18px;
-                text-align: left;
-            }
-            .topbar .user-profile {
-                order: 3;
-                justify-self: end;
-            }
-            .topbar .user-name {
-                display: none;
-            }
-            .container-fluid {
-                padding: 15px;
-            }
-            .card {
-                padding: 15px;
-            }
-            .col-lg-7, .col-lg-5 { 
-                flex: 0 0 100% !important;
-                max-width: 100% !important;
-            }
-            .d-grid {
-                display: grid !important;
-                grid-template-columns: 1fr;
-                gap: 10px !important;
-            }
-            .nav-tabs .nav-link {
-                 margin-bottom: 5px;
-            }
+        .topbar h3 {
+            font-size: 18px;
+            text-align: left;
         }
-    </style>
+        .topbar .user-profile {
+            order: 3;
+            justify-self: end;
+        }
+        .topbar .user-name {
+            display: none;
+        }
+        .container-fluid {
+            padding: 15px;
+        }
+        .card {
+            padding: 15px;
+        }
+        .col-lg-7, .col-lg-5 { 
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+        }
+        .d-grid {
+            display: grid !important;
+            grid-template-columns: 1fr;
+            gap: 10px !important;
+        }
+        .nav-tabs .nav-link {
+             margin-bottom: 5px;
+        }
+    }
+</style>
 </head>
 <body>
 
@@ -627,613 +634,508 @@ $conn->close();
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-
-// Dapatkan data item dari PHP dan simpan dalam pembolehubah global JS
+// Data store for all items fetched from PHP
 const ALL_ITEMS_DATA = <?= json_encode($items_for_dropdown) ?>;
-// Dapatkan ID Pengguna untuk penghantaran borang
-const phpData = { user_id: <?= isset($person_id) ? $person_id : 'null' ?> };
 
+// Variables to hold the current reservation context
+let RESERVATION_CONTEXT = {};
+// Array to hold items the user is requesting
+let REQUEST_ITEMS = [];
 
 $(document).ready(function() {
-
-    // =========================================================
-    // 1. Sidebar Toggle Logic for Sub-Menu & Mobile
-    // =========================================================
-    const itemAvailabilityToggle = $('#itemAvailabilityToggle');
-    const categorySubmenu = $('#categorySubmenu');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('overlay');
-    const menuToggle = document.getElementById('menuToggle');
-    const priorityWarning = $('#priorityWarning'); 
-
-    // Toggle Sub-Menu Kategori
-    itemAvailabilityToggle.on('click', function(e) {
-        e.preventDefault();
-        categorySubmenu.toggleClass('show');
-        $(this).find('i.fa-angle-down').toggleClass('collapsed');
-    });
-
-    // Toggle Sidebar Mobile
-    if (menuToggle) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
-            overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
-        });
-    }
-
-    if (overlay) { 
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.style.display = 'none'; 
-        }); 
-    }
     
-    // =========================================================
-    // 2. Select2 Initialization & Helper: Populate Item Dropdown
-    // =========================================================
-    $('#item_select').select2({
-        theme: "bootstrap-5",
-        dropdownParent: $('#item_select').parent(),
-        placeholder: "Search and select an item"
-    });
+    // --- 1. Initial Setup and Handlers ---
 
-    function populateItemSelect(items) {
-        const $itemSelect = $('#item_select');
-        $itemSelect.empty();
-        $itemSelect.append(new Option('-- Search and select an item --', '', true, true));
-
-        let currentCategory = null;
-        let $optgroup = null;
-
-        items.sort((a, b) => a.category_name.localeCompare(b.category_name));
-
-        items.forEach(item => {
-            if (item.category_name !== currentCategory) {
-                if ($optgroup) {
-                    $itemSelect.append($optgroup);
-                }
-                currentCategory = item.category_name;
-                $optgroup = $('<optgroup label="' + item.category_name + '">'); 
-            }
-            
-            const $option = $('<option>')
-                                     .val(item.item_name)
-                                     .text(item.item_name)
-                                     .attr('data-category-id', item.category_id);
-            
-            $optgroup.append($option);
-        });
-        
-        if ($optgroup) {
-            $itemSelect.append($optgroup);
-        }
-    }
-
-    // =========================================================
-    // 3. Helper: Update Item Display List (Kanan)
-    // =========================================================
-    function updateItemDisplayList(categoryName) {
-        const $listContainer = $('#displayItemList'); 
-        $listContainer.empty();
-        
-        let itemsToDisplay = categoryName 
-            ? ALL_ITEMS_DATA.filter(item => item.category_name === categoryName)
-            : ALL_ITEMS_DATA;
-
-        if (itemsToDisplay.length === 0) {
-             $listContainer.html('<div class="text-center text-muted p-3">No items found in this category.</div>');
-             return;
-        }
-
-        itemsToDisplay.forEach(item => {
-            const imageUrl = item.image_url && item.image_url.trim() !== '' ? item.image_url : '../assets/placeholder.png';
-            
-            const listItem = `
-                <div class="list-group-item d-flex align-items-center p-2">
-                    <div class="category-image-box"> 
-                        <img src="${imageUrl}" 
-                            alt="${item.item_name}" 
-                            class="category-thumb-img">
-                    </div>
-                    <div>
-                        <strong>${item.item_name}</strong><br>
-                        <small class="text-muted">${item.category_name}</small>
-                    </div>
-                </div>
-            `;
-            $listContainer.append(listItem);
-        });
-    }
-
-    // Panggil pada permulaan untuk memuatkan semua item
-    populateItemSelect(ALL_ITEMS_DATA);
-    updateItemDisplayList('');
-
-    // =========================================================
-    // 4. EVENT HANDLER: Category Sidebar Link Click (Filtering)
-    // =========================================================
-    $(document).on('click', '.category-filter-link', function(e) {
-        e.preventDefault();
-        const selectedCategory = $(this).data('category');
-        
-        // Set active class
-        $('.category-filter-link').removeClass('active-category-filter');
-        $(this).addClass('active-category-filter');
-
-        // Laksanakan penapisan
-        populateItemSelect(selectedCategory ? ALL_ITEMS_DATA.filter(item => item.category_name === selectedCategory) : ALL_ITEMS_DATA);
-        updateItemDisplayList(selectedCategory);
-        $('#item_select').val(null).trigger('change'); // Reset item selection
-        
-        // Untuk mobile: tutup sidebar selepas klik
-        if (window.innerWidth <= 992) {
-            $('.sidebar').removeClass('active');
-            $('#overlay').hide();
-        }
-    });
-
-    // =========================================================
-    // 5. Availability Check Logic & Flatpickr
-    // =========================================================
-    
-    let debounceTimer;
-
-    function checkAvailability() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            // Ambil data kontekstual (Tarikh/Tujuan)
-            const reserve = $('#reserveDate').val();
-            const ret = $('#returnDate').val();
-            
-            // Ambil data item (Item/Kuantiti)
-            const itemName = $('#item_select').val();
-            const quantity = $('#quantity').val();
-            
-            const statusDiv = $('#availability-status');
-            const addBtn = $('#addMoreBtn');
-
-            // Semak Ketersediaan HANYA jika semua input item utama diisi DAN kontek telah dikunci
-            if (itemName && quantity > 0 && $('#confirmContextBtn').hasClass('btn-success')) {
-                
-                statusDiv.html('<div class="text-muted"><span class="spinner-border spinner-border-sm"></span> Checking availability...</div>');
-                addBtn.prop('disabled', true);
-
-                $.ajax({
-                    type: 'POST',
-                    url: 'check_availability.php',
-                    data: { 
-                        item_name: itemName,
-                        quantity: quantity,
-                        start_date: reserve, // Tarikh diambil dari field yang dikunci
-                        end_date: ret        // Tarikh diambil dari field yang dikunci
-                    },
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            statusDiv.html('<div class="alert alert-success py-2">✅ <strong>Available!</strong> You can <strong>add this item</strong> to your request list.</div>');
-                            addBtn.prop('disabled', false);
-
-                        } else if (response.status === 'partial') {
-                            let suggestionHTML = `
-                                <div class="alert alert-warning py-2">
-                                    <strong>Suggestion:</strong> ${response.message}
-                                    <button type="button" class="btn btn-sm btn-primary ms-2" id="book-available-btn" data-available="${response.available_count}">
-                                        Adjust to ${response.available_count} unit(s)?
-                                    </button>
-                                </div>`;
-                            statusDiv.html(suggestionHTML);
-                            addBtn.prop('disabled', response.available_count <= 0); 
-
-                        } else { 
-                            statusDiv.html(`<div class="alert alert-danger py-2">❌ <strong>Not Available:</strong> ${response.message}</div>`);
-                            addBtn.prop('disabled', true);
-                        }
-                    },
-                    error: function() { 
-                        statusDiv.html('<div class="alert alert-danger py-2">❌ <strong>Error:</strong> Could not connect to the server.</div>');
-                        addBtn.prop('disabled', true);
-                    }
-                });
-            } else if (!$('#confirmContextBtn').hasClass('btn-success')) {
-                 // Abaikan checkAvailability jika Context belum dikunci
-                 statusDiv.html('<div class="alert alert-info py-2 small">First, click CONFIRM & LOCK Context (Step 1).</div>');
-                 addBtn.prop('disabled', true);
-            } else {
-                statusDiv.html('');
-                addBtn.prop('disabled', true); 
-            }
-        }, 500); 
-    }
-    
-    // Listener untuk butang Adjust Quantity
-    $(document).on('click', '#book-available-btn', function() {
-        const availableCount = $(this).data('available');
-        $('#quantity').val(availableCount); 
-        checkAvailability(); 
-    });
-
-    // Pemicu Availability Check
-    $('#item_select, #quantity').on('input change', checkAvailability); 
-    
-    // Flatpickr
-    const returnDatepicker = flatpickr("#returnDate", {
-        dateFormat: "Y-m-d",
-        minDate: "today"
-    });
-
-    const reserveDatepicker = flatpickr("#reserveDate", {
+    // Initialize Flatpickr for Date Selection
+    flatpickr("#reserveDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
-        onChange: (selectedDates) => {
-            if (selectedDates.length > 0) {
-                returnDatepicker.set('minDate', selectedDates[0]);
-                // Clear return date if it's before the new reserve date
-                if ($('#returnDate').val() && new Date($('#returnDate').val()) < selectedDates[0]) {
-                    $('#returnDate').val('');
-                }
+        altInput: true,
+        altFormat: "F j, Y",
+        onChange: function(selectedDates, dateStr, instance) {
+            // Update the minimum date for the return date picker
+            returnDatePicker.set('minDate', dateStr || new Date());
+            
+            // Re-check item availability when dates change
+            if ($('#items-tab').hasClass('active')) {
+                checkItemAvailability();
             }
         }
     });
 
-    // Tunjuk/Sembunyi Peringatan Priority
+    const returnDatePicker = flatpickr("#returnDate", {
+        dateFormat: "Y-m-d",
+        minDate: "today", // Initial minDate
+        altInput: true,
+        altFormat: "F j, Y",
+        onChange: function(selectedDates, dateStr, instance) {
+            // Re-check item availability when dates change
+            if ($('#items-tab').hasClass('active')) {
+                checkItemAvailability();
+            }
+        }
+    });
+
+    // Initialize Select2 for Item Selection (Step 2)
+    $('#item_select').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search and select an item...',
+        dropdownParent: $('#ItemSelectionCard'), // Fix for modal/card overflow
+        data: ALL_ITEMS_DATA.map(item => ({
+            id: item.item_id,
+            text: `${item.item_name} (${item.category_name})`,
+            itemData: item // Store the full item object for easy lookup
+        }))
+    });
+    
+    // Filter the dropdown items based on the selected category in the sidebar
+    function filterSelect2ByCategoryId(categoryId) {
+        const filteredData = ALL_ITEMS_DATA
+            .filter(item => categoryId === '' || item.category_id === categoryId)
+            .map(item => ({
+                id: item.item_id,
+                text: `${item.item_name} (${item.category_name})`,
+                itemData: item
+            }));
+
+        // Reset and populate Select2 with filtered data
+        $('#item_select').empty().append(new Option('-- Search and select an item --', '')).select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Search and select an item...',
+            dropdownParent: $('#ItemSelectionCard'),
+            data: filteredData
+        });
+
+        // Clear availability status when the filter changes
+        $('#availability-status').html('');
+        $('#addMoreBtn').prop('disabled', true);
+        $('#quantity').val(1);
+    }
+
+    // Set up sidebar category filtering (on the right-hand list and the Select2 dropdown)
+    $('.category-filter-link').on('click', function(e) {
+        e.preventDefault();
+        
+        // Update sidebar active class
+        $('.category-filter-link').removeClass('active-category-filter');
+        $(this).addClass('active-category-filter');
+        
+        // Get the category name for filtering the list
+        const categoryName = $(this).data('category');
+        
+        // Get the category ID (or empty string for 'All Items')
+        const categoryId = ALL_ITEMS_DATA.find(item => item.category_name === categoryName)?.category_id || '';
+
+        // 1. Filter the right-hand side item list (displayItemList)
+        filterItemList(categoryName);
+        
+        // 2. Filter the Step 2 item Select2 dropdown
+        filterSelect2ByCategoryId(categoryId);
+    });
+    
+    // Initial load: show all items on the right-hand list and in Select2
+    filterItemList('');
+    
+    // Toggle Category Submenu
+    $('#itemAvailabilityToggle').on('click', function(e) {
+        e.preventDefault();
+        $('#categorySubmenu').toggleClass('show');
+        $(this).toggleClass('collapsed');
+    });
+
+    // Mobile menu toggle
+    $('#menuToggle').on('click', function() {
+        $('.sidebar').toggleClass('active');
+        $('#overlay').toggle();
+    });
+
+    $('#overlay').on('click', function() {
+        $('.sidebar').removeClass('active');
+        $('#overlay').hide();
+    });
+    
+    // Handle 'I Understand' button click in Terms Modal
+    $('#agreeTermsBtn').on('click', function() {
+        $('#agreeTerms').prop('checked', true).trigger('change');
+    });
+
+
+    // --- 2. Step 1: Context Handling ---
+
+    // Show Priority Warning based on selection
     $('#program_type').on('change', function() {
         if ($(this).val()) {
-            priorityWarning.slideDown();
+            $('#priorityWarning').slideDown(200);
         } else {
-            priorityWarning.slideUp();
-        }
-    });
-    
-    // =========================================================
-    // 6. Context Locking Logic (NEW) & Tab Navigation Control
-    // =========================================================
-    
-    const contextTabLink = $('#context-tab');
-    const itemsTabLink = $('#items-tab');
-    const reviewTabLink = $('#review-tab');
-    const confirmContextBtn = $('#confirmContextBtn');
-    const goToReviewBtn = $('#goToReviewBtn');
-    const backToItemsBtn = $('#backToItemsBtn');
-
-    // Handler Navigasi Tab
-    $('#myTab button').on('click', function (e) {
-        if ($(this).hasClass('disabled')) {
-            e.preventDefault();
-            e.stopPropagation();
-            if ($(this).is(itemsTabLink)) {
-                Swal.fire("Incomplete Step", "Please complete and <strong>Confirm Context</strong> in Step 1 first.", "warning");
-            } else if ($(this).is(reviewTabLink)) {
-                Swal.fire("Incomplete Step", "Please add at least one item in Step 2 before reviewing.", "warning");
-            }
+            $('#priorityWarning').slideUp(200);
         }
     });
 
-    // Butang NEXT: Confirm Context (Step 1 -> Step 2)
-    confirmContextBtn.on('click', function() {
-        const reserve = $('#reserveDate').val();
-        const ret = $('#returnDate').val();
-        const reason = $('#reason').val();
-        const program_type = $('#program_type').val();
+    // Confirm Context (Move to Step 2)
+    $('#confirmContextBtn').on('click', function() {
+        if (checkContextInputs()) {
+            // Collect and store context data
+            RESERVATION_CONTEXT = {
+                reserve_date: $('#reserveDate').val(),
+                return_date: $('#returnDate').val(),
+                program_type: $('#program_type').val(),
+                program_type_text: $('#program_type option:selected').text().trim(),
+                reason: $('#reason').val(),
+                person_id: $('input[name="person_id"]').val()
+            };
 
-        if (!reserve || !ret || !reason.trim() || !program_type) {
-            Swal.fire("Incomplete Context", "Please fill in all dates and purpose details before confirming.", "warning");
-            return;
-        }
-        
-        // 1. Kunci semua medan Konteks
-        $('#ContextCard').find('input, select, textarea').prop('disabled', true);
-        $(this).prop('disabled', true).removeClass('btn-primary').addClass('btn-success')
-               .html('<i class="fa-solid fa-check me-2"></i> CONTEXT CONFIRMED');
-        priorityWarning.hide(); 
-        
-        // 2. Buka Kunci Tab Item Selection
-        itemsTabLink.removeClass('disabled');
-        
-        // 3. Pindah ke Tab 2
-        bootstrap.Tab.getInstance(itemsTabLink[0]).show();
-        
-        // 4. Laksanakan checkAvailability jika ada item yang dipilih
-        checkAvailability(); 
-    });
-    
-    // Butang NEXT: Go to Review (Step 2 -> Step 3)
-    goToReviewBtn.on('click', function() {
-        if (reservationItems.length === 0) {
-            Swal.fire("Empty List", "Please add at least one item before going to review.", "warning");
-            return;
-        }
-        reviewTabLink.removeClass('disabled');
-        renderItemsList(); // Pastikan senarai di tab review terkini
-        bootstrap.Tab.getInstance(reviewTabLink[0]).show();
-    });
-
-    // Butang BACK: Back to Items (Step 3 -> Step 2)
-    backToItemsBtn.on('click', function() {
-        bootstrap.Tab.getInstance(itemsTabLink[0]).show();
-    });
-
-
-    // =========================================================
-    // 7. Request List & Submission Logic 
-    // =========================================================
-    let reservationItems = []; 
-    
-    // Handler Butang Add Item
-    $('#addMoreBtn').on('click', () => {
-        // Semak status Lock
-        if (!confirmContextBtn.hasClass('btn-success')) {
-             Swal.fire("Context Not Locked", "Please confirm and lock the Dates/Purpose in Step 1 first.", "error");
-             return;
-        }
-
-        const itemName = $('#item_select').val();
-        const quantity = $('#quantity').val();
-        
-        if (!itemName || quantity <= 0) {
-             Swal.fire("Incomplete Item Details", "Please select an Item and Quantity.", "warning");
-             return;
-        }
-        
-        if ($('#availability-status').find('.alert-success').length === 0 && $('#addMoreBtn').prop('disabled')) {
-             Swal.fire("Not Confirmed", "Please ensure the item's availability is confirmed before adding it to the list.", "error");
-             return;
-        }
-
-        if (reservationItems.some(item => item.item_name === itemName)) {
-             Swal.fire("Duplicate Item", `Item ${itemName} is already in your request list.`, "info");
-             return;
-        }
-        
-        // Ambil data kontekstual dari medan yang sudah 'disabled'
-        const newItem = { 
-            item_name: itemName, 
-            quantity: quantity, 
-            reserve_date: $('#reserveDate').val(), 
-            return_date: $('#returnDate').val(), 
-            reason: $('#reason').val(), 
-            program_type: $('#program_type').val()
-        };
-        
-        reservationItems.push(newItem);
-        renderItemsList(); 
-
-        // Notifikasi Toast
-        const Toast = Swal.mixin({
-            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
-        });
-        Toast.fire({ icon: 'success', title: `Item ${itemName} added to your request!` });
-
-        
-        // Reset Item Selection untuk item seterusnya
-        $('#item_select').val(null).trigger('change');
-        $('#quantity').val(1);
-        $('#availability-status').html('');
-        goToReviewBtn.prop('disabled', false); // Aktifkan butang review
-    });
-
-    
-    function renderItemsList() {
-        const listDiv = $('#itemsList');
-        const contextSummaryDiv = $('#contextSummary');
-        const submitBtn = $('#finalSubmitBtn');
-        const agreeTermsCheckbox = $('#agreeTerms');
-        
-        if (reservationItems.length > 0) {
-            // Dapatkan Konteks (Item pertama dalam senarai)
-            const contextItem = reservationItems[0];
-            let programTypeText = '';
-            if (contextItem.program_type === '3') programTypeText = 'Academic Project/Class';
-            if (contextItem.program_type === '2') programTypeText = 'Club/Association Program';
-            if (contextItem.program_type === '1') programTypeText = 'Official University Ceremony';
+            // Lock context fields (visually disabled/readonly)
+            $('#ContextCard').find('input, select, textarea, button').not('#confirmContextBtn').prop('disabled', true).css('opacity', 0.6);
+            $('#confirmContextBtn').html('<i class="fa-solid fa-check-double me-2"></i> CONTEXT IS LOCKED').removeClass('btn-primary').addClass('btn-success').prop('disabled', true);
             
-            let contextHtml = `
-                <div class="alert alert-info py-2 small mb-3">
-                    <i class="fa-solid fa-calendar-check me-2"></i> <strong>Submission Context:</strong><br>
-                    Date: ${contextItem.reserve_date} to ${contextItem.return_date}<br>
-                    Purpose: ${contextItem.reason} (${programTypeText})
-                    <hr class="my-1">
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="unlockContextBtn"><i class="fa-solid fa-unlock me-1"></i> Change Context</button>
-                </div>
-            `;
+            // Enable Step 2 tab and switch to it
+            $('#items-tab').removeClass('disabled');
+            new bootstrap.Tab(document.getElementById('items-tab')).show();
             
-            let itemsHtml = reservationItems.map((it, i) => {
-                return `
-                <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded mb-2 border">
-                    <div>
-                        <b>${it.item_name}</b> <span class="badge bg-primary">${it.quantity} unit(s)</span>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-item-btn" data-index="${i}"><i class="fa fa-trash-alt"></i> Remove</button>
-                </div>
-                `;
-            }).join('');
-            
-            contextSummaryDiv.html(contextHtml);
-            listDiv.html(`<div class="p-2 border rounded bg-light">${itemsHtml}</div>`);
-            
-            // Logik untuk Tab Review
-            // agreeTermsCheckbox.prop('disabled', false); // JANGAN ubah disabled di sini. Kawal melalui modal sahaja.
-            submitBtn.prop('disabled', !agreeTermsCheckbox.is(':checked'));
-            reviewTabLink.removeClass('disabled');
-            goToReviewBtn.prop('disabled', false); 
-
+            // Immediately check availability for the initially selected item/quantity (if any)
+            checkItemAvailability();
         } else {
-            // Jika senarai kosong
-            contextSummaryDiv.html('');
-            listDiv.html(`<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p>Your request list is currently empty.</p></div>`);
-            
-            agreeTermsCheckbox.prop('disabled', true).prop('checked', false); 
-            submitBtn.prop('disabled', true);
-            reviewTabLink.addClass('disabled'); // Kunci Tab Review
-            goToReviewBtn.prop('disabled', true);
-            
-            // Jika tiada item, kita unlock Context secara automatik
-            unlockContext(); 
+            Swal.fire('Incomplete Context', 'Please fill in all the required fields (Dates, Program Type, and Purpose) in Step 1.', 'warning');
         }
-
-        // Hantar data penuh ke input tersembunyi
-        $('#allItems').val(JSON.stringify(reservationItems));
-    }
-    
-    // Handler Butang Unlock Context (di Tab Review)
-    $(document).on('click', '#unlockContextBtn', function() {
-        Swal.fire({
-            title: 'Confirm Change Context?',
-            text: "Changing the context (dates/purpose) will EMPTY your current request list and return you to Step 1.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, change it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                reservationItems = [];
-                renderItemsList();
-                // Alih ke Tab 1 (Context)
-                bootstrap.Tab.getInstance(contextTabLink[0]).show();
-                // Logik unlockContext akan dipanggil oleh renderItemsList()
-                Swal.fire('Context Unlocked', 'You may now change the dates/purpose in Step 1.', 'info');
-            }
-        });
     });
-
-    function unlockContext() {
-         // Unlock Medan Input Step 1
-         $('#ContextCard').find('input, select, textarea').prop('disabled', false);
-         confirmContextBtn.prop('disabled', false).removeClass('btn-success').addClass('btn-primary')
-                .html('<i class="fa-solid fa-lock me-2"></i> <strong>CONFIRM & LOCK CONTEXT</strong>');
-         
-         // Kunci Tab 2 & 3
-         itemsTabLink.addClass('disabled');
-         reviewTabLink.addClass('disabled');
-         
-         // Reset item selection
-         $('#availability-status').html('');
-         $('#item_select').val(null).trigger('change');
-         $('#quantity').val(1);
-         $('#addMoreBtn').prop('disabled', true);
-         
-         // Reset T&C
-         $('#agreeTerms').prop('disabled', true).prop('checked', false);
-         
-         // Tunjuk amaran semula
-         if ($('#program_type').val()) {
-            priorityWarning.show();
-         }
+    
+    // Validation check for Step 1 fields
+    function checkContextInputs() {
+        return $('#reserveDate').val() && 
+               $('#returnDate').val() && 
+               $('#program_type').val() && 
+               $('#reason').val();
     }
 
-    // Handler Butang Remove Item (di Tab Review)
-    $('#itemsList').on('click', '.remove-item-btn', function() {
-        const index = $(this).data('index');
-        const itemName = reservationItems[index].item_name;
-        
-        reservationItems.splice(index, 1); 
-        renderItemsList(); 
-        checkAvailability(); 
 
-        // Alihkan pengguna kembali ke Step 2 jika list kosong
-        if (reservationItems.length === 0) {
-             bootstrap.Tab.getInstance(itemsTabLink[0]).show();
-        }
-        
-        const Toast = Swal.mixin({
-            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
-        });
-        Toast.fire({ icon: 'error', title: `Item ${itemName} removed from list.` });
-    });
-    
-    // Handler Checkbox Terms (Hanya kawal butang Submit)
-    $('#agreeTerms').on('change', function() {
-        const submitBtn = $('#finalSubmitBtn');
-        // Hanya dayakan butang Submit jika kotak semak dicentang DAN ada item dalam senarai.
-        if ($(this).is(':checked') && reservationItems.length > 0) {
-            submitBtn.prop('disabled', false);
-        } else {
-            submitBtn.prop('disabled', true);
+    // --- 3. Step 2: Item Selection and Availability ---
+
+    // Availability check triggered by item change or quantity change
+    $('#item_select, #quantity').on('change input', function() {
+        // Only run availability check if context is locked
+        if ($('#confirmContextBtn').is(':disabled')) {
+            checkItemAvailability();
         }
     });
 
-    // Handler Butang I Understand (Modal Terms) 🔑 LOGIK TERKINI DI SINI
-    $('#agreeTermsBtn').on('click', function() {
-        // 1. Tetapkan kotak semak kepada 'checked'
-        $('#agreeTerms').prop('checked', true);
+    // Function to format and display item availability status
+    function displayAvailability(availableQty, requestedQty, itemName) {
+        const statusDiv = $('#availability-status');
+        statusDiv.empty();
         
-        // 2. Buang status 'disabled' dari kotak semak
-        // Ini membolehkan pengguna menyemak atau membatalkan semak secara manual kemudian.
-        $('#agreeTerms').prop('disabled', false); 
-        
-        // 3. Panggil event 'change' untuk mengaktifkan butang Submit jika senarai item sudah penuh.
-        $('#agreeTerms').trigger('change');
-
-        // Notifikasi visual (pilihan)
-        const Toast = Swal.mixin({
-            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true
-        });
-        Toast.fire({ icon: 'info', title: 'Terms agreed. Checkbox unlocked.' });
-    });
-
-    
-    // Handler Final Submit (Kekal sama)
-    $('#finalSubmitBtn').on('click', function (e) {
-        e.preventDefault();
-        const submitBtn = $(this);
-        
-        if (reservationItems.length === 0) {
-            Swal.fire("Empty List", "Please add at least one item before submitting.", "error");
+        if (availableQty === null) {
+            // No item selected
+            statusDiv.append('<div class="alert alert-secondary py-2 small"><i class="fa-solid fa-circle-info me-2"></i> Select an item and quantity above.</div>');
+            $('#addMoreBtn').prop('disabled', true);
             return;
         }
 
-        if (!$('#agreeTerms').is(':checked')) {
-            Swal.fire("Terms and Conditions", "You must agree to the Terms and Conditions to proceed.", "warning");
-            return; 
+        if (availableQty >= requestedQty) {
+            // Available
+            statusDiv.append(`
+                <div class="alert alert-success py-2 small">
+                    <i class="fa-solid fa-check-circle me-2"></i> 
+                    ${itemName}: <strong>${requestedQty} unit(s) is AVAILABLE</strong> from ${availableQty} total unit(s).
+                </div>
+            `);
+            $('#addMoreBtn').prop('disabled', false);
+        } else if (availableQty > 0) {
+            // Partially available
+            statusDiv.append(`
+                <div class="alert alert-warning py-2 small">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> 
+                    ${itemName}: Only <strong>${availableQty} unit(s) are AVAILABLE</strong>. Requested: ${requestedQty}.
+                </div>
+            `);
+            // Disable button if not enough, but still allow if the user accepts the partial quantity by reducing the input
+            if (requestedQty > availableQty) {
+                $('#addMoreBtn').prop('disabled', true);
+                statusDiv.append('<p class="small text-danger mb-0 mt-1">Please reduce the quantity to match the available stock.</p>');
+            } else {
+                $('#addMoreBtn').prop('disabled', false);
+            }
+        } else {
+            // Not available
+            statusDiv.append(`
+                <div class="alert alert-danger py-2 small">
+                    <i class="fa-solid fa-ban me-2"></i> 
+                    ${itemName}: <strong>0 unit(s) AVAILABLE</strong> for the selected dates.
+                </div>
+            `);
+            $('#addMoreBtn').prop('disabled', true);
         }
+    }
+
+    // AJAX call to check item availability
+    function checkItemAvailability() {
+        const item_id = $('#item_select').val();
+        const quantity = parseInt($('#quantity').val());
+
+        if (!item_id || isNaN(quantity) || quantity <= 0) {
+            displayAvailability(null); // Show "Select an item" message
+            return;
+        }
+
+        // Find the full item data
+        const selectedItem = ALL_ITEMS_DATA.find(item => item.item_id == item_id);
+        const itemName = selectedItem ? selectedItem.item_name : 'Selected Item';
         
-        const contextItem = reservationItems[0];
-        
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
-        
-        const submissionData = {
-            user_id: phpData.user_id,
-            all_items: JSON.stringify(reservationItems),
-            program_type: contextItem.program_type, 
-            reason: contextItem.reason 
-        };
-        
+        // Temporarily disable the button while checking
+        $('#addMoreBtn').prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-2"></i> Checking Availability...');
+
         $.ajax({
+            url: 'check_availability.php', // You must create this file
             type: 'POST',
-            url: 'submit_reservation.php', 
-            data: submissionData, 
             dataType: 'json',
+            data: {
+                item_id: item_id,
+                reserve_date: RESERVATION_CONTEXT.reserve_date,
+                return_date: RESERVATION_CONTEXT.return_date,
+            },
             success: function(response) {
-                if(response.status === 'success') {
-                    Swal.fire({
-                        title: 'Success!',
-                        text: 'Your consolidated request has been submitted. Redirecting to history...',
-                        icon: 'success',
-                        timer: 2000,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    }).then(() => {
-                        window.location.href = 'history.php'; 
-                    });
+                if (response.success) {
+                    const availableQty = parseInt(response.available_quantity);
+                    displayAvailability(availableQty, quantity, itemName);
                 } else {
-                    
-                    Swal.fire("Submission Failed", response.message, "error");
+                    $('#availability-status').html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-exclamation-triangle me-2"></i> Error checking availability.</div>');
+                    $('#addMoreBtn').prop('disabled', true);
                 }
+                $('#addMoreBtn').html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong>');
             },
             error: function() {
-                
-                Swal.fire("Submission Failed", "A server error occurred. Please try again.", "error");
+                $('#availability-status').html('<div class="alert alert-danger py-2 small"><i class="fa-solid fa-exclamation-triangle me-2"></i> Server error. Please try again.</div>');
+                $('#addMoreBtn').prop('disabled', true);
+                $('#addMoreBtn').html('<i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong>');
+            }
+        });
+    }
+
+    // Add Item to Request List
+    $('#addMoreBtn').on('click', function() {
+        const item_id = $('#item_select').val();
+        const quantity = parseInt($('#quantity').val());
+        const selectedItem = ALL_ITEMS_DATA.find(item => item.item_id == item_id);
+
+        if (!item_id || isNaN(quantity) || quantity <= 0 || !selectedItem) {
+            Swal.fire('Error', 'Please select a valid item and quantity.', 'error');
+            return;
+        }
+
+        // Check if item is already in the list
+        const existingIndex = REQUEST_ITEMS.findIndex(item => item.item_id == item_id);
+        
+        if (existingIndex !== -1) {
+            // Item exists, update quantity
+            REQUEST_ITEMS[existingIndex].quantity = quantity;
+            Swal.fire('Updated!', `${selectedItem.item_name} quantity updated to ${quantity}.`, 'success');
+        } else {
+            // Add new item
+            REQUEST_ITEMS.push({
+                item_id: item_id,
+                item_name: selectedItem.item_name,
+                category_name: selectedItem.category_name,
+                image_url: selectedItem.image_url,
+                quantity: quantity
+            });
+            Swal.fire('Added!', `${selectedItem.item_name} (x${quantity}) added to your request list.`, 'success');
+        }
+
+        // Reset form for next item
+        $('#item_select').val(null).trigger('change');
+        $('#quantity').val(1);
+        $('#availability-status').empty();
+        $('#addMoreBtn').prop('disabled', true);
+
+        // Enable Review tab and update summary
+        updateReviewTab();
+    });
+
+
+    // --- 4. Step 3: Review and Submission ---
+    
+    // Back to Step 2 button handler
+    $('#backToItemsBtn').on('click', function() {
+        new bootstrap.Tab(document.getElementById('items-tab')).show();
+    });
+
+    // Update the Step 3 tab with context and item list
+    function updateReviewTab() {
+        // A. Update Context Summary
+        const summary = `
+            <div class="alert alert-info py-2 small">
+                <p class="mb-1"><strong><i class="fa-solid fa-calendar-alt me-1"></i> Loan Period:</strong> ${RESERVATION_CONTEXT.reserve_date} until ${RESERVATION_CONTEXT.return_date}</p>
+                <p class="mb-1"><strong><i class="fa-solid fa-users me-1"></i> Program Type:</strong> ${RESERVATION_CONTEXT.program_type_text}</p>
+                <p class="mb-0"><strong><i class="fa-solid fa-pen-nib me-1"></i> Purpose:</strong> ${RESERVATION_CONTEXT.reason}</p>
+            </div>
+        `;
+        $('#contextSummary').html(summary);
+
+        // B. Update Items List
+        let itemsHtml = '';
+        if (REQUEST_ITEMS.length === 0) {
+            itemsHtml = '<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p class="mb-0">Your request list is currently empty.</p></div>';
+            $('#agreeTerms').prop('disabled', true).prop('checked', false).trigger('change');
+        } else {
+            itemsHtml = '<ul class="list-group list-group-flush">';
+            REQUEST_ITEMS.forEach((item, index) => {
+                itemsHtml += `
+                    <li class="list-group-item d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="category-image-box">
+							<img src="../uploads/default-image.jpg" alt="Default Image">
+                            </div>
+                            <div>
+                                <strong class="d-block">${item.item_name}</strong>
+                                <span class="text-muted small">${item.category_name}</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge text-bg-primary fs-6 me-3">${item.quantity} unit(s)</span>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-item-btn" data-index="${index}">
+                                <i class="fa-solid fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </li>
+                `;
+            });
+            itemsHtml += '</ul>';
+            $('#agreeTerms').prop('disabled', false); // Enable checkbox if list is not empty
+        }
+        $('#itemsList').html(itemsHtml);
+        
+        // Update total items hidden input for form submission
+        $('input#allItems').val(JSON.stringify(REQUEST_ITEMS));
+
+        // Re-attach removal handlers
+        $('.remove-item-btn').on('click', removeItemFromList);
+    }
+    
+    // Remove item from request list
+    function removeItemFromList() {
+        const indexToRemove = $(this).data('index');
+        
+        Swal.fire({
+            title: 'Confirm Removal',
+            text: "Are you sure you want to remove this item from the list?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#06b6d4',
+            cancelButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Remove It!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                REQUEST_ITEMS.splice(indexToRemove, 1);
+                updateReviewTab(); // Re-render the list
+                Swal.fire('Removed!', 'The item has been removed.', 'success');
+            }
+        });
+    }
+
+    // Enable/Disable final submit button based on terms checkbox
+    $('#agreeTerms').on('change', function() {
+        $('#finalSubmitBtn').prop('disabled', !$(this).is(':checked'));
+    });
+
+    // Final Submission Handler
+    $('#finalSubmitBtn').on('click', function() {
+        if (REQUEST_ITEMS.length === 0) {
+            Swal.fire('Error', 'Your request list is empty. Please add items in Step 2.', 'error');
+            return;
+        }
+        if (!$('#agreeTerms').is(':checked')) {
+            Swal.fire('Error', 'Please read and agree to the Terms and Conditions.', 'error');
+            return;
+        }
+
+        // Prepare data for final AJAX submission
+        const submissionData = {
+            ...RESERVATION_CONTEXT,
+            items: REQUEST_ITEMS
+        };
+
+        // Disable button to prevent double submission
+        const $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-2"></i> Submitting...');
+
+        $.ajax({
+            url: 'submit_reservation.php', // You must create this file
+            type: 'POST',
+            dataType: 'json',
+            contentType: 'application/json', // Tell server we're sending JSON
+            data: JSON.stringify(submissionData),
+            success: function(response) {
+                if (response.success) {
+                    Swal.fire({
+                        title: 'Success!',
+                        text: response.message,
+                        icon: 'success'
+                    }).then(() => {
+                        window.location.href = 'history.php'; // Redirect to history page
+                    });
+                } else {
+                    Swal.fire('Submission Failed', response.message, 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("Submission Error:", error);
+                Swal.fire('Server Error', 'Could not process the submission. Please check the network connection or try again later.', 'error');
             },
             complete: function() {
-                
-                const shouldBeEnabled = reservationItems.length > 0 && $('#agreeTerms').is(':checked');
-                submitBtn.prop('disabled', !shouldBeEnabled).html('<i class="fa-solid fa-paper-plane me-2"></i> **Submit Final Request**');
+                // Re-enable button
+                $btn.prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-2"></i> <strong>Submit Final Request</strong>');
             }
         });
     });
+
+    // --- 5. Utility Functions ---
     
-    // Pastikan senarai dikemas kini pada pemuatan awal
-    renderItemsList();
+    // Function to render the right-hand side list of ALL items based on category
+    function filterItemList(categoryName) {
+        const displayList = $('#displayItemList');
+        displayList.empty();
+        
+        const filteredItems = ALL_ITEMS_DATA.filter(item => 
+            categoryName === '' || item.category_name === categoryName
+        );
+
+        if (filteredItems.length === 0) {
+            displayList.html('<p class="text-center text-muted p-3">No items found in this category.</p>');
+            return;
+        }
+
+filteredItems.forEach(item => {
+    // Tentukan laluan imej yang betul.
+    // Menambah '../' untuk naik satu direktori, mengandaikan skrip ini di dalam subfolder (cth: /user/)
+    // dan folder 'uploads/' berada di akar projek.
+    const imagePath = item.image_url ? `../${item.image_url}` : '../path/to/default-image.jpg';
+    
+    const itemHtml = `
+        <a href="#" class="list-group-item list-group-item-action d-flex align-items-center py-3" onclick="selectItemFromList(${item.item_id}); return false;">
+            <div class="category-image-box">
+                <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img">
+            </div>
+            <div>
+                <strong class="d-block">${item.item_name}</strong>
+                <span class="text-muted small">${item.category_name}</span>
+            </div>
+            <i class="fa-solid fa-chevron-right ms-auto text-muted small"></i>
+        </a>
+    `;
+    displayList.append(itemHtml);
+});
+    }
+
+    // Expose selectItemFromList globally so the onclick handler works
+    window.selectItemFromList = function(itemId) {
+        $('#item_select').val(itemId).trigger('change');
+        // Smooth scroll to the item selection card
+        $('html, body').animate({
+            scrollTop: $('#ItemSelectionCard').offset().top - 80
+        }, 500);
+    }
+    
+    // Initial display update for the item list
+    filterItemList(''); 
 });
 </script>
 </body>

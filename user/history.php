@@ -90,27 +90,7 @@ if ($stmt = $conn->prepare($sql)) {
 }
 
 
-$upcoming_bookings_all = [];
-$sql_upcoming = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
-                 FROM reservations r
-                 JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
-                 JOIN item i ON ri.item_id = i.item_id
-                 WHERE r.person_id = ? AND ri.status IN ('Approved', 'Pending', 'Checked Out') 
-                 ORDER BY ri.id ASC";
-
-if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
-    $stmt_upcoming->bind_param("i", $person_id);
-    $stmt_upcoming->execute();
-    $result_upcoming = $stmt_upcoming->get_result();
-    while ($row_up = $result_upcoming->fetch_assoc()) {
-        $upcoming_bookings_all[] = $row_up;
-    }
-    $stmt_upcoming->close();
-} else {
-    error_log("Failed to prepare upcoming bookings statement: " . $conn->error);
-}
-
-
+/* UPCOMING BOOKINGS PHP CODE DELETED */
 
 ?>
 <!DOCTYPE html>
@@ -150,9 +130,9 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
     }
     
     body {  
-        font-family: 'Inter', sans-serif;   
-        background-color: var(--bg-light-gray);   
-        color: var(--text-dark);    
+        font-family: 'Inter', sans-serif;    
+        background-color: var(--bg-light-gray);    
+        color: var(--text-dark);      
         min-height: 100vh;  
     }
     
@@ -161,25 +141,25 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
         width: 280px; position: fixed; top: 0; bottom: 0; left: 0;    
         background: var(--card-bg); padding: 20px;  
         box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1000;  
-        display: flex; flex-direction: column; justify-content: space-between; 
-        transition: transform 0.3s ease-in-out; 
+        display: flex; flex-direction: column; justify-content: space-between;  
+        transition: transform 0.3s ease-in-out;  
     }
     .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
     .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
     .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-    .sidebar a {   
+    .sidebar a {    
         display: flex; align-items: center; gap: 15px;  
         color: var(--text-muted); text-decoration: none;    
-        padding: 14px 18px; margin-bottom: 6px; 
-        border-radius: 10px; font-weight: 500; font-size: 15px; 
-        transition: all 0.2s;   
+        padding: 14px 18px; margin-bottom: 6px;  
+        border-radius: 10px; font-weight: 500; font-size: 15px;  
+        transition: all 0.2s;    
     }
         
     .sidebar a.active { 
         background: var(--primary-light);    
         color: var(--primary-color);    
-        font-weight: 700;    
+        font-weight: 700;     
         box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
     }
     .sidebar a:hover:not(.active) {
@@ -194,18 +174,18 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
     .topbar {    
         background: var(--card-bg); 
         padding: 18px 30px; 
-        display: flex;   
+        display: flex;    
         justify-content: space-between; 
         align-items: center; 
-        border-bottom: 1px solid #eef1f4;    
-        z-index: 999;    
+        border-bottom: 1px solid #eef1f4;     
+        z-index: 999;     
         position: sticky;    
         top: 0; 
     }
     .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
     .topbar .user-profile { 
-        display: flex;   
-        align-items: center;     
+        display: flex;    
+        align-items: center;       
         gap: 15px; 
         position: relative; 
     }
@@ -214,10 +194,10 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
         
     .card { 
         border-radius: 12px;
-        box-shadow: var(--shadow-light);     
+        box-shadow: var(--shadow-light);       
         background: var(--card-bg); 
-        margin-bottom: 25px;     
-        border: none;    
+        margin-bottom: 25px;       
+        border: none;     
         transition: all 0.2s;
         padding: 25px; 
     }
@@ -305,80 +285,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
         --bs-pagination-active-border-color: var(--primary-color);
     }
 
-    /* --- Upcoming Bookings (Reka Bentuk Baharu) --- */
-
-    .card h4.title-booking {
-        font-weight: 700;
-        font-size: 1.2rem;
-        color: var(--text-dark);
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .upcoming-list {
-        display: flex;
-        flex-direction: column;
-        gap: 15px; /* Jarak antara item */
-    }
-
-    .upcoming-item {
-        border: 1px solid #eef1f4;
-        border-radius: 10px; /* Jejari yang kemas */
-        padding: 10px 15px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        background-color: var(--card-bg);
-        transition: all 0.2s;
-        overflow: hidden; /* Penting untuk bar status */
-    }
-
-    .upcoming-item:hover {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-    }
-
-    /* Bar status warna di atas */
-    .item-status-bar {
-        height: 4px; 
-        width: 100%;
-        margin: -10px -15px 10px -15px; /* Penuhkan lebar card */
-    }
-
-    /* Teks Nama Item */
-    .item-name {
-        font-weight: 600;
-        color: var(--text-dark);
-        font-size: 15px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 3px;
-    }
-    .item-name i {
-        color: var(--text-muted); /* Warna ikon */
-        font-size: 14px;
-    }
-
-    /* Teks Tarikh dan Status */
-    .item-dates-status {
-        font-size: 13px;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: space-between; 
-    }
-
-    /* Warna-warna Status Bar */
-    .status-bar-checkedout { background-color: #16a34a; /* Hijau Gelap */ }
-    .status-bar-approved { background-color: #06b6d4; /* Primary / Cyan */ } 
-    .status-bar-pending { background-color: #f59e0b; /* Kuning/Amber */ }
-
-    /* Warna Teks Status */
-    .text-success-dark { color: #16a34a !important; font-weight: 600; }
-    .text-info-dark { color: #0891b2 !important; font-weight: 600; }
-    .text-warning-dark { color: #b45309 !important; font-weight: 600; }
+    /* --- Upcoming Bookings (Reka Bentuk Baharu) - DELETED STYLES --- */
 
     /* --- Mobile Optimizations (Kekalkan) --- */
     @media (max-width: 992px) {
@@ -428,15 +335,10 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
     </div>
     <div class="container-fluid">
         <div class="row">
-            <div class="col-lg-8 col-12"> 
-                <div class="card">
+            <div class="col-12"> <div class="card">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
                         <h5 class="mb-0"><i class="fa-solid fa-list-ul me-2 text-primary"></i> My Loan History</h5>
-                        <div class="btn-group" role="group">
-                            <button type="button" id="tableViewBtn" class="btn btn-primary btn-sm active"><i class="fa-solid fa-table-list me-2"></i>Table</button>
-                            <button type="button" id="calendarViewBtn" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-calendar-days me-2"></i>Calendar</button>
                         </div>
-                    </div>
 
                     <div id="tableView">                    
                         <div class="filter-controls-container">
@@ -531,7 +433,7 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
                                 <?php endif; ?>
 
                                 <?php
-                                 
+                                
                                  $maxPagesToShow = 5; 
                                  $startPage = max(1, $currentPage - floor($maxPagesToShow / 2));
                                  $endPage = min($totalPages, $startPage + $maxPagesToShow - 1);
@@ -547,9 +449,9 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
                                  }
 
                                  for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                    <li class="page-item <?= ($i == $currentPage) ? 'active' : '' ?>">
-                                        <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
-                                    </li>
+                                     <li class="page-item <?= ($i == $currentPage) ? 'active' : '' ?>">
+                                         <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                                     </li>
                                  <?php endfor;
 
                                  if ($endPage < $totalPages) {
@@ -575,62 +477,10 @@ if ($stmt_upcoming = $conn->prepare($sql_upcoming)) {
                         </nav>
                     </div>
 
-                    <div id="calendarView" style="display: none;">
-                        </div>
-                </div>
+                    </div>
             </div>
 
-            <div class="col-lg-4 col-12">
-                <div class="card">
-                    <h4 class="title-booking"><i class="fa-solid fa-calendar-check me-2 text-primary"></i> Upcoming Bookings</h4>
-                    
-                    <div class="upcoming-list">
-                        <?php if (!empty($upcoming_bookings_all)): ?>
-                            <?php foreach ($upcoming_bookings_all as $booking):
-                                $status_upcoming = strtolower($booking['status']);
-                                $bar_class = ''; 
-                                $status_text_class = ''; 
-                                
-                                if ($status_upcoming === 'checked out') {
-                                    $bar_class = 'status-bar-checkedout';
-                                    $status_text_class = 'text-success-dark'; 
-                                } elseif ($status_upcoming === 'approved') {
-                                    $bar_class = 'status-bar-approved';
-                                    $status_text_class = 'text-info-dark'; 
-                                } elseif ($status_upcoming === 'pending') {
-                                    $bar_class = 'status-bar-pending';
-                                    $status_text_class = 'text-warning-dark'; 
-                                }
-                            ?>
-                            <div class="upcoming-item">
-                                <div class="item-status-bar <?= $bar_class ?>"></div> 
-                                
-                                <div class="item-name">
-                                    <i class="fa-solid fa-box"></i>
-                                    <?= htmlspecialchars($booking['item_name']) ?>
-                                </div>
-                                
-                                <div class="item-dates-status">
-                                    <span class="dates-range text-muted">
-                                        <i class="fa-solid fa-calendar-alt me-1"></i>
-                                        <?= date("d M", strtotime($booking['reserve_date'])) ?> &rarr; <?= date("d M Y", strtotime($booking['return_date'])) ?>
-                                    </span>
-                                    <span class="status-text <?= $status_text_class ?>">
-                                        <?= ucfirst(htmlspecialchars($booking['status'])) ?>
-                                    </span>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="text-center py-4 text-muted">
-                                <i class="fa-solid fa-face-smile fa-2x mb-2"></i><br>
-                                Tiada tempahan yang sedang aktif atau menunggu kelulusan.
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
             </div>
-        </div>
     </div>
 </div>
 
@@ -642,7 +492,6 @@ if (isset($conn)) {
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
@@ -679,54 +528,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
-    const tableViewBtn = document.getElementById('tableViewBtn');
-    const calendarViewBtn = document.getElementById('calendarViewBtn');
-    const tableView = document.getElementById('tableView');
-    const calendarView = document.getElementById('calendarView');
-    let calendar = null;
-
-    function initializeCalendar() {
-        if (calendar) {
-            calendar.render(); 
-            return;
-        } 
-        
-        calendar = new FullCalendar.Calendar(calendarView, {
-            initialView: 'dayGridMonth',
-            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
-            
-            events: 'get_bookings.php?person_id=<?= $person_id ?>', 
-            height: 'auto',
-            eventClick: function(info) {
-                alert('Item: ' + info.event.title + 
-                      '\nStatus: ' + info.event.extendedProps.status + 
-                      '\nStart: ' + info.event.startStr.substring(0, 10) +
-                      '\nEnd: ' + info.event.endStr.substring(0, 10));
-            }
-        });
-        calendar.render();
-    }
-
-    if (tableViewBtn && calendarViewBtn && tableView && calendarView) {
-        tableViewBtn.addEventListener('click', () => {
-            tableView.style.display = 'block';
-            calendarView.style.display = 'none';
-            tableViewBtn.classList.add('active', 'btn-primary');
-            tableViewBtn.classList.remove('btn-outline-primary');
-            calendarViewBtn.classList.remove('active', 'btn-primary');
-            calendarViewBtn.classList.add('btn-outline-primary');
-        });
-
-        calendarViewBtn.addEventListener('click', () => {
-            tableView.style.display = 'none';
-            calendarView.style.display = 'block';
-            calendarViewBtn.classList.add('active', 'btn-primary');
-            calendarViewBtn.classList.remove('btn-outline-primary');
-            tableViewBtn.classList.remove('active', 'btn-primary');
-            tableViewBtn.classList.add('btn-outline-primary');
-            initializeCalendar(); 
-        });
-    }
+    /* CALENDAR VIEW TOGGLE JS DELETED */
 
     
     const historyTable = document.getElementById('historyTable');
@@ -781,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             
             if (visibleCount === 0) {
-                 
+                
                 if (initialRows.length > 0) {
                     const tr = document.createElement('tr');
                     tr.className = 'no-filter-match';

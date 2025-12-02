@@ -427,6 +427,22 @@ $events_json = json_encode($events);
     .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
     .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
     
+	/* ---------------------------------- */
+/* --- FULLCALENDAR BUTTON FIX --- */
+/* ---------------------------------- */
+.fc-toolbar-chunk .fc-button {
+    /* Menargetkan semua tombol di toolbar kalender (termasuk prev, next, today) */
+    text-transform: capitalize !important;
+}
+
+/* Jika tema Anda menggunakan Bootstrap dan membatalkan kapitalisasi: */
+.fc-dayGridMonth-button,
+.fc-timeGridWeek-button,
+.fc-timeGridDay-button,
+.fc-listWeek-button {
+    text-transform: capitalize !important;
+}
+
 </style>
 </head>
 <body>

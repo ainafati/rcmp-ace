@@ -21,7 +21,7 @@ if ($logo_file_path === false) {
 
 $html = str_replace('{{logo_path}}', $logo_file_path, $html);
 
-$template_path = 'pdf_template.html';
+$template_path = 'pdf_template_admin.php';
 if (!file_exists($template_path)) {
     $mpdf = new Mpdf();
     $mpdf->WriteHTML('<h1>Configuration Error</h1><p>PDF template file not found. Please ensure a file named <strong>pdf_template.html</strong> exists.</p>');

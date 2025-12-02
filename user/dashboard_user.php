@@ -331,6 +331,58 @@ $initial_reservations_data = $stmt_initial->get_result()->fetch_all(MYSQLI_ASSOC
 $stmt_initial->close();
 
 
+// --- GET RESERVATIONS FOR FULLCALENDAR ---
+$calendar_events = [];
+$calendar_sql = "
+    SELECT 
+        ri.id, 
+        i.item_name, 
+        ri.reserve_date, 
+        ri.return_date, 
+        ri.status
+    FROM reservation_items ri
+    JOIN item i ON ri.item_id = i.item_id
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    WHERE r.person_id = ? AND ri.status IN ('Approved', 'Checked Out')
+";
+$stmt_calendar = $conn->prepare($calendar_sql);
+
+if ($stmt_calendar === false) { die("SQL Prepare Error (Calendar): " . $conn->error); }
+
+$stmt_calendar->bind_param("i", $user_id);
+$stmt_calendar->execute();
+$calendar_data = $stmt_calendar->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt_calendar->close();
+
+// Format data ke dalam format FullCalendar
+foreach ($calendar_data as $res) {
+    $title = $res['item_name'];
+    $start_date = $res['reserve_date'];
+    $end_date = $res['return_date'];
+    $status = strtolower($res['status']);
+    
+    // Tentukan warna berdasarkan status
+    $color = '#06b6d4'; // Primary Blue (Approved/Checked Out)
+    if ($status === 'checked out') {
+        $color = '#22c55e'; // Success Green
+    }
+    
+    // FullCalendar memerlukan tarikh akhir (end) ditambah 1 hari 
+    // untuk memastikan acara pada hari akhir dipaparkan sepenuhnya.
+    $end_date_fc = date('Y-m-d', strtotime($end_date . ' +1 day'));
+
+    $calendar_events[] = [
+        'title' => $title,
+        'start' => $start_date,
+        'end' => $end_date_fc, // Penting: +1 day
+        'color' => $color,
+        'extendedProps' => ['reservation_id' => $res['id'], 'status' => $res['status']]
+    ];
+}
+
+// Convert data kepada JSON untuk kegunaan JavaScript
+$calendar_events_json = json_encode($calendar_events);
+
 
 $notif_sql = "
     SELECT id, message, type, created_at 
@@ -354,14 +406,15 @@ $stmt_notif_list->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>User Dashboard — UniKL</title>
+    <title>User Dashboard — UniKL Equipment System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/main.min.css' rel='stylesheet' />
     <style>
-        /* --- CSS STYLES (Kekal Sama) --- */
+        /* --- CSS STYLES --- */
         :root {
             --primary-color: #06b6d4; 
             --primary-light: #f0f9ff; 
@@ -404,7 +457,7 @@ $stmt_notif_list->close();
             border-radius: 10px; font-weight: 500; font-size: 15px; 
             transition: all 0.2s; 
         }
-        
+          
         .sidebar a.active { 
             background: var(--primary-light); 
             color: var(--primary-color); 
@@ -439,7 +492,7 @@ $stmt_notif_list->close();
         }
         .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
         .container-fluid { padding: 30px; }
-        
+          
         .card { 
             border-radius: 12px;
             box-shadow: var(--shadow-light); 
@@ -451,7 +504,7 @@ $stmt_notif_list->close();
         .card:hover {
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); 
         }
-        
+          
         .card-summary { 
             text-align: left; 
             border: 1px solid #eef1f4;
@@ -464,7 +517,7 @@ $stmt_notif_list->close();
             transform: translateY(-3px); 
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1) !important;
         }
-        
+          
         .card-clickable {
             cursor: pointer;
         }
@@ -473,48 +526,125 @@ $stmt_notif_list->close();
             box-shadow: 0 0 0 5px var(--primary-light), 0 6px 15px rgba(0, 0, 0, 0.1) !important; 
             transform: none !important; 
         }
-        
+          
         .card-summary .card-body { 
             padding: 25px !important;
             border-left: 5px solid; 
         }
-        
+          
         .card-summary h3 { font-weight: 700; font-size: 28px; margin: 0; color: var(--text-dark); }
         .card-summary p { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
         .card-summary i { opacity: 0.8; }
-        
+          
         .border-left-primary { border-left-color: var(--primary-color) !important; background-color: var(--primary-light) !important; }
         .border-left-success { border-left-color: #22c55e !important; background-color: #f0fdf4 !important; } 
         .border-left-warning { border-left-color: #f59e0b !important; background-color: #fffbeb !important; } 
         .border-left-danger { border-left-color: #ef4444 !important; background-color: #fff7f7 !important; } 
+          
         
-        .card.pickup-schedule { 
-            background-color: #ecfdf5 !important;
-            border: 1px solid #14b8a6;
-            border-left: 5px solid #14b8a6 !important; 
-            padding: 30px; 
-            box-shadow: var(--shadow-light);
+        /* NEW STYLES for Action Center */
+        .action-center-card {
+            border: 1px solid #e2e8f0; /* slategray-200 */
+            box-shadow: none;
         }
         
-        /* New Styles for Timely Alerts */
-        .alert-card {
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            border: 1px solid;
-            font-size: 14px;
-        }
-        .alert-card.alert-return {
-            background-color: #fef3c7; 
-            border-color: #f59e0b; 
-            color: #b45309; 
-        }
-        .alert-card.alert-pickup {
-            background-color: #d1fae5; 
-            border-color: #10b981; 
-            color: #065f46; 
+        .action-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
         }
 
+        .action-item {
+            padding: 15px 0;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9; /* slategray-100 */
+            transition: background-color 0.2s;
+        }
+        .action-item:hover {
+            background-color: #fafbfd;
+        }
+        .action-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-icon-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-right: 15px;
+            opacity: 0.9;
+        }
+
+        .icon-return { background-color: #fef3c7; color: #d97706; } /* Yellow/Amber for urgency */
+        .icon-approved { background-color: #e0f2fe; color: var(--primary-color); } /* Primary Blue for new approval */
+
+        .action-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+        .action-subtitle {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .badge-pill-custom {
+            padding: 0.4em 0.8em;
+            border-radius: 50rem; /* make it pill-shaped */
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* NEW STYLES for Service Hours Card */
+        .service-hours-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3); /* Stronger shadow */
+        }
+        .service-hours-card h5 {
+            color: white;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+        }
+        .service-hours-card h5 i {
+            color: #a5f3fc; /* Light blue accent */
+        }
+        .service-hours-card hr {
+            border-color: rgba(255, 255, 255, 0.3);
+            margin: 15px 0;
+        }
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .schedule-day {
+            font-weight: 400;
+        }
+        .schedule-time {
+            font-weight: 700;
+            text-align: right;
+        }
+        .service-hours-card .small-note {
+            font-size: 13px;
+            margin-top: 15px;
+            opacity: 0.85;
+        }
+
+        /* Table Styles */
         .table-responsive { 
             padding: 0 30px 30px 30px; 
         }
@@ -539,16 +669,16 @@ $stmt_notif_list->close();
             background-color: #fafbfd; 
             cursor: pointer;
         }
-        
+          
         .badge { font-weight: 700; padding: 0.5em 0.8em; }
-        
+          
         #reservationTables .card-header {
             border-top-left-radius: 12px !important;
             border-top-right-radius: 12px !important;
             border-bottom: none;
             padding: 15px 30px !important;
         }
-        
+          
         .page-link {
             color: var(--primary-color);
             border-radius: 8px;
@@ -566,6 +696,34 @@ $stmt_notif_list->close();
 
         .menu-toggle-btn { display: none; }
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
+
+        /* FullCalendar Customization */
+        .fc { 
+            font-size: 14px;
+        }
+        .fc .fc-toolbar-title {
+            font-size: 1.5em; 
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        .fc-event {
+            border-radius: 4px;
+            border: none !important;
+            padding: 2px 5px !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .fc-toolbar-chunk .fc-button {
+            text-transform: capitalize !important;
+        }
+        .fc-dayGridMonth-button,
+        .fc-timeGridWeek-button,
+        .fc-timeGridDay-button,
+        .fc-listWeek-button {
+            text-transform: capitalize !important;
+        }
 
         @media (max-width: 992px) {
             .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
@@ -610,21 +768,21 @@ $stmt_notif_list->close();
         </button>
         <h3>Dashboard</h3>
         <div class="user-profile">
-            <span class="user-name"><?= htmlspecialchars($user['name']) ?></span>
+            <span class="user-name"><?= htmlspecialchars($user['name'] ?? 'Guest User') ?></span>
             
             <div class="dropdown me-3" style="position: relative;">
                 <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fa-solid fa-bell fa-xl"></i>
-                    <?php if ($new_notif_count > 0): ?>
-                        <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;">
-                            <?= $new_notif_count ?>
+                    <?php if (($new_notif_count ?? 0) > 0): ?>
+                        <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;" id="notif-count-badge">
+                              <?= $new_notif_count ?>
                         </span>
                     <?php endif; ?>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" style="width: 300px;" id="notificationList">
-                    <h6 class="dropdown-header">Notifications (<?= $new_notif_count ?> New)</h6>
-                    <?php if ($new_notif_count > 0): ?>
-                        <?php foreach($new_notifications as $notif): 
+                    <h6 class="dropdown-header">Notifications (<span id="notif-count-header"><?= $new_notif_count ?? 0 ?></span> New)</h6>
+                    <?php if (($new_notif_count ?? 0) > 0): ?>
+                        <?php foreach(($new_notifications ?? []) as $notif): 
                             $icon = ($notif['type'] == 'reject' || $notif['type'] == 'reservation_rejected') ? 'fa-times-circle text-danger' : 'fa-check-circle text-success';
                         ?>
                             <li class="notif-item" data-id="<?= $notif['id'] ?>">
@@ -642,7 +800,7 @@ $stmt_notif_list->close();
                         <?php endforeach; ?>
                         <li><a class="dropdown-item text-center small text-primary" href="#" id="markAllRead">Mark all as read</a></li>
                     <?php else: ?>
-                        <li><span class="dropdown-item text-center text-muted">No new notifications.</span></li>
+                        <li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>
                     <?php endif; ?>
                 </ul>
             </div>
@@ -652,21 +810,21 @@ $stmt_notif_list->close();
             </a>
         </div>
     </div>
-    <div class="container-fluid">
+<div class="container-fluid">
         
         <div class="row mb-5">
             
             <div class="col-lg-3 col-sm-6 mb-4"> 
-                <div class="card card-summary card-clickable  text-primary border-left-primary h-100" 
+                <div class="card card-summary card-clickable text-primary border-left-primary h-100" 
                     data-bs-toggle="collapse" 
                     data-bs-target="#tableCollapseTotal" 
-                    aria-expanded="false" 
+                    aria-expanded="true" 
                     aria-controls="tableCollapseTotal" 
                     data-status-filter="all"> 
                     <div class="card-body d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-muted text-uppercase mb-1 small fw-bold">Total Reservations</p> 
-                            <h3 class="mb-0"><?= $total ?></h3>
+                            <h3 class="mb-0" data-count="total"><?= $total ?></h3>
                         </div>
                         <i class="fa-solid fa-layer-group fa-3x text-primary"></i> 
                     </div>
@@ -683,7 +841,7 @@ $stmt_notif_list->close();
                     <div class="card-body d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-muted text-uppercase mb-1 small fw-bold">Approved</p> 
-                            <h3 class="mb-0"><?= $approved ?></h3>
+                            <h3 class="mb-0" data-count="approved"><?= $approved ?></h3>
                         </div>
                         <i class="fa-solid fa-circle-check fa-3x text-success"></i> 
                     </div>
@@ -700,7 +858,7 @@ $stmt_notif_list->close();
                     <div class="card-body d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-muted text-uppercase mb-1 small fw-bold">Pending</p> 
-                            <h3 class="mb-0"><?= $pending ?></h3>
+                            <h3 class="mb-0" data-count="pending"><?= $pending ?></h3>
                         </div>
                         <i class="fa-solid fa-hourglass-half fa-3x text-warning"></i> 
                     </div>
@@ -716,104 +874,160 @@ $stmt_notif_list->close();
                     data-status-filter="rejected,completed"> 
                     <div class="card-body d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Rejected</p> 
-                            <h3 class="mb-0"><?= $rejected_completed ?></h3>
+                            <p class="text-muted text-uppercase mb-1 small fw-bold">Rejected / Completed</p> 
+                            <h3 class="mb-0" data-count="rejected_completed"><?= $rejected_completed ?></h3>
                         </div>
                         <i class="fa-solid fa-circle-xmark fa-3x text-danger"></i> 
                     </div>
                 </div> 
             </div>
         </div>
-        <div id="reservationTables" class="mt-4">
-
+        
+        <div id="reservationTables" class="mt-2 mb-5">
             <div class="collapse multi-collapse mb-4" id="tableCollapseTotal" data-bs-parent="#reservationTables">
                 <div class="card card-content-container" data-status-id="all">
                     <div class="card-header bg-primary text-white py-3 fw-bold rounded-top-2">
-                        <i class="fa-solid fa-table me-2"></i> All Reservations (Showing <?= $offset_initial + 1 ?>-<?= min($offset_initial + $limit, $total) ?> of <?= $total ?> Items)
+                        <i class="fa-solid fa-table me-2"></i> All Reservations (Showing 1-<?= min($limit, $total ?? 0) ?> of <?= $total ?? 0 ?> Items)
                     </div>
-                    <?php 
-                    echo renderReservationTable($initial_reservations_data, 'all', $page_initial, $total_pages_initial, $total, $limit, true); 
-                    ?>
+                    <?= renderReservationTable($initial_reservations_data ?? [], 'all', $page_initial ?? 1, $total_pages_initial ?? 1, $total ?? 0, $limit ?? 10, true) ?>
                 </div>
             </div>
 
             <div class="collapse multi-collapse mb-4" id="tableCollapseApproved" data-bs-parent="#reservationTables">
-                 <div class="card card-content-container" data-status-id="approved,checked out">
-                    <div class="d-flex justify-content-center align-items-center py-5">
+                <div class="card card-content-container" data-status-id="approved,checked out">
+                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
                         <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading Data...</span>
+                        <span class="ms-3 text-primary fw-bold">Loading Approved Data...</span>
                     </div>
                 </div>
             </div>
 
             <div class="collapse multi-collapse mb-4" id="tableCollapsePending" data-bs-parent="#reservationTables">
-                 <div class="card card-content-container" data-status-id="pending">
-                    <div class="d-flex justify-content-center align-items-center py-5">
+                <div class="card card-content-container" data-status-id="pending">
+                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
                         <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading Data...</span>
+                        <span class="ms-3 text-primary fw-bold">Loading Pending Data...</span>
                     </div>
                 </div>
             </div>
             
             <div class="collapse multi-collapse mb-4" id="tableCollapseRejected" data-bs-parent="#reservationTables">
-                 <div class="card card-content-container" data-status-id="rejected,completed">
-                    <div class="d-flex justify-content-center align-items-center py-5">
+                <div class="card card-content-container" data-status-id="rejected,completed">
+                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
                         <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading Data...</span>
+                        <span class="ms-3 text-primary fw-bold">Loading History Data...</span>
                     </div>
                 </div>
             </div>
 
+        </div>
+        
+        <div class="row mb-5">
+            <div class="col-lg-6 mb-4">
+                <div class="card p-4 h-100">
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-calendar-alt me-2 text-primary"></i> Reservation Calendar</h5>
+                    <div id="fullCalendarContainer" class="p-3 border rounded-3 h-100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card p-4 h-100 action-center-card">
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-bell me-2 text-danger"></i> Timely Action Center</h5>
+                    <p class="text-muted small">Upcoming returns and newly approved items requiring action.</p>
+
+                    <ul class="action-list">
+                        <?php 
+                        if (empty($due_soon_items) && empty($newly_approved_items)): ?>
+                            <li class="py-4 text-center text-muted">🎉 All good! No urgent activities in the coming days.</li>
+                        <?php endif; ?>
+
+                        <?php foreach($due_soon_items as $item): ?>
+                            <li class="action-item">
+                                <div class="item-icon-circle icon-return">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </div>
+                                <div class="d-flex flex-column flex-grow-1">
+                                    <p class="action-title text-danger mb-0">Return Due Soon</p>
+                                    <p class="action-subtitle mb-0"><?= htmlspecialchars($item['item_name']) ?></p>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge badge-pill-custom text-bg-warning"><?= date("d M Y", strtotime($item['due_date'])) ?></span>
+                                    <p class="mb-0 small text-muted">Due Date</p>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+
+                        <?php foreach($newly_approved_items as $item): ?>
+                            <li class="action-item">
+                                <div class="item-icon-circle icon-approved">
+                                    <i class="fa-solid fa-box-open"></i>
+                                </div>
+                                <div class="d-flex flex-column flex-grow-1">
+                                    <p class="action-title text-primary mb-0">Newly Approved</p>
+                                    <p class="action-subtitle mb-0"><?= htmlspecialchars($item['item_name']) ?></p>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge badge-pill-custom text-bg-primary"><?= date("d M Y", strtotime($item['reserve_date'])) ?></span>
+                                    <p class="mb-0 small text-muted">Pick Up From</p>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+
+                    <div class="mt-auto pt-3 text-end">
+                        <a href="history.php" class="btn btn-sm btn-outline-secondary">View All History <i class="fa-solid fa-arrow-right-long ms-2"></i></a>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="row mt-4">
             <div class="col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-body p-4">
-                        <h5 class="fw-bold"><i class="fa-solid fa-id-card me-2 text-primary"></i> User Information</h5>
-                        <hr class="mt-3 mb-3">
-                        <div class="row small py-1">
-                            <div class="col-sm-4 text-muted">Name:</div>
-                            <div class="col-sm-8 fw-semibold"><?= htmlspecialchars($user['name']) ?></div>
-                        </div>
-                        <div class="row small py-1">
-                            <div class="col-sm-4 text-muted">Email:</div>
-                            <div class="col-sm-8 fw-semibold"><?= htmlspecialchars($user['email']) ?></div>
-                        </div>
-                        <div class="row small py-1">
-                            <div class="col-sm-4 text-muted">Phone:</div>
-                            <div class="col-sm-8 fw-semibold"><?= htmlspecialchars($user['phoneNum']) ?></div>
-                        </div>
-                        <div class="mt-4 text-end">
-                            <a href="profile.php" class="btn btn-sm btn-primary">Update Profile <i class="fa-solid fa-arrow-right-long ms-2"></i></a>
-                        </div>
+                <div class="service-hours-card h-100">
+                    <h5><i class="fa-solid fa-hourglass-half me-2"></i> Equipment Service Hours</h5>
+                    <hr>
+                    
+                    <div class="schedule-item">
+                        <span class="schedule-day"><i class="fa-solid fa-calendar-check me-2"></i> Monday – Thursday:</span>
+                        <span class="schedule-time">9:00 AM – 5:00 PM</span>
                     </div>
+                    
+                    <div class="schedule-item">
+                        <span class="schedule-day"><i class="fa-solid fa-calendar-check me-2"></i> Friday:</span>
+                        <span class="schedule-time">9:00 AM – 12:00 PM</span>
+                    </div>
+
+                    <p class="small-note">Please note the service break on Friday: **1:00 PM – 2:45 PM**. All pickups and returns must be completed within these hours.</p>
                 </div>
-                
             </div>
+
             <div class="col-md-6 mb-3">
-                <div class="card h-100 pickup-schedule">
-                    <h5 class="fw-bold"><i class="fa-solid fa-calendar-days me-2" style="color:#14b8a6;"></i> Pickup Schedule</h5>
+                <div class="card h-100 p-4">
+                    <h5 class="fw-bold text-dark"><i class="fa-solid fa-phone me-2 text-primary"></i> Contact & Location</h5>
                     <hr class="mt-3 mb-3">
-                    <div class="row fw-semibold">
-                        <div class="col-6">Monday – Thursday:</div>
-                        <div class="col-6">9:00 AM – 5:00 PM</div>
+                    <div class="schedule-item">
+                        <span class="text-muted"><i class="fa-solid fa-location-dot me-2"></i> Location:</span>
+                        <span class="fw-semibold text-end">IT Department, Level 1</span>
                     </div>
-                    <div class="row mt-2 fw-semibold">
-                        <div class="col-6">Friday:</div>
-                        <div class="col-6">9:00 AM – 12:00 PM    (Break 1:00 PM – 2:45 PM)</div>
+                    <div class="schedule-item">
+                        <span class="text-muted"><i class="fa-solid fa-phone-volume me-2"></i> Contact No.:</span>
+                        <span class="fw-semibold text-end">+603-5543 XXXX (Ext: 1234)</span>
                     </div>
-                    <p class="text-muted mt-3 mb-0 small">Make sure the item is picked up within the above working hours.</p>
+                    <div class="schedule-item">
+                        <span class="text-muted"><i class="fa-solid fa-envelope me-2"></i> Email:</span>
+                        <span class="fw-semibold text-end text-primary">it.rcmp@unikl.edu.my</span>
+                    </div>
+                    <p class="text-muted mt-3 mb-0 small">Please contact the service counter for any immediate issues or inquiries.</p>
                 </div>
             </div>
         </div>
-
-		        <div class="row mb-5">
+        <div class="row mb-5">
             <div class="col-lg-6 mb-4">
                 <div class="card p-4 h-100">
                     <h5 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie me-2 text-primary"></i> Reservation Status Breakdown</h5>
-                    <?php if ($total > 0): ?>
+                    <?php if (($total ?? 0) > 0): ?>
                         <div style="max-height: 350px;">
-                             <canvas id="statusChart"></canvas>
+                               <canvas id="statusChart"></canvas>
                         </div>
                     <?php else: ?>
                         <div class="alert alert-secondary text-center py-5">No reservation data to display a chart.</div>
@@ -823,7 +1037,7 @@ $stmt_notif_list->close();
             <div class="col-lg-6 mb-4">
                 <div class="card p-4 h-100">
                     <h5 class="fw-bold mb-3"><i class="fa-solid fa-ranking-star me-2 text-success"></i> Top 5 Most Reserved Items (Personal)</h5>
-                    <?php if (!empty($top_items)): ?>
+                    <?php if (!empty($top_items ?? [])): ?>
                         <div style="max-height: 350px;">
                             <canvas id="topItemsChart"></canvas>
                         </div>
@@ -833,11 +1047,12 @@ $stmt_notif_list->close();
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 
 const sidebar = document.querySelector('.sidebar');
@@ -868,6 +1083,33 @@ window.addEventListener('resize', function() {
         overlay.style.display = 'none';
     }
 });
+
+        const calendarEl = document.getElementById('fullCalendarContainer');
+        // Anggap $calendar_events_json telah wujud dari PHP anda:
+        const calendarEventsJson = <?= $calendar_events_json ?? '[]' ?>; 
+
+        if (calendarEl && typeof FullCalendar !== 'undefined') {
+             const calendar = new FullCalendar.Calendar(calendarEl, {
+                 initialView: 'dayGridMonth',
+                 headerToolbar: {
+                     left: 'prev,next today',
+                     center: 'title',
+                     right: 'dayGridMonth,timeGridWeek'
+                 },
+                 events: calendarEventsJson,
+                 height: '100%',
+                 editable: false,
+                 navLinks: true, 
+                 eventClick: function(info) {
+                     if (info.event.url) {
+                         window.open(info.event.url);
+                         info.jsEvent.preventDefault();
+                     }
+                 },
+             });
+             calendar.render();
+        }
+        
 
 
 document.addEventListener('DOMContentLoaded', function () {
