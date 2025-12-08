@@ -1,7 +1,7 @@
 <?php
 
 session_start();
-include '../config.php';
+include '../config.php'; 
 
 
 if (!isset($_SESSION['person_id'])) {
@@ -10,6 +10,10 @@ if (!isset($_SESSION['person_id'])) {
 }
 $person_id = (int)$_SESSION['person_id'];
 
+// Sambungan DB
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
 
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
 $stmt_tech->bind_param("i", $person_id);
@@ -43,12 +47,11 @@ $categories_result = $conn->query("SELECT category_id, category_name FROM catego
 $categories = $categories_result ? $categories_result->fetch_all(MYSQLI_ASSOC) : [];
 
 
-
-
+// TANGKAP INPUT FILTER BARU (asset_code)
 $start_date = isset($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-01');
 $end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-t');
 $category_filter_id = isset($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
-
+$asset_filter_code = isset($_POST['asset_code']) ? trim($_POST['asset_code']) : ''; 
 
 $current_month = date('m', strtotime($start_date));
 $current_year = date('Y', strtotime($start_date));
@@ -58,23 +61,26 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $start = ($page - 1) * $limit;
 
 
-
-
+// KUERI SQL UNTUK 3 LAJUR STAF
 $sql_base_select = "SELECT
-                u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-                ri.reserve_date, ri.return_date, ri.return_condition,
-                approver.name AS technician_name"; 
-                
+             u.name AS user_name, i.item_name, a.asset_code, c.category_name,
+             ri.reserve_date, ri.return_date, ri.return_condition,
+             approver.name AS approved_by_name, 
+             checkout.name AS checked_out_by_name, 
+             checkin.name AS checked_in_by_name";
+             
 $sql_base_from = " FROM reservation_items ri
-                JOIN reservations r ON ri.reserve_id = r.reserve_id
-                JOIN person u ON r.person_id = u.person_id             /* Peminjam */
-                JOIN item i ON ri.item_id = i.item_id
-                JOIN categories c ON i.category_id = c.category_id
-                
-                LEFT JOIN person approver ON ri.approved_by = approver.person_id /* Pengesah/Technician */
-                
-                LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
-                LEFT JOIN assets a ON ra.asset_id = a.asset_id";
+             JOIN reservations r ON ri.reserve_id = r.reserve_id
+             JOIN person u ON r.person_id = u.person_id             
+             JOIN item i ON ri.item_id = i.item_id
+             JOIN categories c ON i.category_id = c.category_id
+             
+             LEFT JOIN person approver ON ri.approved_by = approver.person_id 
+             LEFT JOIN person checkout ON ri.checked_out_by = checkout.person_id 
+             LEFT JOIN person checkin ON ri.checked_in_by = checkin.person_id 
+             
+             LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
+             LEFT JOIN assets a ON ra.asset_id = a.asset_id";
 				
 
 $sql_where_clauses = [
@@ -91,11 +97,17 @@ if ($category_filter_id > 0) {
     $param_values[] = $category_filter_id;
 }
 
+// TAMBAH KLAUSA WHERE UNTUK ASSET CODE
+if (!empty($asset_filter_code)) {
+    $sql_where_clauses[] = "a.asset_code = ?";
+    $param_types .= "s";
+    $param_values[] = $asset_filter_code;
+}
+
 $sql_where = " WHERE " . implode(' AND ', $sql_where_clauses);
 
 
-
-
+// Logik Pagination & Fetch
 $sql_count = "SELECT COUNT(ri.id) AS total" . $sql_base_from . $sql_where;
 $stmt_count = $conn->prepare($sql_count);
 if ($stmt_count === false) { die("SQL Error (Count): " . htmlspecialchars($conn->error)); }
@@ -114,8 +126,6 @@ $count_result = $stmt_count->get_result();
 $total_records = $count_result->fetch_assoc()['total'];
 $total_pages = ceil($total_records / $limit);
 $stmt_count->close();
-
-
 
 
 $sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY ri.return_date DESC, a.asset_code ASC LIMIT ?, ?";
@@ -145,7 +155,8 @@ $conn->close();
 $pagination_params = http_build_query([
     'start_date' => $start_date,
     'end_date' => $end_date,
-    'category_id' => $category_filter_id
+    'category_id' => $category_filter_id,
+    'asset_code' => $asset_filter_code
 ]);
 
 ?>
@@ -322,7 +333,6 @@ $pagination_params = http_build_query([
             <h5 class="mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Report Data</h5>
 
             <form method="POST" action="report.php" id="reportForm">
-                <!-- Hidden inputs for Start and End Date - these are the values that get submitted -->
                 <input type="hidden" id="start_date_hidden" name="start_date" value="<?= htmlspecialchars($start_date) ?>">
                 <input type="hidden" id="end_date_hidden" name="end_date" value="<?= htmlspecialchars($end_date) ?>">
                 
@@ -349,7 +359,7 @@ $pagination_params = http_build_query([
                         </select>
                     </div>
 
-                    <div class="col-md-6 col-12">
+                    <div class="col-md-3 col-6">
                         <label for="category_filter" class="form-label fw-bold">Filter by Category</label>
                         <select id="category_filter" name="category_id" class="form-select">
                             <option value="0">All Categories</option>
@@ -360,11 +370,17 @@ $pagination_params = http_build_query([
                             <?php endforeach; endif; ?>
                         </select>
                     </div>
+					
+					<div class="col-md-3 col-6">
+                        <label for="asset_code_filter" class="form-label fw-bold">Filter by Asset Code</label>
+                        <input type="text" id="asset_code_filter" name="asset_code" class="form-control" 
+                            value="<?= htmlspecialchars($asset_filter_code) ?>" placeholder="e.g., LCT-001">
+                    </div>
+
                 </div>
                 <hr>
 
                 <div class="row g-3 align-items-end">
-                    <!-- Visible Date Pickers - primarily for user input, values copied to hidden fields on change -->
                     <div class="col-md-4 col-12">
                         <label for="start_date_display" class="form-label fw-bold">Start Date</label>
                         <input type="text" id="start_date_display" class="form-control" value="<?= htmlspecialchars($start_date) ?>">
@@ -384,10 +400,10 @@ $pagination_params = http_build_query([
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
                 <h5 class="mb-2 mb-md-0">Returned Items (<?= $total_records ?> total records found)</h5>
                 <div class="d-flex">
-                    <a href="generate_pdf.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>" target="_blank" class="btn btn-danger btn-sm flex-grow-1">
+                    <a href="generate_pdf.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>&asset_code=<?= urlencode($asset_filter_code) ?>" target="_blank" class="btn btn-danger btn-sm flex-grow-1">
                         <i class="fa-solid fa-file-pdf me-2"></i>PDF
                     </a>
-                    <a href="export_excel_tech.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>" target="_blank" class="btn btn-success btn-sm ms-2 flex-grow-1">
+                    <a href="export_excel_tech.php?start_date=<?= urlencode($start_date) ?>&end_date=<?= urlencode($end_date) ?>&category_id=<?= $category_filter_id ?>&asset_code=<?= urlencode($asset_filter_code) ?>" target="_blank" class="btn btn-success btn-sm ms-2 flex-grow-1">
                         <i class="fa-solid fa-file-excel me-2"></i>Excel
                     </a>
                 </div>
@@ -398,15 +414,18 @@ $pagination_params = http_build_query([
                     <thead>
                         <tr>
                             <th>User</th>
-                            <th>Item Details & Status</th> <th class="d-none d-md-table-cell">Category</th>
+                            <th>Item Details & Status</th> 
+                            <th class="d-none d-md-table-cell">Category</th>
                             <th class="d-none d-lg-table-cell">Borrow Date</th>
                             <th>Return Date</th>
-                            <th class="d-none d-lg-table-cell">Handled By</th>
+                            <th class="d-none d-lg-table-cell">Approved By</th>
+                            <th class="d-none d-lg-table-cell">Check Out By</th>
+							<th class="d-none d-lg-table-cell">Check In By</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($records)): ?>
-                            <tr><td colspan="6" class="text-center text-muted py-5">No records found for the selected filters.</td></tr>
+                            <tr><td colspan="8" class="text-center text-muted py-5">No records found for the selected filters.</td></tr>
                         <?php else: foreach ($records as $record): ?>
                             <tr>
                                 <td><?= htmlspecialchars($record['user_name']) ?></td>
@@ -436,7 +455,9 @@ $pagination_params = http_build_query([
                                 <td class="d-none d-md-table-cell"><?= htmlspecialchars($record['category_name']) ?></td>
                                 <td class="d-none d-lg-table-cell"><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
                                 <td><?= date("d M Y", strtotime($record['return_date'])) ?></td>
-                                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['technician_name'] ?: 'N/A') ?></td>
+                                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['approved_by_name'] ?: 'N/A') ?></td>
+                                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['checked_out_by_name'] ?: 'N/A') ?></td>
+                                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['checked_in_by_name'] ?: 'N/A') ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -454,8 +475,6 @@ $pagination_params = http_build_query([
                         </li>
 
                         <?php 
-                        
-                        
                         $start_page = max(1, $page - 2);
                         $end_page = min($total_pages, $page + 2);
 
@@ -546,8 +565,6 @@ $pagination_params = http_build_query([
         const year = yearSelect.value;
         const month = monthSelect.value;
         
-        
-        
         const lastDay = new Date(year, month, 0).getDate(); 
         
         const startDate = `${year}-${month}-01`;
@@ -555,7 +572,7 @@ $pagination_params = http_build_query([
 
         
         startDateDisplay._flatpickr.setDate(startDate, true); 
-        endDateDisplay._flatpickr.setDate(endDate, true);     
+        endDateDisplay._flatpickr.setDate(endDate, true); 
         
         
         startDateHidden.value = startDate;

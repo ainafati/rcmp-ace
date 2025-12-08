@@ -115,13 +115,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 exit();
             }
 
-            // PENETAPAN SESI BERJAYA
-            $_SESSION['person_id'] = $person['person_id'];
-            $_SESSION['name'] = $person['name'];
-            $_SESSION['logged_in_role'] = $mapped_role;
-            $_SESSION['all_roles'] = $roles_db;
-            
-            
+// PENETAPAN SESI BERJAYA
+$_SESSION['person_id'] = $person['person_id'];
+$_SESSION['name'] = $person['name'];
+$_SESSION['logged_in_role'] = $mapped_role; 
+$_SESSION['all_roles'] = $roles_db;
+
+// --- UTAMA: PENETAPAN $_SESSION['user_type'] UNTUK LOG AKTIVITI ---
+
+// 1. Tentukan peranan log berdasarkan peranan yang DIPILIH dan DITERIMA
+$user_type_for_log = null;
+
+if ($mapped_role === 'Admin') {
+    $user_type_for_log = 'admin';
+} elseif ($mapped_role === 'Technician') {
+    $user_type_for_log = 'tech'; // Pastikan ia adalah 'tech' (huruf kecil)
+} elseif ($mapped_role === 'User') {
+    $user_type_for_log = 'user'; // Pastikan ia adalah 'user' (huruf kecil)
+}
+
+// 2. Set $_SESSION['user_type']
+if (is_null($user_type_for_log)) {
+    // Fallback sekiranya pemetaan gagal (walaupun tidak mungkin jika $mapped_role sah)
+    $_SESSION['user_type'] = 'user'; 
+} else {
+    // Nilai yang betul ('admin', 'tech', atau 'user')
+    $_SESSION['user_type'] = $user_type_for_log; 
+}
+
             // PENGALIHAN (REDIRECT)
             switch ($mapped_role) {
                 case 'Admin':

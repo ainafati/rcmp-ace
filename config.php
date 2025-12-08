@@ -22,7 +22,7 @@ $pass = "";
 $db = "inventory";
 
 if (!defined('BASE_URL')) {
-    define('BASE_URL', 'http://localhost/UniKL%20ACE/'); 
+    define('BASE_URL', 'https://nexcheck.rcmp.edu.my/'); 
 }
 
 

@@ -122,7 +122,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     switch ($status_filter) {
         case 'approved,checked out':
             $where_clause = "AND (ri.status = 'Approved' OR ri.status = 'Checked Out')";
-            $header_text = "Approved & Checked Out";
+            $header_text = "Approved";
             $bg_class = "bg-success text-white";
             $icon_class = "fa-check-to-slot";
             break;
@@ -134,7 +134,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             break;
         case 'rejected,completed':
             $where_clause = "AND (ri.status = 'Rejected' OR ri.status = 'Completed')";
-            $header_text = "Completed & Rejected";
+            $header_text = "Rejected";
             $bg_class = "bg-danger text-white";
             $icon_class = "fa-ban";
             break;
@@ -874,7 +874,7 @@ $stmt_notif_list->close();
                     data-status-filter="rejected,completed"> 
                     <div class="card-body d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Rejected / Completed</p> 
+                            <p class="text-muted text-uppercase mb-1 small fw-bold">Rejected</p> 
                             <h3 class="mb-0" data-count="rejected_completed"><?= $rejected_completed ?></h3>
                         </div>
                         <i class="fa-solid fa-circle-xmark fa-3x text-danger"></i> 
@@ -995,7 +995,7 @@ $stmt_notif_list->close();
                         <span class="schedule-time">9:00 AM – 12:00 PM</span>
                     </div>
 
-                    <p class="small-note">Please note the service break on Friday: **1:00 PM – 2:45 PM**. All pickups and returns must be completed within these hours.</p>
+                    <p class="small-note">Please note the service break on Friday: <strong>1:00 PM – 2:45 PM</strong>. All pickups and returns must be completed within these hours.</p>
                 </div>
             </div>
 
@@ -1015,14 +1015,14 @@ $stmt_notif_list->close();
                         <span class="text-muted"><i class="fa-solid fa-envelope me-2"></i> Email:</span>
                         <span class="fw-semibold text-end text-primary">it.rcmp@unikl.edu.my</span>
                     </div>
-                    <p class="text-muted mt-3 mb-0 small">Please contact the service counter for any immediate issues or inquiries.</p>
+                    <p class="text-muted mt-3 mb-0 small">Please contact the number for any immediate issues or inquiries.</p>
                 </div>
             </div>
         </div>
         <div class="row mb-5">
             <div class="col-lg-6 mb-4">
                 <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie me-2 text-primary"></i> Reservation Status Breakdown</h5>
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie me-2 text-primary"></i> Reservation Status </h5>
                     <?php if (($total ?? 0) > 0): ?>
                         <div style="max-height: 350px;">
                                <canvas id="statusChart"></canvas>
@@ -1034,7 +1034,7 @@ $stmt_notif_list->close();
             </div>
             <div class="col-lg-6 mb-4">
                 <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-ranking-star me-2 text-success"></i> Top 5 Most Reserved Items (Personal)</h5>
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-ranking-star me-2 text-success"></i> Most Reserved Items (Personal)</h5>
                     <?php if (!empty($top_items ?? [])): ?>
                         <div style="max-height: 350px;">
                             <canvas id="topItemsChart"></canvas>

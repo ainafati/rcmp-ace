@@ -59,46 +59,85 @@ function fetch_reservation_items_by_id($conn, $reserve_id) {
     return $result;
 }
 
-/**
- * FUNGSI FINAL DIBETULKAN: Log aktiviti ke dalam jadual activity_logs.
- * MENGGUNAKAN nilai $person_id yang dibekalkan sebagai data untuk lajur DB 'user_id'.
- */
 function logActivity($conn, $person_id, $action_type, $description, $related_id = NULL) {
     
-    // 1. Dapatkan role & ID pengguna.
-    // user_type diambil dari sesi. Jika hilang, set 'system' (kerana DB anda NOT NULL).
-    $user_type = $_SESSION['user_type'] ?? 'system'; 
-    $user_id_for_db = (int)$person_id; // Nilai person_id dihantar ke lajur user_id
+    $person_id_for_db = (int)$person_id;
     
-    // Pilihan: Semak ENUM jika anda mahu lebih ketat (jika nilai sesi salah ejaan)
+    // 1. Cuba ambil user_type daripada Sesi. Jika hilang, guna 'unknown'.
+    $user_type = $_SESSION['user_type'] ?? 'unknown'; 
+
+    // 2. Jika Sesi hilang ATAU tidak sah, cuba dapatkan dari DB
     $valid_types = ['admin', 'user', 'tech', 'system'];
-    if (!in_array($user_type, $valid_types)) {
-        $user_type = 'system'; 
+    $is_valid_session_type = in_array($user_type, $valid_types);
+
+    if (!$is_valid_session_type && $person_id_for_db > 0) {
+        
+        try {
+            // QUERY MENGGUNAKAN NAMA JADUAL ANDA (inventory_person & inventory_roles)
+            // Walaupun skema anda menunjukkan inventory_person_roles, 
+            // inventori_person.role_id kelihatan seperti penetapan peranan utama yang mencukupi untuk log.
+            $stmt_role = $conn->prepare("
+                SELECT r.role_name 
+                FROM person_roles p
+                JOIN roles r ON p.role_id = r.role_id
+                WHERE p.person_id = ?
+            ");
+            
+            if ($stmt_role) {
+                $stmt_role->bind_param("i", $person_id_for_db);
+                $stmt_role->execute();
+                $result = $stmt_role->get_result();
+                
+                if ($row = $result->fetch_assoc()) {
+                    $db_role = strtolower($row['role_name']); 
+                    
+                    // Logic untuk pemetaan dan keutamaan peranan:
+                    if (strpos($db_role, 'admin') !== false) {
+                        $user_type = 'admin'; // Keutamaan tertinggi
+                    } elseif (strpos($db_role, 'tech') !== false || strpos($db_role, 'technician') !== false) {
+                        $user_type = 'tech';
+                    } else {
+                        $user_type = 'user'; 
+                    }
+                    
+                } else {
+                    $user_type = 'system'; // Person ID tidak ditemui dalam DB
+                }
+                $stmt_role->close();
+            } else {
+                error_log("Role Fetch Prepare Failed: " . $conn->error);
+                $user_type = 'system';
+            }
+        } catch (Exception $e) {
+            error_log("Role Fetch Error: " . $e->getMessage());
+            $user_type = 'system'; 
+        }
+
+    } elseif (!$is_valid_session_type || $person_id_for_db === 0) {
+        // Jika tidak dapat tentukan atau person_id=0, guna 'system'
+        $user_type = 'system';
     }
 
-    $action = strtoupper($action_type); // Contoh: CHECKOUT, APPROVE
+
+    $action = strtoupper($action_type); 
     $details = (string)$description; 
     $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
     
-    // 2. QUERY: Memasukkan data ke dalam lajur user_id, user_type, action, details, ip_address
+    // 3. QUERY dan BIND PARAMETER
     $stmt = $conn->prepare("
-        INSERT INTO activity_logs (user_id, user_type, action, details, ip_address) 
+        INSERT INTO activity_logs (person_id, user_type, action, details, ip_address) 
         VALUES (?, ?, ?, ?, ?)
     ");
 
     if (!$stmt) {
-        // Log ralat persediaan SQL
         error_log("Logging Prepare Error: " . $conn->error);
         return false;
     }
     
-    // 3. BIND PARAMETER: 
-    // i (user_id/person_id), s (user_type), s (action), s (details), s (ip_address)
-    $stmt->bind_param("issss", $user_id_for_db, $user_type, $action, $details, $ip_address);
+    $stmt->bind_param("issss", $person_id_for_db, $user_type, $action, $details, $ip_address);
     
     if (!$stmt->execute()) {
-        // Log ralat pelaksanaan (mungkin user_type bukan nilai ENUM)
-        error_log("Logging Execute Error (user_id: {$user_id_for_db}, type: {$user_type}): " . $stmt->error);
+        error_log("Logging Execute Error (person_id: {$person_id_for_db}, type: {$user_type}): " . $stmt->error);
         $stmt->close();
         return false;
     }
@@ -106,7 +145,6 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
     $stmt->close();
     return true;
 }
-
 
 function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
     
@@ -126,8 +164,6 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
         
         $mail->setFrom(SMTP_USER, SMTP_FROM_NAME);
         $mail->addAddress($to_email, $user_name);
-
-		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = 'Confirmation: Reservation ID ' . $reserve_id . ' Has Been Processed';
