@@ -1,6 +1,5 @@
 <?php
 session_start();
-// Pastikan config.php mengandungi sambungan $conn (MySQLi)
 include '../config.php'; 
 
 header('Content-Type: application/json');

@@ -47,7 +47,7 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
         $bind_values[] = $filter_date;
     }
 
-    // Susunan: Nama Pengguna -> ID Tempahan -> Tarikh Tempahan
+    
     $sql .= " ORDER BY u.name ASC, r.reserve_id ASC, r.created_at ASC"; 
 
     
@@ -102,7 +102,7 @@ function create_request_table($requests) {
         return;
     }
 
-    // Level 1: Mengumpulkan semua item mengikut Nama Pengguna
+    
     $grouped_by_user = [];
     foreach ($requests as $row) {
         $user_name = $row['user_name'];
@@ -111,7 +111,7 @@ function create_request_table($requests) {
 
     $main_accordion_id = 'accordion_main_' . uniqid();
     
-    // Tentukan status tab semasa (Berdasarkan item pertama)
+    
     $current_status = isset($requests[0]) ? strtolower(trim($requests[0]['status'])) : '';
     $is_pending_tab = ($current_status === 'pending');
     $is_approved_tab = ($current_status === 'approved');
@@ -121,10 +121,10 @@ function create_request_table($requests) {
 
     $user_index = 0;
 
-    // --- LOOP LUAR (Level 1: Accordion Pengguna) ---
+    
     foreach ($grouped_by_user as $user_name => $user_items) {
         
-        // Level 2: Mengumpulkan item dalam pengguna ini mengikut Reserve ID
+        
         $grouped_by_reserve = [];
         foreach ($user_items as $item) {
             $grouped_by_reserve[$item['reserve_id']][] = $item;
@@ -133,14 +133,14 @@ function create_request_table($requests) {
         $total_reserve_count = count($grouped_by_reserve);
         $user_phone = $user_items[0]['user_phone']; 
         
-        // ID UNIK UNTUK PENGGUNA (Accordion Luar)
+        
         $user_collapse_id = 'collapse_user_' . $user_index;
         $user_header_id = 'header_user_' . $user_index;
-        $inner_accordion_id = 'inner_accordion_' . $user_index; // ID untuk Accordion dalam
+        $inner_accordion_id = 'inner_accordion_' . $user_index; 
 
         echo '<div class="accordion-item shadow-sm mb-3">';
 
-        // -- ACCORDION HEADER LUAR (Pengguna) --
+        
         echo '<h2 class="accordion-header" id="' . $user_header_id . '">';
         echo '  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '" aria-expanded="false" aria-controls="' . $user_collapse_id . '">';
         
@@ -157,11 +157,11 @@ function create_request_table($requests) {
         echo '  </button>';
         echo '</h2>';
         
-        // -- ACCORDION BODY LUAR (Mengandungi Accordion Dalam) --
+        
         echo '<div id="' . $user_collapse_id . '" class="accordion-collapse collapse" aria-labelledby="' . $user_header_id . '" data-bs-parent="#' . $main_accordion_id . '">';
         echo '  <div class="accordion-body p-3">'; 
 
-        // --- ACCORDION DALAM (Level 2: Kumpulan Reserve ID) ---
+        
         echo '<div class="accordion" id="' . $inner_accordion_id . '">';
         $reserve_index = 0;
 
@@ -171,7 +171,7 @@ function create_request_table($requests) {
             $reserve_collapse_id = 'collapse_reserve_' . $user_index . '_' . $reserve_index;
             $reserve_header_id = 'header_reserve_' . $user_index . '_' . $reserve_index;
             
-            // Logik untuk Butang Pukal: Semak jika terdapat item yang betul statusnya dalam tempahan ini
+            
             $has_relevant_items = false;
             foreach ($reservation_items as $item) {
                 $status = strtolower(trim($item['status']));
@@ -185,13 +185,13 @@ function create_request_table($requests) {
 
             echo '<div class="accordion-item mb-2 border rounded">';
 
-            // -- ACCORDION HEADER DALAM (Reserve ID) --
+            
             echo '<h2 class="accordion-header p-0" id="' . $reserve_header_id . '">';
             
-            // Gunakan d-flex untuk menyusun butang dan tajuk sebaris
+            
             echo '  <div class="d-flex align-items-center bg-light rounded-top">';
             
-            // Butang Collapse utama (di sebelah kiri)
+            
             echo '    <button class="accordion-button collapsed p-3 bg-light w-auto flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#' . $reserve_collapse_id . '" aria-expanded="false" aria-controls="' . $reserve_collapse_id . '">';
             echo '      <div class="d-flex justify-content-between w-100 pe-3">'; 
             echo '        <div class="d-flex align-items-center">';
@@ -201,11 +201,11 @@ function create_request_table($requests) {
             echo '      </div>';
             echo '    </button>';
 
-            // --- KAWASAN BUTANG PUKAL ---
+            
             if ($has_relevant_items) {
                 
                 if ($is_approved_tab) {
-                    // Butang CHECK OUT ALL - HANYA ditunjukkan di tab approved
+                    
                     echo '  <button 
                                 class="btn btn-primary btn-sm checkout-all-btn me-3" 
                                 data-reserve-id="' . htmlspecialchars($reserve_id) . '"
@@ -215,16 +215,16 @@ function create_request_table($requests) {
                             </button>';
                 } 
             }
-            // --- KAWASAN BUTANG PUKAL TAMAT ---
+            
 
-            echo '  </div>'; // Penutup d-flex align-items-center
+            echo '  </div>'; 
             echo '</h2>';
 
-            // -- ACCORDION BODY DALAM (Mengandungi Jadual Item) --
+            
             echo '<div id="' . $reserve_collapse_id . '" class="accordion-collapse collapse" aria-labelledby="' . $reserve_header_id . '" data-bs-parent="#' . $inner_accordion_id . '">';
             echo '  <div class="accordion-body p-0">'; 
 
-            // --- JADUAL ITEM UNTUK BOOKING ID INI ---
+            
             echo '<div class="table-responsive"><table class="table mb-0 align-middle table-sm">';
             echo '<thead><tr>';
             echo '  <th class="ps-3">Item / Priority</th>';
@@ -238,7 +238,7 @@ function create_request_table($requests) {
                 
                 $status = strtolower(trim($row['status']));
 
-                // Setup Priority Badges (Kod sedia ada)
+                
                 $priority_class = 'bg-secondary';
                 $priority_text = 'Normal Priority';
                 if ($row['priority'] == 1) {
@@ -252,14 +252,14 @@ function create_request_table($requests) {
                     $priority_text = 'Low Priority';
                 }
 
-                // Setup Status Badges (Kod sedia ada)
+                
                 $badgeClass = 'bg-secondary';
                 if ($status === 'pending') $badgeClass = 'bg-warning text-dark';
                 if ($status === 'approved') $badgeClass = 'bg-success';
                 if ($status === 'checked out') $badgeClass = 'bg-primary';
                 if ($status === 'rejected') $badgeClass = 'bg-danger';
                 
-                // Kod untuk baris <tr> dan butang Actions (Kod sedia ada)
+                
                 echo "<tr id='row-{$row['reservation_item_id']}'  
                      data-phone='" . htmlspecialchars($row['user_phone']) . "' 
                      data-itemname='" . htmlspecialchars($row['item_name']) . "' 
@@ -279,7 +279,7 @@ function create_request_table($requests) {
                 echo "<td><span class='badge rounded-pill $badgeClass'>" . ucfirst(str_replace('_', ' ', $status)) . "</span></td>";
                 echo "<td class='text-center pe-3'>";
                 
-                // Action Buttons Individu (Kod sedia ada)
+                
                 if ($status === 'pending') {
                       echo "<button class='btn btn-success btn-sm' title='Approve' aria-label='Approve Request' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
                       echo "<button class='btn btn-danger btn-sm' title='Reject' aria-label='Reject Request' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
@@ -291,27 +291,27 @@ function create_request_table($requests) {
                       echo "<span class='text-muted'>—</span>";
                 }
                 echo "</td></tr>";
-            } // Loop Item Tamat
+            } 
 
-            echo '</tbody></table></div>'; // Jadual Tamat
+            echo '</tbody></table></div>'; 
             
-            echo '  </div>'; // Accordion Body Dalam Tamat
-            echo '</div>'; // Accordion Collapse Dalam Tamat
-            echo '</div>'; // Accordion Item Dalam Tamat
+            echo '  </div>'; 
+            echo '</div>'; 
+            echo '</div>'; 
 
             $reserve_index++;
-        } // Loop Reserve ID Tamat
+        } 
 
-        echo '</div>'; // Accordion Dalam Tamat
+        echo '</div>'; 
         
-        echo '  </div>'; // Accordion Body Luar Tamat
-        echo '</div>'; // Accordion Collapse Luar Tamat
-        echo '</div>'; // Accordion Item Luar Tamat
+        echo '  </div>'; 
+        echo '</div>'; 
+        echo '</div>'; 
 
         $user_index++;
-    } // Loop Pengguna Tamat
+    } 
 
-    echo '</div>'; // Accordion Utama Tamat
+    echo '</div>'; 
 }
 ?>
 
@@ -625,7 +625,7 @@ function create_request_table($requests) {
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
 
-// Pembolehubah Global
+
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
 $(document).ready(function() {
@@ -642,13 +642,13 @@ $(document).ready(function() {
             confirmButtonText: confirmText
         }).then((result) => {
             if (result.isConfirmed) {
-                var $button = $(`[data-reserve-id="${reserveId}"]`); // Cari butang yang sama
+                var $button = $(`[data-reserve-id="${reserveId}"]`); 
                 var originalText = $button.html(); 
                 
                 $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...');
 
                 $.ajax({
-                    url: 'checkout_action.php', // Menggunakan fail process_actions.php
+                    url: 'checkout_action.php', 
                     type: 'POST',
                     dataType: 'json',
                     data: {
@@ -674,22 +674,22 @@ $(document).ready(function() {
         });
     }
 
-    // --- B. Check Out All (Pengeluaran Pukal) ---
+    
     $(document).on('click', '.checkout-all-btn', function() {
         var reserveId = $(this).data('reserve-id');
         handleBulkAction(
             'checkout_all_items', 
             reserveId,
-            'Confirm Bulk Check-Out?',
-            "Semua item Approved dalam Tempahan ID: " + reserveId + " akan ditandakan sebagai Checked Out (On Loan).",
+            'Confirm  Check-Out?',
+            "All items approved in Booking ID: " + reserveId + " will be marked as Checked Out (On Loan).",
             'Yes, Check Out All!',
-            '#3b82f6' // Biru
+            '#3b82f6' 
         );
     });
 
 
 function checkOutItem(id) {
-    const $btn = $(`[onclick="checkOutItem(${id})"]`); // Cari butang yang dipanggil
+    const $btn = $(`[onclick="checkOutItem(${id})"]`); 
     const originalText = $btn.html();
 
     Swal.fire({
@@ -703,7 +703,7 @@ function checkOutItem(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             
-            // 1. Tunjukkan Loading State Awal
+            
             Swal.fire({ 
                 title: 'Preparing Assets...', 
                 text: 'Fetching assets list from server.', 
@@ -712,7 +712,7 @@ function checkOutItem(id) {
             });
             $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Checking Out...');
             
-            // 2. Dapatkan Senarai Asset ID yang Ditetapkan
+            
             $.ajax({
                 url: 'checkout_action.php',
                 method: 'GET',
@@ -728,7 +728,7 @@ function checkOutItem(id) {
 
                     const asset_ids = assets.map(a => a.asset_id);
                     
-                    // 3. Panggil Logik 'checkout_multi' dengan Asset IDs
+                    
                     $.ajax({
                         url: 'checkout_action.php',
                         method: 'POST',
@@ -736,7 +736,7 @@ function checkOutItem(id) {
                         data: {
                             action: 'checkout_multi',
                             reservation_item_id: id,
-                            asset_ids: JSON.stringify(asset_ids) // Hantar sebagai JSON string
+                            asset_ids: JSON.stringify(asset_ids) 
                         },
                         success: function(data) {
                             Swal.close();
@@ -754,7 +754,7 @@ function checkOutItem(id) {
                             if (xhr.responseJSON && xhr.responseJSON.message) {
                                 realErrorMessage = xhr.responseJSON.message;
                             }
-                            // Mesej ralat di sini akan mengandungi butiran dari backend (PHP try/catch)
+                            
                             Swal.fire('Error', 'An error occurred during check-out. Details: ' + realErrorMessage, 'error');
                             $btn.prop('disabled', false).html(originalText);
                         }
@@ -773,7 +773,7 @@ function checkOutItem(id) {
         }
     });
 }
-// Jadikan fungsi global supaya butang HTML boleh memanggilnya
+
 window.checkOutItem = checkOutItem;
 
 
@@ -859,13 +859,13 @@ window.checkOutItem = checkOutItem;
                 
             } else if (currentQtyToApprove === 0) {
                 
-                 $assetContainer.html('<div class="alert alert-info mb-0">Quantity to Approve is 0. This request will be processed as a **Full Rejection**. Please provide a reason above.</div>');
+                 $assetContainer.html('<div class="alert alert-info mb-0">Quantity to Approve is 0. This request will be processed as a full rejection. Please provide a reason above.</div>');
                 
             } else if (availableCount < currentQtyToApprove) {
                 $assetContainer.html(`<div class='alert alert-danger'>❌ Only ${availableCount} unit(s) available. You cannot approve ${currentQtyToApprove}.</div>`);
                 
             } else if (availableCount === 0 && currentQtyToApprove > 0) {
-                 $assetContainer.html("<div class='alert alert-danger mb-0'>❌ No available assets found for this item. Please **Reject** the request (or enter 0 above with a reason).</div>");
+                 $assetContainer.html("<div class='alert alert-danger mb-0'>❌ No available assets found for this item. Please reject the request (or enter 0 above with a reason).</div>");
                 
             } else {
                 
@@ -900,11 +900,11 @@ window.checkOutItem = checkOutItem;
         
         new bootstrap.Modal('#approveDetailsModal').show();
     }
-    // Jadikan fungsi global
+    
     window.openApproveModal = openApproveModal;
 
 
-    // Pengendalian Butang Confirm Approve (Kekal Sama)
+    
     $('#confirmApproveBtn').on('click', function() {
         const reservation_item_id = $('#approve_reservation_item_id').val();
         const selected = $('.asset-checkbox:checked').map(function() { return $(this).val(); }).get();
@@ -948,16 +948,16 @@ window.checkOutItem = checkOutItem;
     });
 
 
-    // FUNGSI openRejectModal (Kekal Sama)
+    
     function openRejectModal(id) {
         $('#reject_reservation_item_id').val(id);
         $('#reject_reason').val('');
         new bootstrap.Modal('#rejectModal').show();
     }
-    // Jadikan fungsi global
+    
     window.openRejectModal = openRejectModal;
 
-    // Pengendalian Butang Confirm Reject (Kekal Sama)
+    
     $('#confirmRejectBtn').on('click', function() {
         const reservation_item_id = $('#reject_reservation_item_id').val();
         const reason = $('#reject_reason').val().trim();
@@ -981,7 +981,7 @@ window.checkOutItem = checkOutItem;
     });
 
 
-    // FUNGSI checkInItem (Kekal Sama)
+    
     function checkInItem(id) {
         const row = document.getElementById('row-' + id);
         if (!row) return;
@@ -1030,8 +1030,8 @@ window.checkOutItem = checkOutItem;
                                     <label class="form-check-label" for="condition_good_${asset_id}">Good</label>
                                 </div>
                                 <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="${unique_radio_name}" id="condition_damaged_${asset_id}" value="Damaged/Incomplete">
-                                    <label class="form-check-label text-danger" for="condition_damaged_${asset_id}">Damaged/Incomplete</label>
+                                    <input class="form-check-input" type="radio" name="${unique_radio_name}" id="condition_damaged_${asset_id}" value="Maintenance">
+                                    <label class="form-check-label text-danger" for="condition_damaged_${asset_id}">Damaged</label>
                                 </div>
                             </div>
                             <div class="form-check form-check-inline">
@@ -1062,10 +1062,10 @@ window.checkOutItem = checkOutItem;
             }
         });
     }
-    // Jadikan fungsi global
+    
     window.checkInItem = checkInItem;
 
-    // Pengendalian Event Radio Button Check In (Kekal Sama)
+    
     $('#checkInModalBody').on('change', 'input[type="radio"]', function() {
         const $card = $(this).closest('.checkin-asset-card');
         const $remarksContainer = $card.find('.remarks-container');
@@ -1077,7 +1077,7 @@ window.checkOutItem = checkOutItem;
         
         const selectedValue = $(this).val();
 
-        if (selectedValue === 'Damaged/Incomplete') {
+        if (selectedValue === 'Maintenance') {
             $remarksLabel.text('Remarks (Required if damaged):'); 
             $remarksInput.prop('required', true);
             $remarksContainer.slideDown();
@@ -1092,7 +1092,7 @@ window.checkOutItem = checkOutItem;
         }
     });
 
-    // Pengendalian Butang Confirm Check In (Kekal Sama)
+    
     $('#confirmCheckInBtn').on('click', function() {
         const reservation_item_id = $('#checkin_reservation_item_id').val();
         let asset_conditions = [];
@@ -1169,11 +1169,11 @@ window.checkOutItem = checkOutItem;
         });
     });
 
-    // =========================================================================
-    // 4. LOGIK UI (Sidebar/Layout) - Kekal Sama
-    // =========================================================================
     
-    // ... (Logik Sidebar / Layout Sedia Ada) ...
+    
+    
+    
+    
     const $sidebar = $('.sidebar');
     const $overlay = $('#sidebarOverlay');
     const $focusableElements = $sidebar.find('a, button');

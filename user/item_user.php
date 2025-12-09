@@ -2,13 +2,13 @@
 session_start();
 include '../config.php';
 
-// Pastikan sambungan DB berjaya
+
 if (!$conn) {
     error_log("Database connection failed: " . mysqli_connect_error());
     die("Server connection error."); 
 }
 
-// Semak Log Masuk
+
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -16,7 +16,7 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int) $_SESSION['person_id'];
 
-// 1. Fetch User Data
+
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     error_log("Error preparing statement: " . $conn->error);
@@ -34,7 +34,7 @@ if (!$user) {
     exit();
 }
 
-// 2. Fetch Categories (Untuk Menu Sidebar Kategori)
+
 $categories = [];
 $res_cat = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name");
 if ($res_cat) {
@@ -44,7 +44,7 @@ if ($res_cat) {
     $res_cat->free();
 }
 
-// 3. Fetch All Items for Dropdown & Filtering (ALL_ITEMS_DATA)
+
 $items_for_dropdown = [];
 $sql_all_items = "
     SELECT 
@@ -60,7 +60,7 @@ if ($res_items) {
     }
     $res_items->free();
 }
-// Tutup sambungan DB
+
 $conn->close();
 
 ?>
@@ -446,7 +446,7 @@ $conn->close();
         
         <a href="dashboard_user.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
         
-        <a href="#" class="active item-availability-link collapsed" id="itemAvailabilityToggle">
+        <a href="item_user.php" class="active item-availability-link collapsed" id="itemAvailabilityToggle">
             <i class="fa-solid fa-box"></i> Item Availability
             <i class="fa-solid fa-angle-down ms-auto" style="font-size: 12px;"></i>
         </a>
@@ -522,7 +522,7 @@ $conn->close();
                         <div class="tab-pane fade show active" id="context-tab-pane" role="tabpanel" aria-labelledby="context-tab" tabindex="0">
                             <div class="card" id="ContextCard">
                                 <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> <strong>Step 1: Define & Lock Context</strong></h5>
-                                <p class="text-muted small">Specify the borrowing dates and the main purpose for this **single** submission.</p>
+                                <p class="text-muted small">Specify the borrowing dates and the main purpose for this <strong>single</strong> submission.</p>
                                 <hr>
                                 
                                 <div class="row mb-3">
@@ -620,7 +620,7 @@ $conn->close();
 <div class="tab-pane fade" id="review-tab-pane" role="tabpanel" aria-labelledby="review-tab" tabindex="0">
     <div class="card">
         <h5><i class="fa-solid fa-clipboard-list me-2 text-primary"></i> <strong>Step 3: Review & Submit (1 Submission)</strong> </h5>
-        <p class="text-muted small">3. Review your reservation context and the list of requested items before final submission.</p>
+        <p class="text-muted small">Review your reservation context and the list of requested items before final submission.</p>
         <hr>
         
         <h6><i class="fa-solid fa-file-lines me-2"></i> Context Summary</h6>
@@ -677,25 +677,25 @@ $conn->close();
                     <strong>Eligibility:</strong> All equipment is available for <strong>reservation</strong> only to registered students and staff of UniKL with a valid ID.
                 </li>
                 <li>
-                    **Reservation Duration:** The **duration** of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
+                    <strong>Reservation Duration:</strong> The <strong>duration</strong> of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
                 </li>
                 <li>
-                    **Responsibility:** The party making the reservation is fully responsible for the **reserved equipment** from the moment of collection until they are returned and checked in by a technician.
+                    <strong>Responsibility:</strong> The party making the reservation is fully responsible for the <strong>reserved equipment</strong> from the moment of collection until they are returned and checked in by a technician.
                 </li>
                 <li>
-                    **Condition of Items:** The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
+                    <strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
                 </li>
                 <li>
-                    **Damage or Loss:** The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
+                    <strong>Damage or Loss:</strong> The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
                 </li>
                 <li>
-                    **Late Returns:** Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of **reservation** privileges.
+                    <strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of <strong>reservation</strong> privileges.
                 </li>
                 <li>
-                    **Purpose of Use:** Items are to be used for academic or official university purposes only, as specified in the reservation form.
+                    <strong>Purpose of Use:</strong> Items are to be used for academic or official university purposes only, as specified in the reservation form.
                 </li>
                 <li>
-                    **Collection:** Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
+                    <strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
                 </li>
             </ol>
             <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
@@ -715,24 +715,24 @@ $conn->close();
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-// Data store for all items fetched from PHP (Mesti diisi oleh PHP)
-// Pastikan $items_for_dropdown telah di-encode di sini
+
+
 const ALL_ITEMS_DATA = <?= json_encode($items_for_dropdown) ?>;
 
-// Variables to hold the current reservation context
+
 let RESERVATION_CONTEXT = {};
-// Array to hold items the user is requesting
+
 let REQUEST_ITEMS = [];
 
-// 💥 Deklarasi Global untuk Objek Flatpickr
+
 let reserveDatePicker;
 let returnDatePicker;
 
 $(document).ready(function() {
     
-    // --- 1. Initial Setup and Handlers ---
+    
 
-    // --- Guardrails untuk Tab Navigation ---
+    
     $('#myTab button[data-bs-toggle="tab"]').on('click', function (e) {
         if ($(this).hasClass('disabled')) {
             e.preventDefault();
@@ -747,7 +747,7 @@ $(document).ready(function() {
         }
     });
     
-    // Initialize Flatpickr for Date Selection
+    
     reserveDatePicker = flatpickr("#reserveDate", {
         dateFormat: "Y-m-d",
         minDate: "today",
@@ -773,7 +773,7 @@ $(document).ready(function() {
         }
     });
 
-    // Initialize Select2 for Item Selection (Step 2)
+    
     $('#item_select').select2({
         theme: 'bootstrap-5',
         placeholder: 'Search and select an item...',
@@ -785,35 +785,35 @@ $(document).ready(function() {
         }))
     });
     
-// 💥 FUNGSI UNTUK MEMBUKA KUNCI BORANG KONTEKS (STEP 1) - VERSI AKHIR UNTUK MEMBETULKAN KALENDAR
+
 function unlockContext() {
-    // 1. Buka kunci semua medan input/select/textarea
-    // Kita aktifkan input *sebelum* membetulkan Flatpickr
+    
+    
     $('#ContextCard').find('input, select, textarea').prop('disabled', false).css('opacity', 1);
 
-    // 💥 PENTING: KOREKSI FLATPCIKR (MEMASTIKAN KALENDAR TIDAK KOSONG)
+    
 
-    // A. Pastikan Flatpickr diaktifkan semula dengan betul dan tidak di-readonly
+    
     if (typeof reserveDatePicker !== 'undefined' && reserveDatePicker) {
-        // Hapus sebarang atribut readonly/disabled yang mungkin kekal
+        
         $(reserveDatePicker.element).prop('readonly', false).prop('disabled', false);
         $(reserveDatePicker.altInput).prop('readonly', false).prop('disabled', false);
 
-        // Secara eksplisit panggil setDate() dengan data yang disimpan
+        
         if (RESERVATION_CONTEXT.reserve_date) {
             reserveDatePicker.setDate(RESERVATION_CONTEXT.reserve_date, true, 'Y-m-d'); 
         }
         
-        // PENTING: Untuk mengelakkan isu apabila ia di-disabled/reenabled
+        
         reserveDatePicker.set('clickOpens', true);
     }
 
     if (typeof returnDatePicker !== 'undefined' && returnDatePicker) {
-        // Hapus sebarang atribut readonly/disabled yang mungkin kekal
+        
         $(returnDatePicker.element).prop('readonly', false).prop('disabled', false);
         $(returnDatePicker.altInput).prop('readonly', false).prop('disabled', false);
 
-        // Secara eksplisit panggil setDate() dengan data yang disimpan
+        
         if (RESERVATION_CONTEXT.return_date) {
             returnDatePicker.setDate(RESERVATION_CONTEXT.return_date, true, 'Y-m-d');
         }
@@ -821,17 +821,17 @@ function unlockContext() {
         returnDatePicker.set('clickOpens', true);
     }
 
-    // 2. Tukar semula butang "LOCKED" kepada butang asal
+    
     $('#confirmContextBtn').html('<i class="fa-solid fa-check-double me-2"></i> Confirm Context').removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
 
-    // 3. Sembunyikan butang "Next" di Step 1
+    
     $('#nextToItemsBtn').addClass('d-none').prop('disabled', true);
     
-    // Notifikasi Pop-up (seperti dalam imej anda)
+    
     Swal.fire('Context Unlocked', 'You can now edit the dates, program type, and purpose.', 'info');
 }
 	
-    // Filter the dropdown items based on the selected category in the sidebar
+    
     function filterSelect2ByCategoryId(categoryId) {
         const filteredData = ALL_ITEMS_DATA
             .filter(item => categoryId === '' || item.category_id === categoryId)
@@ -853,7 +853,7 @@ function unlockContext() {
         $('#quantity').val(1);
     }
 
-    // Set up sidebar category filtering
+    
     $('.category-filter-link').on('click', function(e) {
         e.preventDefault();
         
@@ -869,14 +869,14 @@ function unlockContext() {
     
     filterItemList('');
     
-    // Toggle Category Submenu
+    
     $('#itemAvailabilityToggle').on('click', function(e) {
         e.preventDefault();
         $('#categorySubmenu').toggleClass('show');
         $(this).toggleClass('collapsed');
     });
 
-    // Mobile menu toggle
+    
     $('#menuToggle').on('click', function() {
         $('.sidebar').toggleClass('active');
         $('#overlay').toggle();
@@ -887,7 +887,7 @@ function unlockContext() {
         $('#overlay').hide();
     });
     
-    // LOGIK KESELAMATAN: KAWALAN PERSETUJUAN TERMA
+    
     $('#termsModal').on('shown.bs.modal', function () {
         if (REQUEST_ITEMS.length > 0) {
             $('#agreeTerms').prop('disabled', false);
@@ -901,9 +901,9 @@ function unlockContext() {
     });
 
 
-    // --- 2. Step 1: Context Handling ---
+    
 
-    // Show Priority Warning based on selection
+    
     $('#program_type').on('change', function() {
         if ($(this).val()) {
             $('#priorityWarning').slideDown(200);
@@ -912,7 +912,7 @@ function unlockContext() {
         }
     });
 
-    // Validation check for Step 1 fields
+    
     function checkContextInputs() {
         return $('#reserveDate').val() && 
                $('#returnDate').val() && 
@@ -920,10 +920,10 @@ function unlockContext() {
                $('#reason').val();
     }
 
-    // Confirm Context (Move to Step 2)
+    
     $('#confirmContextBtn').on('click', function() {
         if (checkContextInputs()) {
-            // Collect and store context data
+            
             RESERVATION_CONTEXT = {
                 reserve_date: $('#reserveDate').val(),
                 return_date: $('#returnDate').val(),
@@ -933,17 +933,17 @@ function unlockContext() {
                 person_id: $('input[name="person_id"]').val()
             };
 
-            // Lock context fields (visually disabled/readonly)
-            // KUNCI BORANG: Disable semua input
+            
+            
             $('#ContextCard').find('input, select, textarea').prop('disabled', true).css('opacity', 0.6);
             
-            // Kunci butang
+            
             $('#confirmContextBtn').html('<i class="fa-solid fa-check-double me-2"></i> CONTEXT IS LOCKED').removeClass('btn-primary').addClass('btn-success').prop('disabled', true);
             
-            // Aktifkan butang Next (jika ada)
+            
             $('#nextToItemsBtn').removeClass('d-none').prop('disabled', false); 
 
-            // Enable Step 2 tab and switch to it
+            
             $('#items-tab').removeClass('disabled');
             new bootstrap.Tab(document.getElementById('items-tab')).show();
             
@@ -953,9 +953,9 @@ function unlockContext() {
         }
     });
 
-    // --- Button Navigation Handlers (Step 1 & 2) ---
+    
 
-    // Next button from Step 1
+    
     $('#nextToItemsBtn').on('click', function() {
         if ($('#confirmContextBtn').is(':disabled')) {
               new bootstrap.Tab(document.getElementById('items-tab')).show();
@@ -964,16 +964,16 @@ function unlockContext() {
         }
     });
 
-    // 💥 EVENT HANDLER UNTUK BUTANG 'PREVIOUS: CONTEXT' (Step 2)
+    
     $('#prevToContextBtn').on('click', function() {
-        // 1. Panggil fungsi unlockContext() yang telah diperbaiki
+        
         unlockContext(); 
         
-        // 2. Tukar tab kembali ke Step 1
+        
         new bootstrap.Tab(document.getElementById('context-tab')).show();
     });
     
-    // Next button from Step 2 to Step 3
+    
     $('#nextToReviewBtn').on('click', function() {
         if (REQUEST_ITEMS.length > 0) {
             updateReviewTab(); 
@@ -983,16 +983,16 @@ function unlockContext() {
         }
     });
 
-    // --- 3. Step 2: Item Selection and Availability ---
+    
 
-    // Availability check triggered by item change or quantity change
+    
     $('#item_select, #quantity').on('change input', function() {
         if ($('#confirmContextBtn').is(':disabled')) {
             checkItemAvailability();
         }
     });
 
-    // Function to format and display item availability status
+    
     function displayAvailability(availableQty, requestedQty, itemName) {
         const statusDiv = $('#availability-status');
         statusDiv.empty();
@@ -1035,7 +1035,7 @@ function unlockContext() {
         }
     }
 
-    // AJAX call to check item availability
+    
     function checkItemAvailability() {
         const item_id = $('#item_select').val();
         const quantity = parseInt($('#quantity').val());
@@ -1075,7 +1075,7 @@ function unlockContext() {
         });
     }
 
-    // Add Item to Request List
+    
     $('#addMoreBtn').on('click', function() {
         const item_id = $('#item_select').val();
         const quantity = parseInt($('#quantity').val());
@@ -1102,7 +1102,7 @@ function unlockContext() {
             Swal.fire('Added!', `${selectedItem.item_name} (x${quantity}) added to your request list.`, 'success');
         }
 
-        // Reset form for next item
+        
         $('#item_select').val(null).trigger('change');
         $('#quantity').val(1);
         $('#availability-status').empty();
@@ -1112,16 +1112,16 @@ function unlockContext() {
     });
 
 
-    // --- 4. Step 3: Review and Submission ---
     
-    // Back to Step 2 button handler
+    
+    
     $('#backToItemsBtn').on('click', function() {
         new bootstrap.Tab(document.getElementById('items-tab')).show();
     });
 
-// Update the Step 3 tab with context and item list
+
 function updateReviewTab() {
-    // A. Update Context Summary
+    
     const summary = `
         <div class="alert alert-info py-2 small">
             <p class="mb-1"><strong><i class="fa-solid fa-calendar-alt me-1"></i> Loan Period:</strong> ${RESERVATION_CONTEXT.reserve_date} until ${RESERVATION_CONTEXT.return_date}</p>
@@ -1131,10 +1131,10 @@ function updateReviewTab() {
     `;
     $('#contextSummary').html(summary);
 
-    // --- B. Update Items List for STEP 2 (DENGAN BUTANG BUANG) ---
+    
     let itemsListHtml_Step2 = '';
     
-    // --- C. Update Items List for STEP 3 (RESIT VIEW) ---
+    
     let itemsListHtml_Step3_Review = ''; 
     
     if (REQUEST_ITEMS.length === 0) {
@@ -1150,7 +1150,7 @@ function updateReviewTab() {
         REQUEST_ITEMS.forEach((item, index) => {
             const imagePath = item.image_url ? `../${item.image_url}` : '../assets/default-image.jpg';
             
-            // --- KOD ITEM UNTUK STEP 2 ---
+            
             itemsListHtml_Step2 += `
                 <li class="list-group-item d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
@@ -1171,7 +1171,7 @@ function updateReviewTab() {
                 </li>
             `;
             
-            // --- KOD ITEM UNTUK STEP 3 ---
+            
             itemsListHtml_Step3_Review += `
                 <li class="list-group-item d-flex align-items-center justify-content-between border-bottom">
                     <div class="d-flex align-items-center flex-grow-1">
@@ -1194,12 +1194,12 @@ function updateReviewTab() {
         $('#agreeTerms').prop('checked', false).prop('disabled', true);
     }
     
-    // APLIKASI KOD
+    
     $('#itemsList').html(itemsListHtml_Step2);
     $('#itemsReviewList').html(itemsListHtml_Step3_Review);
 
 
-    // D. AKTIFKAN TAB REVIEW & UPDATE STATUS ITEMS
+    
     const reviewTabElement = $('#review-tab');
     const nextReviewBtn = $('#nextToReviewBtn');
     
@@ -1218,7 +1218,7 @@ function updateReviewTab() {
     $('.remove-item-btn').on('click', removeItemFromList);
 }
 
-    // Remove item from request list
+    
     function removeItemFromList() {
         const indexToRemove = $(this).data('index');
         
@@ -1239,12 +1239,12 @@ function updateReviewTab() {
         });
     }
 
-    // Enable/Disable final submit button based on terms checkbox
+    
     $('#agreeTerms').on('change', function() {
         $('#finalSubmitBtn').prop('disabled', !$(this).is(':checked'));
     });
 
-    // Final Submission Handler
+    
     $('#finalSubmitBtn').on('click', function() {
         if (REQUEST_ITEMS.length === 0) {
             Swal.fire('Error', 'Your request list is empty. Please add items in Step 2.', 'error');
@@ -1297,7 +1297,7 @@ function updateReviewTab() {
                     if (errorMessage.includes("Tempahan berjaya dihantar") || jsonResponse.status === 'success') {
                          Swal.fire({
                              title: 'Success (Resolved)',
-                             text: "Tempahan berjaya dihantar. Ralat output kotor telah diselesaikan.",
+                             text: "Booking successfully sent. Ralat output kotor telah diselesaikan.",
                              icon: 'success'
                          }).then(() => {
                              window.location.href = 'history.php';
@@ -1305,10 +1305,10 @@ function updateReviewTab() {
                          return; 
                     }
                 } catch (e) {
-                    if (responseText.includes("Tempahan berjaya dihantar")) {
+                    if (responseText.includes("Booking successfully sent")) {
                          Swal.fire({
                              title: 'Success (Resolved)',
-                             text: "Successfully sent!.",
+                             text: "Successfully sent!",
                              icon: 'success'
                          }).then(() => {
                              window.location.href = 'history.php';
@@ -1334,9 +1334,9 @@ function updateReviewTab() {
         });
     });
 
-    // --- 5. Utility Functions ---
     
-    // Function to render the right-hand side list of ALL items based on category
+    
+    
     function filterItemList(categoryName) {
         const displayList = $('#displayItemList');
         displayList.empty();
@@ -1369,7 +1369,7 @@ function updateReviewTab() {
     });
     }
 
-    // Expose selectItemFromList globally so the onclick handler works
+    
     window.selectItemFromList = function(itemId) {
         $('#item_select').val(itemId).trigger('change');
         $('html, body').animate({

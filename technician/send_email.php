@@ -5,13 +5,11 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 
-
 require '../PHPMailer-master/src/Exception.php';
 require '../PHPMailer-master/src/PHPMailer.php';
 require '../PHPMailer-master/src/SMTP.php';
 
 function fetch_reservation_items_by_id($conn, $reserve_id) {
-    // Perhatikan penggunaan LEFT JOIN dengan reservation_assets dan GROUP_CONCAT
     $stmt = $conn->prepare("
         SELECT
             ri.id,
@@ -37,7 +35,7 @@ function fetch_reservation_items_by_id($conn, $reserve_id) {
         LEFT JOIN 
             reservation_assets ra ON ri.id = ra.reservation_item_id -- JOIN ke jadual aset
         LEFT JOIN
-            assets a ON ra.asset_id = a.asset_id                  -- JOIN ke jadual aset untuk mendapatkan kod
+            assets a ON ra.asset_id = a.asset_id                  
         WHERE
             ri.reserve_id = ?
         GROUP BY
@@ -63,19 +61,18 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
     
     $person_id_for_db = (int)$person_id;
     
-    // 1. Cuba ambil user_type daripada Sesi. Jika hilang, guna 'unknown'.
-    $user_type = $_SESSION['user_type'] ?? 'unknown'; 
-
-    // 2. Jika Sesi hilang ATAU tidak sah, cuba dapatkan dari DB
-    $valid_types = ['admin', 'user', 'tech', 'system'];
+    // 1. Tentukan user_type awal (dari Sesi atau 'unknown')
+    $user_type = $_SESSION['user_type'] ?? 'unknown';
+    
+    $valid_types = ['admin', 'user', 'tech'];
     $is_valid_session_type = in_array($user_type, $valid_types);
-
-    if (!$is_valid_session_type && $person_id_for_db > 0) {
+    
+    // 2. Jika person_id wujud tetapi user_type tidak sah/tidak ditetapkan, cuba dapatkan dari DB
+    if ($person_id_for_db > 0 && !$is_valid_session_type) {
         
         try {
-            // QUERY MENGGUNAKAN NAMA JADUAL ANDA (inventory_person & inventory_roles)
-            // Walaupun skema anda menunjukkan inventory_person_roles, 
-            // inventori_person.role_id kelihatan seperti penetapan peranan utama yang mencukupi untuk log.
+            
+            // Kuerti untuk mendapatkan peranan pengguna
             $stmt_role = $conn->prepare("
                 SELECT r.role_name 
                 FROM person_roles p
@@ -91,9 +88,9 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
                 if ($row = $result->fetch_assoc()) {
                     $db_role = strtolower($row['role_name']); 
                     
-                    // Logic untuk pemetaan dan keutamaan peranan:
+                    // Logik untuk menentukan jenis ringkas
                     if (strpos($db_role, 'admin') !== false) {
-                        $user_type = 'admin'; // Keutamaan tertinggi
+                        $user_type = 'admin'; 
                     } elseif (strpos($db_role, 'tech') !== false || strpos($db_role, 'technician') !== false) {
                         $user_type = 'tech';
                     } else {
@@ -101,7 +98,7 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
                     }
                     
                 } else {
-                    $user_type = 'system'; // Person ID tidak ditemui dalam DB
+                    $user_type = 'system'; // Tiada peranan ditemui
                 }
                 $stmt_role->close();
             } else {
@@ -112,32 +109,37 @@ function logActivity($conn, $person_id, $action_type, $description, $related_id 
             error_log("Role Fetch Error: " . $e->getMessage());
             $user_type = 'system'; 
         }
-
-    } elseif (!$is_valid_session_type || $person_id_for_db === 0) {
-        // Jika tidak dapat tentukan atau person_id=0, guna 'system'
+    
+    } elseif ($person_id_for_db === 0) {
+        
+        // Jika person_id adalah 0, anggap sistem
         $user_type = 'system';
     }
-
-
+    
+    
+    // 3. Logik INSERT ke dalam activity_logs
     $action = strtoupper($action_type); 
     $details = (string)$description; 
+    
+    // Dapatkan IP address
     $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
     
-    // 3. QUERY dan BIND PARAMETER
+    
     $stmt = $conn->prepare("
-        INSERT INTO activity_logs (person_id, user_type, action, details, ip_address) 
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO activity_logs (person_id, user_type, action, details, ip_address, related_id) 
+        VALUES (?, ?, ?, ?, ?, ?)
     ");
-
+    
     if (!$stmt) {
         error_log("Logging Prepare Error: " . $conn->error);
         return false;
     }
     
-    $stmt->bind_param("issss", $person_id_for_db, $user_type, $action, $details, $ip_address);
+    // 'issssi' merujuk kepada: int, string, string, string, string, int (related_id)
+    $stmt->bind_param("issssi", $person_id_for_db, $user_type, $action, $details, $ip_address, $related_id);
     
     if (!$stmt->execute()) {
-        error_log("Logging Execute Error (person_id: {$person_id_for_db}, type: {$user_type}): " . $stmt->error);
+        error_log("Logging Execute Error (person_id: {$person_id_for_db}, type: {$user_type}, action: {$action}): " . $stmt->error);
         $stmt->close();
         return false;
     }
@@ -171,27 +173,27 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
         $item_list_html = '';
         $partial_notice = '';
         
-        // 1. Bina senarai item
+        
         foreach ($items_array as $item) {
             $item_name = htmlspecialchars($item['item_name']);
             $quantity = $item['quantity'];
-            // Ambil Assigned Assets, jika tiada, guna string kosong
+            
             $assigned_assets = isset($item['assigned_assets']) ? htmlspecialchars($item['assigned_assets']) : 'N/A';
             $reserve_date = date('d M Y', strtotime($item['reserve_date']));
-            // $return_date = date('d M Y', strtotime($item['return_date'])); // Tidak digunakan dalam jadual
+            
             $status = $item['status'];
             
             $status_color = (strtolower($status) === 'approved') ? '#27ae60' : '#e74c3c';
             $status_text = (strtolower($status) === 'approved') ? 'Approved' : 'Rejected';
 
             if (strtolower($status) === 'rejected') {
-                // Jika Rejected, Assigned Assets adalah NA
+                
                 $assigned_assets = 'N/A';
-                 // Kumpul notis penolakan sebahagian, jika ada
+                 
                  $partial_notice = "<p style='color: #e74c3c; font-weight: bold;'>
-                                    Perhatian: Sesetengah item mungkin telah ditolak atau diubah suai. Sila semak status setiap item di bawah.</p>";
+                                   Attention: Some items may have been rejected or modified. Please check the status of each item below.</p>";
             } else if (strtolower($status) === 'approved' && empty($assigned_assets)) {
-                // Jika Approved tapi tiada aset (sepatutnya tidak berlaku), beri amaran
+                
                 $assigned_assets = 'Error: No Asset Codes!';
             }
 
@@ -210,7 +212,7 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
             <html>
             <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
                 <div style='max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 20px;'>
-                    <h2 style='color: #27ae60;'>Reservation Processed (ID: {$reserve_id})</h2>
+                    <h2 style='color: #27ae60;'>Reservation Processed</h2>
                     <p>Hello <strong>{$user_name}</strong>,</p>
                     {$partial_notice}
                     <p>Your reservation request containing multiple items has been fully processed by the technician. Please see the status of all requested items below.</p>
@@ -231,7 +233,7 @@ function sendGroupedNotificationEmail($to_email, $user_name, $reserve_id, $items
                     </table>
                     
                     <p style='margin-top: 20px;'>
-                        <strong>Action Required:</strong> Please proceed to the inventory counter to collect the **Approved** item(s).
+                        <strong>Action Required:</strong> Please proceed to the inventory counter to collect the <strong>Approved</strong> item(s).
                     </p>
                     <p>Kindly contact the IT staff if you have any questions.</p>
 
@@ -350,7 +352,7 @@ function sendNewReservationNotification($technician_email, $reserve_id, $user_na
         
         $mail->addAddress($technician_email, 'Inventory Technician'); 
 
-		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
+		$mail->addBCC('aina.fatihah@t.unikl.edu.my','IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = "NEW RESERVATION: Item - {$item_name} by {$user_name}";
@@ -449,12 +451,8 @@ function sendRejectionEmail($to_email, $user_name, $item_name, $rejection_reason
         return false; 
     }
 	
-	// --- Tambah fungsi ini dalam fail e-mel anda (`send_email.php`) ---
+	
 
-/**
- * Menghantar satu e-mel tolakan kepada pengguna dengan senarai semua item dalam satu reserve_id.
- * Dicetuskan apabila SEMUA item dalam tempahan telah diproses (Rejected atau Approved).
- */
 function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_array, $smtp_user, $smtp_pass) {
     
     $mail = new PHPMailer(true);
@@ -480,7 +478,7 @@ function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_ar
         $item_list_html = '';
         $rejected_count = 0;
         
-        // 1. Bina senarai item
+        
         foreach ($items_array as $item) {
             $item_name = htmlspecialchars($item['item_name']);
             $status = $item['status'];
@@ -501,7 +499,7 @@ function sendGroupedRejectionEmail($to_email, $user_name, $reserve_id, $items_ar
         }
         
         $header_text = ($rejected_count === count($items_array)) 
-                       ? "Your entire reservation has been **REJECTED**." 
+                       ? "Your entire reservation has been <strong>REJECTED</strong>." 
                        : "Your reservation has been processed. Some item(s) were rejected.";
                        
         $mail->Body = "

@@ -23,14 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $user_id = (int) $_SESSION['person_id'];
 
 
-// Hanya mengambil email, phoneNum, dan data password. Nama diabaikan.
+
 $email = trim($_POST['email']);
 $phoneNum = trim($_POST['phoneNum']);
 $new_password = $_POST['new_password'];
 $confirm_password = $_POST['confirm_password'];
 
 
-// Semakan kosong: hanya email dan phoneNum diperlukan
+
 if (empty($email) || empty($phoneNum)) {
     $_SESSION['error'] = "Email and phone number cannot be empty.";
     header("Location: profile.php");
@@ -38,7 +38,7 @@ if (empty($email) || empty($phoneNum)) {
 }
 
 
-// Semakan format email
+
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $_SESSION['error'] = "Invalid email format.";
     header("Location: profile.php");
@@ -46,7 +46,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 }
 
 
-// Semakan format phoneNum
+
 if (!preg_match('/^[0-9\-\+\s\(\)]+$/', $phoneNum)) {
     $_SESSION['error'] = "Invalid phone number format. Only numbers and basic symbols (+-()) are allowed.";
     header("Location: profile.php");
@@ -54,7 +54,7 @@ if (!preg_match('/^[0-9\-\+\s\(\)]+$/', $phoneNum)) {
 }
 
 
-// Semak jika email sudah digunakan oleh pengguna lain
+
 $stmt_check = $conn->prepare("SELECT person_id FROM person WHERE email = ? AND person_id != ?");
 $stmt_check->bind_param("si", $email, $user_id);
 $stmt_check->execute();
@@ -70,14 +70,14 @@ $stmt_check->close();
 $stmt = null;
 if (!empty($new_password)) {
 
-    // Semak padanan kata laluan
+    
     if ($new_password !== $confirm_password) {
         $_SESSION['error'] = "New passwords do not match.";
         header("Location: profile.php");
         exit();
     }
     
-    // Semakan kekuatan kata laluan
+    
     $uppercase = preg_match('@[A-Z]@', $new_password);
     $lowercase = preg_match('@[a-z]@', $new_password);
     $number    = preg_match('@[0-9]@', $new_password);
@@ -91,7 +91,7 @@ if (!empty($new_password)) {
     
     $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
     
-    // KEMASKINI dengan password dan password_updated_at (menggunakan NOW())
+    
     $sql = "UPDATE person SET email = ?, phoneNum = ?, password = ?, password_updated_at = NOW() WHERE person_id = ?";
     $stmt = $conn->prepare($sql);
     
@@ -100,7 +100,7 @@ if (!empty($new_password)) {
 
 } else {
     
-    // KEMASKINI tanpa password dan password_updated_at (Hanya email dan phoneNum)
+    
     $sql = "UPDATE person SET email = ?, phoneNum = ? WHERE person_id = ?";
     $stmt = $conn->prepare($sql);
     

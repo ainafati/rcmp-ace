@@ -227,12 +227,34 @@ if ($historyResult) {
     error_log("Error fetching reservation history for calendar: " . $conn->error);
 }
 
+$tech_id = (int) $_SESSION['person_id']; 
+$tech_role_id = 2; 
+
+$sql_notif = "SELECT n.*
+              FROM notifications n
+              WHERE n.person_id = ? 
+              AND n.recipient_role_id = ? 
+              AND n.is_read = 0 
+              ORDER BY n.created_at DESC 
+              LIMIT 10";
+              
+$stmt_notif = $conn->prepare($sql_notif);
+
+if (!$stmt_notif) {
+    error_log("Notification Prepare failed: (" . $conn->errno . ") " . $conn->error);
+    $new_notifications = [];
+} else {
+    $stmt_notif->bind_param("ii", $tech_id, $tech_role_id);
+    $stmt_notif->execute();
+    $result_notif = $stmt_notif->get_result();
+    $new_notifications = $result_notif ? $result_notif->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt_notif->close();
+}
+
+$new_notif_count = count($new_notifications);
 
 
 
-
-
-$conn->close();
 
 
 $total_assets_details_json = json_encode($total_assets_details);
@@ -242,6 +264,10 @@ $overdue_details_json = json_encode($overdue_details);
 $maintenance_assets_details_json = json_encode($maintenance_assets_details);
 $events_json = json_encode($events);
 
+
+$new_notifications_json = json_encode($new_notifications);
+
+$conn->close(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -256,9 +282,6 @@ $events_json = json_encode($events);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-    /* ---------------------------------- */
-    /* --- COLOR PALETTE (UPDATED) --- */
-    /* ---------------------------------- */
     :root {
         /* Warna Utama (Cyan/Teal) */
         --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
@@ -427,9 +450,6 @@ $events_json = json_encode($events);
     .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
     .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
     
-	/* ---------------------------------- */
-/* --- FULLCALENDAR BUTTON FIX --- */
-/* ---------------------------------- */
 .fc-toolbar-chunk .fc-button {
     /* Menargetkan semua tombol di toolbar kalender (termasuk prev, next, today) */
     text-transform: capitalize !important;
@@ -441,6 +461,29 @@ $events_json = json_encode($events);
 .fc-timeGridDay-button,
 .fc-listWeek-button {
     text-transform: capitalize !important;
+}
+
+.dropdown-menu-end {
+    /* Pastikan dropdown berbaris dengan betul di sebelah kanan ikon */
+    left: auto !important; 
+    right: 0 !important;
+}
+
+#notificationList {
+    /* Kelas yang kita ubah suai */
+    width: 320px; /* Lebar minimum */
+    max-height: 400px; /* Ketinggian maksimum sebelum scroll */
+    overflow-y: auto; /* Membenarkan vertical scroll */
+    overflow-x: hidden; /* Mencegah horizontal slide/scroll */
+}
+
+/* Penting: Memastikan teks notifikasi 'wrap' */
+#notificationList .dropdown-item p {
+    white-space: normal !important; /* Benarkan teks dibungkus */
+}
+/* Force wrap for the notification message */
+.dropdown-item p {
+    white-space: normal;
 }
 
 </style>
@@ -482,6 +525,43 @@ $events_json = json_encode($events);
 
         <div class="technician-profile d-flex align-items-center">
             <span class="technician-name me-2 d-none d-sm-block"><?= htmlspecialchars($tech['name']) ?></span> 
+			
+			<div class="dropdown me-3" style="position: relative;">
+                <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fa-solid fa-bell fa-xl"></i>
+                    <?php if (($new_notif_count ?? 0) > 0): ?>
+                        <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;" id="notif-count-badge">
+                              <?= $new_notif_count ?>
+                        </span>
+                    <?php endif; ?>
+                </button>
+							<ul class="dropdown-menu dropdown-menu-end" 
+                            style="width: 320px; max-height: 400px; overflow-y: auto; overflow-x: hidden;" 
+                            id="notificationList">
+							<h6 class="dropdown-header">Notifications (<span id="notif-count-header"><?= $new_notif_count ?? 0 ?></span> New)</h6>
+                    <?php if (($new_notif_count ?? 0) > 0): ?>
+                        <?php foreach(($new_notifications ?? []) as $notif): 
+                            $icon = ($notif['type'] == 'reject' || $notif['type'] == 'reservation_rejected') ? 'fa-times-circle text-danger' : 'fa-check-circle text-success';
+                        ?>
+                            <li class="notif-item" data-id="<?= $notif['id'] ?>">
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex align-items-start">
+                                        <i class="fa-solid <?= $icon ?> me-2 mt-1 fa-lg"></i>
+                                        <div>
+                                            <p class="mb-0 small fw-bold text-wrap"><?= htmlspecialchars($notif['message']) ?></p>
+                                            <small class="text-muted"><?= date('H:i, d M', strtotime($notif['created_at'])) ?></small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                        <?php endforeach; ?>
+                        <li><a class="dropdown-item text-center small text-primary" href="#" id="markAllRead">Mark all as read</a></li>
+                    <?php else: ?>
+                        <li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>
+                    <?php endif; ?>
+                </ul>
+            </div>
             <a href="profile_tech.php" title="My Profile" class="text-secondary" style="text-decoration: none;">
                 <i class="fa-solid fa-circle-user fa-2x text-primary-blue"></i>
             </a>
@@ -693,27 +773,190 @@ $events_json = json_encode($events);
 </div>
 
 
-
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 <script>
-    
-    
-    
-    
+
     const totalAssetsDetails = <?php echo $total_assets_details_json; ?>;
     const availableAssetsDetails = <?php echo $available_assets_details_json; ?>;
     const checkedOutAssetsDetails = <?php echo $checked_out_details_json; ?>;
     const overdueDetails = <?php echo $overdue_details_json; ?>;
-    const maintenanceAssetsDetails = <?php echo $maintenance_assets_details_json; ?>; 
+    const maintenanceAssetsDetails = <?php echo $maintenance_assets_details_json; ?>;
     const eventsData = <?php echo $events_json; ?>;
 
+    // --- PEMBOLEHUBAH NOTIFIKASI BARU (Pastikan PHP menyediakannya) ---
+    const newNotifications = <?php echo $new_notifications_json; ?>;
+    let currentNewCount = <?php echo $new_notif_count; ?>;
+    
+
     document.addEventListener('DOMContentLoaded', function() {
+
+        
+        if (typeof jQuery === 'undefined') {
+            console.error("jQuery is not loaded. Notification and DataTables functions will fail.");
+            return;
+        }
+
+        
+        
+        
+
+        const $notifBadge = $('#notif-count-badge');
+        const $notifHeaderCount = $('#notif-count-header');
+        const $notifList = $('#notificationList');
+        
+        
+        updateNotificationCount(currentNewCount, false); 
+
+
+        
+        function renderNotifications(notifications) {
+            $notifList.empty();
+            if (notifications.length === 0) {
+                $notifList.append('<li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>');
+                return;
+            }
+            
+            
+            $('#no-notif-message').parent().remove();
+
+            notifications.forEach((notif, index) => {
+                
+                const createdDate = new Date(notif.created_at);
+                const timeStr = createdDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+                const item = `<li class="notif-item dropdown-item dropdown-item-unread" data-id="${notif.id}">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-bell me-3 text-primary"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0 fw-bold">${notif.type.replace('_', ' ')}</h6>
+                            <p class="text-truncate mb-0">${notif.message}</p>
+                            <small class="text-muted">${timeStr}</small>
+                        </div>
+                    </div>
+                </li>`;
+                $notifList.append(item);
+                
+                
+                if (index < notifications.length - 1) {
+                    $notifList.append('<li class="dropdown-divider"></li>');
+                }
+            });
+            
+            
+             $notifList.append('<li><hr class="dropdown-divider"></li>');
+             $notifList.append('<li><a class="dropdown-item text-center text-success" href="#" id="markAllRead"><i class="fa-solid fa-check-double me-1"></i> Mark all as read</a></li>');
+        }
+
+
+        
+        function updateNotificationCount(newCount, redraw = true) {
+            currentNewCount = newCount;
+            
+            
+            if (newCount > 0) {
+                $notifBadge.text(newCount).removeClass('d-none').addClass('position-absolute');
+            } else {
+                $notifBadge.addClass('d-none').removeClass('position-absolute');
+            }
+
+            
+            $notifHeaderCount.text(newCount);
+            
+            
+            if (newCount === 0 && redraw) {
+                
+                $notifList.empty();
+                $notifList.append('<li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>');
+            }
+        }
+
+        
+        function markNotificationAsRead(id, successCallback) {
+            const url = 'update_notification_status.php'; 
+            
+            $.ajax({
+                url: url,
+                type: 'POST',
+                dataType: 'json',
+                data: { id: id },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        
+                        if (successCallback) {
+                            successCallback();
+                        }
+                    } else {
+                        console.error("Error updating status:", response.message);
+                        Swal.fire('Error', 'Failed to update notification status on server.', 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                    Swal.fire('Error', 'Server communication error. Please try again.', 'error');
+                }
+            });
+        }
+        
+        
+        renderNotifications(newNotifications);
+
+
+        
+        
+        
+        $notifList.on('click', 'li.notif-item', function(e) {
+            e.preventDefault();
+            const notifId = $(this).data('id');
+            const $item = $(this);
+
+            if ($item.hasClass('dropdown-item-unread')) {
+                markNotificationAsRead(notifId, function() {
+                    $item.removeClass('dropdown-item-unread').addClass('dropdown-item-read');
+                    
+                    
+                    $item.next('.dropdown-divider').remove(); 
+                    $item.remove();
+                    updateNotificationCount(currentNewCount - 1); 
+                });
+            }
+        });
+
+        
+        $notifList.on('click', '#markAllRead', function(e) {
+            e.preventDefault();
+            
+            if (currentNewCount === 0) {
+                Swal.fire('No New Notifications', 'There are no new notifications to mark as read.', 'info');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Confirm',
+                text: "Mark all " + currentNewCount + " notifications as read?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Mark All'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    markNotificationAsRead('all', function() {
+                        updateNotificationCount(0, true); 
+                        Swal.fire('Done!', 'All notifications marked as read.', 'success');
+                    });
+                }
+            });
+        });
+        
+        
+        
+        
+
+
+        
         
         
         
@@ -721,7 +964,7 @@ $events_json = json_encode($events);
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
         const overlay = document.getElementById('sidebarOverlay');
-        
+
         function toggleSidebar() {
             sidebar.classList.toggle('toggled');
             overlay.classList.toggle('active');
@@ -733,11 +976,10 @@ $events_json = json_encode($events);
                  sidebar.classList.remove('toggled');
                  overlay.classList.remove('active');
              }
-         }
+        }
         window.addEventListener('resize', checkScreenSize);
-        checkScreenSize(); 
+        checkScreenSize();
 
-        
         
         
         
@@ -748,33 +990,33 @@ $events_json = json_encode($events);
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' 
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
                 },
                 events: eventsData,
                 height: 'auto',
-                firstDay: 1, 
-                
+                firstDay: 1,
+
                 eventDidMount: function(info) {
                     if (info.event.extendedProps.description === 'Reservation') {
-                        info.el.style.backgroundColor = '#10b981'; 
+                        info.el.style.backgroundColor = '#10b981';
                         info.el.style.borderColor = '#059669';
                         info.el.style.color = 'white';
                     } else if (info.event.extendedProps.description === 'Buffer Timeline - Pending Check-in') {
-                        info.el.style.backgroundColor = '#f59e0b'; 
+                        info.el.style.backgroundColor = '#f59e0b';
                         info.el.style.borderColor = '#d97706';
                         info.el.style.color = 'white';
                     }
                 },
                 eventContent: function(arg) {
-                    
+
                     return { html: '<div class="fc-event-main-frame">' + arg.event.title + '</div>' };
                 }
-                
+
             });
             calendar.render();
         } else { console.error("Calendar element #calendar not found."); }
 
-        
+
         
         
         
@@ -782,48 +1024,51 @@ $events_json = json_encode($events);
             if (!assetList || assetList.length === 0) {
                 return '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No matching assets found.</div>';
             }
-            
+
             const tableId = `assetTable_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-            let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`; 
+            let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
             tableHTML += `<thead><tr>
-                                    <th>Asset Code</th>
-                                    <th>Item Name</th>
-                                    <th>Category</th>
-                                    ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
-                                  </tr></thead><tbody>`;
+                                          <th>Asset Code</th>
+                                          <th>Item Name</th>
+                                          <th>Category</th>
+                                          ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
+                                        </tr></thead><tbody>`;
 
             assetList.forEach(asset => {
-                 const itemName = asset.item_name || '<em class="text-muted">N/A</em>';
-                 const categoryName = asset.category_name || '<em class="text-muted">N/A</em>';
-                 const statusValue = asset.status || 'Unknown';
-                 let statusBadgeClass = 'badge-status-default';
-                 
-                 if (statusValue === 'Available') statusBadgeClass = 'badge-status-available';
-                 else if (statusValue === 'Checked Out') statusBadgeClass = 'badge-status-checked-out';
-                 else if (statusValue === 'Maintenance') statusBadgeClass = 'badge-status-maintenance'; 
-                 else if (statusValue === 'Broken' || statusValue === 'Decommissioned' || statusValue === 'Missing') statusBadgeClass = 'badge-status-danger';
-                 
-                 const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
+                const itemName = asset.item_name || '<em class="text-muted">N/A</em>';
+                const categoryName = asset.category_name || '<em class="text-muted">N/A</em>';
+                const statusValue = asset.status || 'Unknown';
+                let statusBadgeClass = 'badge-status-default';
 
-                 tableHTML += `<tr>
-                                     <td><strong>${asset.asset_code || 'N/A'}</strong></td>
-                                     <td>${itemName}</td>
-                                     <td>${categoryName}</td>`;
-                 if (includeUserAndReturnDate) {
-                     const userName = asset.user_name || '<em class="text-muted">N/A</em>';
-                     const returnDate = asset.return_date ? new Date(asset.return_date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '<em class="text-muted">N/A</em>';
-                     tableHTML += `<td>${userName}</td><td>${returnDate}</td>`;
-                 } else {
-                     tableHTML += `<td>${statusBadge}</td>`;
-                 }
+                if (statusValue === 'Available') statusBadgeClass = 'badge-status-available';
+                else if (statusValue === 'Checked Out') statusBadgeClass = 'badge-status-checked-out';
+                else if (statusValue === 'Maintenance') statusBadgeClass = 'badge-status-maintenance';
+                else if (statusValue === 'Broken' || statusValue === 'Decommissioned' || statusValue === 'Missing') statusBadgeClass = 'badge-status-danger';
 
-                 tableHTML += `</tr>`;
+                const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
+
+                tableHTML += `<tr>
+                                          <td><strong>${asset.asset_code || 'N/A'}</strong></td>
+                                          <td>${itemName}</td>
+                                          <td>${categoryName}</td>`;
+                if (includeUserAndReturnDate) {
+                    const userName = asset.user_name || '<em class="text-muted">N/A</em>';
+                    
+                    const returnDate = asset.return_date ? new Date(asset.return_date + 'T00:00:00') : null;
+                    const returnDateFormatted = returnDate && !isNaN(returnDate) ? returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '<em class="text-muted">N/A</em>';
+
+                    tableHTML += `<td>${userName}</td><td>${returnDateFormatted}</td>`;
+                } else {
+                    tableHTML += `<td>${statusBadge}</td>`;
+                }
+
+                tableHTML += `</tr>`;
             });
             tableHTML += '</tbody></table>';
-            return { html: tableHTML, id: tableId }; 
+            return { html: tableHTML, id: tableId };
         }
 
-        
+
         
         
         
@@ -833,44 +1078,46 @@ $events_json = json_encode($events);
             const listContainer = document.getElementById(listContainerId);
 
             if (card && modalElement && listContainer) {
-                const modalInstance = new bootstrap.Modal(modalElement);
-                modalElement.addEventListener('hidden.bs.modal', function () {
-                     const existingTable = listContainer.querySelector('.asset-detail-table');
-                     if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
-                     listContainer.innerHTML = ''; 
-                 });
+                
+                const $modal = $(modalElement);
+                
+                $modal.on('hidden.bs.modal', function () {
+                    const existingTable = listContainer.querySelector('.asset-detail-table');
+                    if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
+                    listContainer.innerHTML = '';
+                   });
 
-                card.addEventListener('click', function() {
+                $(card).on('click', function() {
                     const tableData = createAssetTableHTML(dataList, includeUser);
                     listContainer.innerHTML = tableData.html;
-                    modalInstance.show();
-                     
-                     setTimeout(() => {
-                         const newTable = $(`#${tableData.id}`);
-                         if (newTable.length) {
-                             newTable.DataTable({
-                                 "pageLength": 10, "order": [], "destroy": true,
-                                 "language": {
-                                     "search": "Search:", "lengthMenu": "Show _MENU_ assets",
-                                     "info": "Showing _START_ to _END_ of _TOTAL_ assets", "infoEmpty": "No assets found",
-                                     "infoFiltered": "(filtered from _MAX_ total assets)", "zeroRecords": "No matching assets found",
-                                     "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
-                                 }
-                             });
-                         }
-                     }, 200); 
+                    $modal.modal('show');
 
-                });
+                    setTimeout(() => {
+                        const newTable = $(`#${tableData.id}`);
+                        if (newTable.length) {
+                            newTable.DataTable({
+                                "pageLength": 10, "order": [], "destroy": true,
+                                "language": {
+                                    "search": "Search:", "lengthMenu": "Show _MENU_ assets",
+                                    "info": "Showing _START_ to _END_ of _TOTAL_ assets", "infoEmpty": "No assets found",
+                                    "infoFiltered": "(filtered from _MAX_ total assets)", "zeroRecords": "No matching assets found",
+                                    "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
+                                }
+                            });
+                        }
+                    }, 200);
+
+                   });
             }
         }
 
-        
+
         
         
         
         setupModalTrigger('totalAssetsCard', 'totalAssetsModal', 'totalAssetsList', totalAssetsDetails);
         setupModalTrigger('availableAssetsCard', 'availableAssetsModal', 'availableAssetsList', availableAssetsDetails);
-        setupModalTrigger('checkedOutAssetsCard', 'checkedOutAssetsModal', 'checkedOutAssetsList', checkedOutAssetsDetails, true); 
+        setupModalTrigger('checkedOutAssetsCard', 'checkedOutAssetsModal', 'checkedOutAssetsList', checkedOutAssetsDetails, true);
         setupModalTrigger('maintenanceAssetsCard', 'maintenanceAssetsModal', 'maintenanceAssetsList', maintenanceAssetsDetails);
 
 
@@ -882,16 +1129,16 @@ $events_json = json_encode($events);
         const overdueListContainer = document.getElementById('overdueList');
 
         if (overdueCard && overdueModalElement && overdueListContainer) {
-            const overdueModal = new bootstrap.Modal(overdueModalElement);
+            const $overdueModal = $(overdueModalElement);
 
-             overdueModalElement.addEventListener('hidden.bs.modal', function () {
+             $overdueModal.on('hidden.bs.modal', function () {
                  const existingTable = overdueListContainer.querySelector('.asset-detail-table');
                  if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
-                 overdueListContainer.innerHTML = ''; 
-             });
+                 overdueListContainer.innerHTML = '';
+               });
 
-            overdueCard.addEventListener('click', function() {
-                overdueListContainer.innerHTML = ''; 
+            $(overdueCard).on('click', function() {
+                overdueListContainer.innerHTML = '';
 
                 if (overdueDetails.length === 0) {
                     overdueListContainer.innerHTML = '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No items are currently overdue.</div>';
@@ -899,53 +1146,50 @@ $events_json = json_encode($events);
                      const tableId = `overdueTable_${Date.now()}`;
                      let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
                      tableHTML += `<thead><tr>
-                                         <th>User</th>
-                                         <th>Item</th>
-                                         <th>Asset Code(s)</th>
-                                         <th>Return Date</th>
-                                         <th class="text-danger">Days Overdue</th>
-                                         <th>Contact</th>
-                                       </tr></thead><tbody>`;
+                                             <th>User</th>
+                                             <th>Item</th>
+                                             <th>Asset Code(s)</th>
+                                             <th>Return Date</th>
+                                             <th class="text-danger">Days Overdue</th>
+                                             <th>Contact</th>
+                                           </tr></thead><tbody>`;
                      overdueDetails.forEach(item => {
-                         const returnDate = new Date(item.return_date + 'T00:00:00');
-                         const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                         const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
-                         const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
+                          const returnDate = new Date(item.return_date + 'T00:00:00');
+                          const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                          const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
+                          const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
 
-                         tableHTML += `<tr>
-                                             <td><strong>${item.user_name || 'N/A'}</strong></td>
-                                             <td>${item.item_name || 'N/A'}</td>
-                                             <td>${assignedAssets}</td>
-                                             <td>${returnDateFormatted}</td>
-                                             <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
-                                             <td>${phoneLink}</td>
-                                         </tr>`;
+                          tableHTML += `<tr>
+                                               <td><strong>${item.user_name || 'N/A'}</strong></td>
+                                               <td>${item.item_name || 'N/A'}</td>
+                                               <td>${assignedAssets}</td>
+                                               <td>${returnDateFormatted}</td>
+                                               <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
+                                               <td>${phoneLink}</td>
+                                             </tr>`;
                      });
                      tableHTML += '</tbody></table>';
                      overdueListContainer.innerHTML = tableHTML;
 
-                     overdueModal.show();
-                     
+                     $overdueModal.modal('show');
+
                      setTimeout(() => {
-                         const newTable = $(`#${tableId}`);
-                         if (newTable.length) {
-                             newTable.DataTable({
-                                 "pageLength": 10, "order": [[4, "desc"]], "destroy": true,
-                                 "language": {
-                                     "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
-                                     "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
-                                     "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
-                                     "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
-                                 }
-                             });
-                         }
-                     }, 200); 
-                }
-            });
+                          const newTable = $(`#${tableId}`);
+                          if (newTable.length) {
+                              newTable.DataTable({
+                                  "pageLength": 10, "order": [[4, "desc"]], "destroy": true,
+                                  "language": {
+                                      "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
+                                      "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
+                                      "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
+                                      "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
+                                   }
+                              });
+                          }
+                     }, 200);
+                   }
+             });
         }
-
     });
-</script>
-
-</body>
+</script></body>
 </html>

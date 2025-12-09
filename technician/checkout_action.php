@@ -6,15 +6,14 @@ error_reporting(E_ALL);
 
 session_start();
 
-// Asumsikan fail-fail ini wujud dan berfungsi seperti yang diperlukan
 include __DIR__ . '/../config.php';
 include 'config_email.php';
-require 'send_email.php'; // Mengandungi fetch_reservation_items_by_id, sendGroupedRejectionEmail, sendGroupedNotificationEmail, sendRejectionEmail, dan logActivity
+require 'send_email.php'; 
 
 if (!isset($_SESSION['person_id'])) {
     header('Content-Type: application/json');
     http_response_code(403);
-    echo json_encode(['message' => 'Akses Ditolak. Sila log masuk semula.']);
+    echo json_encode(['message' => 'Access Denied. Please log in again.']);
     exit();
 }
 
@@ -31,7 +30,7 @@ if (isset($_POST['action'])) {
 if (empty($action)) {
     header('Content-Type: application/json');
     http_response_code(400);
-    echo json_encode(['message' => 'Permintaan tidak sah. Tiada tindakan dinyatakan.']);
+    echo json_encode(['message' => 'Invalid request. No action specified.']);
     exit();
 }
 
@@ -47,7 +46,7 @@ case 'approve':
     
     $technician_id = isset($_SESSION['person_id']) ? (int)$_SESSION['person_id'] : 0; 
     
-    // --- START: Dapatkan Kuantiti Asal dan RESERVE_ID ---
+    
     $original_qty = 0;
     $reserve_id = 0; 
     try {
@@ -64,18 +63,18 @@ case 'approve':
     } catch (Exception $e) {
         error_log("ORIGINAL_QTY_FETCH_ERROR: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['message' => 'Ralat sistem semasa mengambil kuantiti asal/Reserve ID.']);
+        echo json_encode(['message' => 'System error while retrieving original quantity/Reserve ID.']);
         exit();
     }
-    // --- END: Dapatkan Kuantiti Asal dan RESERVE_ID ---
     
     
-    // --- LOGIK PENOLAKAN PENUH (Jika Kuantiti Diluluskan = 0) ---
+    
+    
     if ($new_quantity == 0) {
         
         if (strlen($partial_reason) < 5) {
             http_response_code(400);
-            echo json_encode(['message' => 'Sebab penolakan penuh diperlukan jika Kuantiti Diluluskan ialah 0.']);
+            echo json_encode(['message' => 'Full rejection is required if the Approved Quantity is 0.']);
             exit();
         }
 
@@ -107,7 +106,7 @@ case 'approve':
         } catch (Exception $e) {
             error_log("Reject Info Fetch Error: " . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Gagal mengambil maklumat pengguna untuk penolakan penuh.']);
+            echo json_encode(['success' => false, 'message' => 'Failed to retrieve user information for full rejection.']);
             exit();
         }
 
@@ -115,14 +114,14 @@ case 'approve':
         $conn->begin_transaction();
         try {
             
-            // KEMASKINI STATUS KEPADA REJECTED
+            
             $stmt_r = $conn->prepare("UPDATE reservation_items SET status = 'Rejected', rejection_reason = ? WHERE id = ?");
             if (!$stmt_r) throw new Exception("Prepare failed (reject update): " . $conn->error);
             $stmt_r->bind_param("si", $reason, $reservation_item_id);
             $stmt_r->execute();
             $stmt_r->close();
 
-            // NOTIFIKASI DALAMAN 
+            
             $message_notify = "Your request for " . $item_name . " has been rejected. Reason: " . htmlspecialchars($reason);
             $stmt_notify = $conn->prepare("INSERT INTO notifications (person_id, message, type, related_id) VALUES (?, ?, 'reject', ?)");
             if (!$stmt_notify) throw new Exception("Prepare failed (notify reject): " . $conn->error);
@@ -132,9 +131,9 @@ case 'approve':
             
 
             $conn->commit();
-            $response_message = 'Permintaan ditolak sepenuhnya kerana Kuantiti Diluluskan ialah 0.';
+            $response_message = 'The request was completely rejected because the Approved Quantity is 0.';
             
-            // --- LOGIK E-MEL BERKUMPUL SELEPAS TRANSAKSI BERJAYA ---
+            
             
             $stmt_check_pending = $conn->prepare("SELECT COUNT(id) FROM reservation_items WHERE reserve_id = ? AND status = 'Pending'");
             $stmt_check_pending->bind_param("i", $reserve_id);
@@ -161,17 +160,17 @@ case 'approve':
                         SMTP_PASS
                     );
                     
-                    // TIDAK PERLU UPDATE STATUS JADUAL 'reservations' UTAMA
                     
-                    $response_message .= ' **Pemberitahuan E-mel Berkelompok telah dihantar.**';
+                    
+                    $response_message .= 'The Group Email Notification has been sent.';
 
                 } else {
-                    $response_message .= ' **Amaran: Pemberitahuan E-mel Berkelompok gagal dihantar (Ralat Data/SMTP).**';
+                    $response_message .= 'Warning: Email Notification failed to send (Data/SMTP Error).';
                 }
             } else {
-                $response_message .= " Item individu ditolak. **Menunggu {$pending_count} item yang tinggal dalam tempahan ini diproses.**";
+                $response_message .= " Individual item rejected. Waiting{$pending_count} the items remaining in this order are being processed.";
             }
-            // --- END: LOGIK E-MEL BERKUMPUL ---
+            
 
             echo json_encode(['success' => true, 'message' => $response_message]);
             exit(); 
@@ -180,28 +179,28 @@ case 'approve':
             $conn->rollback();
             http_response_code(500);
             error_log("DB_TRANSACTION_ERROR (Full Reject - Approve Case): " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Transaksi Pangkalan Data Gagal semasa penolakan penuh: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Database Transaction Failed during full rejection: ' . $e->getMessage()]);
             exit();
         }
     }
     
-    // --- LOGIK KELULUSAN / PENOLAKAN SEBAHAGIAN ---
+    
     
     if (empty($reservation_item_id) || empty($selectedAssets) || $new_quantity <= 0) {
         http_response_code(400); 
-        echo json_encode(['message' => 'Maklumat tidak lengkap (ID, Aset, atau Kuantiti).']); 
+        echo json_encode(['message' => 'Incomplete information (ID, Asset, or Quantity).']); 
         exit();
     }
     
     if ($new_quantity < $original_qty && strlen($partial_reason) < 5) {
         http_response_code(400); 
-        echo json_encode(['message' => 'Sebab penolakan sebahagian diperlukan jika kuantiti dikurangkan.']); 
+        echo json_encode(['message' => 'Some rejection is necessary if the quantity is reduced.']); 
         exit();
     }
 
     if (count($selectedAssets) !== $new_quantity) {
           http_response_code(400); 
-          echo json_encode(['message' => 'Ralat Mismatch: Jumlah aset tidak sepadan dengan kuantiti yang diluluskan.']); 
+          echo json_encode(['message' => 'Mismatch Error: The total assets do not match the approved quantity.']); 
           exit();
     }
 
@@ -209,7 +208,7 @@ case 'approve':
     $conn->begin_transaction();
     try {
         
-        // 1. KEMASKINI ITEM KEPADA APPROVED
+        
         $stmt = $conn->prepare("UPDATE reservation_items 
                                     SET status = 'Approved', 
                                           approved_by = ?, 
@@ -225,9 +224,9 @@ case 'approve':
         $stmt->execute();
         $stmt->close();
 
-        // 2. KEMASKINI/SISIPAN reservation_assets dan assets status
         
-        // Padam rekod lama aset yang mungkin ada (pencegahan)
+        
+        
         $stmt_delete_ra = $conn->prepare("DELETE FROM reservation_assets WHERE reservation_item_id = ?");
         if (!$stmt_delete_ra) throw new Exception("Prepare failed (delete ra): " . $conn->error);
         $stmt_delete_ra->bind_param("i", $reservation_item_id);
@@ -238,7 +237,7 @@ case 'approve':
         $stmt_asset_insert = $conn->prepare("INSERT INTO reservation_assets (reservation_item_id, asset_id) VALUES (?, ?)");
         if (!$stmt_asset_insert) throw new Exception("Prepare failed (insert asset): " . $conn->error);
 
-        // Kemaskini status aset ke 'Reserved'
+        
         $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = 'Reserved' WHERE asset_id = ?"); 
         if (!$stmt_asset_update) throw new Exception("Prepare failed (update asset): " . $conn->error);
         
@@ -256,7 +255,7 @@ case 'approve':
         
         $conn->commit(); 
         
-        // --- START: LOGIK E-MEL BERKUMPUL ---
+        
         
         $stmt_check_pending = $conn->prepare("SELECT COUNT(id) FROM reservation_items WHERE reserve_id = ? AND status = 'Pending'");
         $stmt_check_pending->bind_param("i", $reserve_id);
@@ -268,7 +267,7 @@ case 'approve':
 
 
         $email_sent = false;
-        $message = "Permintaan diluluskan untuk {$new_quantity} unit!";
+        $message = "Request approved for {$new_quantity} unit!";
         
         if ($pending_count === 0) {
             
@@ -288,17 +287,16 @@ case 'approve':
                     SMTP_PASS
                 );
                 
-                $message .= ' **Pemberitahuan E-mel Berkelompok telah dihantar.**';
+                $message .= 'Email Notification has been sent.';
 
             } else {
-                 $message .= ' **Amaran: Pemberitahuan E-mel Berkelompok gagal dihantar (Ralat Data/SMTP).**';
+                 $message .= ' Warning: Email Notification failed to send (Data/SMTP Error).';
             }
         } else {
-            $message .= " Item individu diluluskan. **Menunggu {$pending_count} item yang tinggal dalam tempahan ini diproses.**";
+            $message .= " Individual item rejected. Waiting {$pending_count} the items remaining in this order are being processed.";
         }
-        // --- END: LOGIK E-MEL BERKUMPUL ---
 
-        // 5. KOD NOTIFIKASI DALAMAN 
+        
         $info = null;
         try {
             $stmt_info_db = $conn->prepare("
@@ -314,9 +312,9 @@ case 'approve':
 
 
         if ($info && isset($info['person_id'])) {
-              $message_notify = "Permintaan anda untuk " . htmlspecialchars($info['item_name']) . " telah diluluskan dan sedia diambil. ";
+              $message_notify = "Your request for " . htmlspecialchars($info['item_name']) . " has been approved and is ready to be collected. ";
               if ($original_qty > $new_quantity) {
-                  $message_notify .= " (Kuantiti dikurangkan dari {$original_qty} kepada {$new_quantity}).";
+                  $message_notify .= " (Quantity reduced from {$original_qty} to {$new_quantity}).";
               }
               
               $stmt_notify = $conn->prepare("INSERT INTO notifications (person_id, message, type, related_id) VALUES (?, ?, 'approve', ?)");
@@ -334,7 +332,7 @@ case 'approve':
         $conn->rollback();
         http_response_code(500);
         error_log("DB_TRANSACTION_ERROR (Approve): " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Transaksi Pangkalan Data Gagal: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Database Transaction Failed: ' . $e->getMessage()]);
     }
     break;   
     
@@ -344,7 +342,7 @@ case 'reject':
 
     if (strlen($reason) < 5) {
         http_response_code(400);  
-        echo json_encode(['success' => false, 'message' => 'Sebab penolakan diperlukan (min 5 aksara).']);  
+        echo json_encode(['success' => false, 'message' => 'Reason for rejection is required (min 5 characters).']);  
         exit();
     }
     
@@ -381,7 +379,7 @@ case 'reject':
             $user_name = $user_info['user_name'];
 
             
-            $message_db = "Permintaan anda untuk " . $item_name . " telah DITOLAK. Sebab: " . htmlspecialchars($reason);
+            $message_db = "Your request for " . $item_name . " has been REJECTED. Reason: " . htmlspecialchars($reason);
             $stmt_notify = $conn->prepare("INSERT INTO notifications (person_id, message, type, related_id) VALUES (?, ?, 'reject', ?)");
             if (!$stmt_notify) throw new Exception("Notification INSERT Prepare Error: " . $conn->error);
             $stmt_notify->bind_param("isi", $person_id_applicant, $message_db, $reservation_item_id);
@@ -402,15 +400,15 @@ case 'reject':
         }
 
         $conn->commit();
-        $message = 'Permintaan berjaya ditolak dan pengguna telah dimaklumkan.';
-        $message .= $email_sent ? ' Pemberitahuan E-mel telah dihantar.' : ' Amaran: Pemberitahuan E-mel gagal dihantar.';
+        $message = 'The request was successfully declined and the user has been informed.';
+        $message .= $email_sent ? ' Email notification has been sent.' : ' Warning: Email notification failed to send.';
         echo json_encode(['success' => true, 'message' => $message]);
 
     } catch (Exception $e) {
         $conn->rollback();
         http_response_code(500);
         error_log("DB_TRANSACTION_ERROR (Reject): " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Gagal menolak permintaan: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Failed to decline request: ' . $e->getMessage()]);
     }
     break;
 
@@ -428,7 +426,7 @@ case 'approve_all_items':
     $total_approved_items = 0;
     
     try {
-        // 1. Dapatkan semua reservation_item_id, item_id, dan kuantiti yang Pending
+        
         $stmt_pending = $conn->prepare("
              SELECT 
                  ri.id AS reservation_item_id, 
@@ -450,17 +448,17 @@ case 'approve_all_items':
 
         if (empty($pending_items)) {
             $conn->rollback();
-            echo json_encode(['success' => true, 'message' => 'Tiada item Pending untuk kelulusan di bawah ID Tempahan ini.']);
+            echo json_encode(['success' => true, 'message' => 'There are no pending items for approval under this Booking ID.']);
             exit();
         }
         
-        // Loop melalui setiap item yang Pending
+        
         foreach ($pending_items as $item) {
             $ri_id = (int)$item['reservation_item_id'];
             $item_id = (int)$item['item_id'];
             $quantity = (int)$item['quantity'];
             
-            // 2. Dapatkan Aset yang Tersedia untuk item_id ini (Status 'Available')
+            
             $stmt_assets = $conn->prepare("
                  SELECT asset_id 
                  FROM assets 
@@ -476,31 +474,31 @@ case 'approve_all_items':
             $asset_ids_to_assign = array_column($available_assets, 'asset_id');
 
             if (count($asset_ids_to_assign) < $quantity) {
-                // Jika aset tidak mencukupi, anggap item ini REJECTED
-                $reason = "Ditolak Secara Automatik: Hanya " . count($asset_ids_to_assign) . " aset tersedia untuk kuantiti yang diminta ({$quantity}).";
+                
+                $reason = "Automatically Rejected: Only " . count($asset_ids_to_assign) . " assets available for the requested quantity ({$quantity}).";
                 
                 $stmt_reject = $conn->prepare("UPDATE reservation_items SET status = 'Rejected', rejection_reason = ? WHERE id = ?");
                 $stmt_reject->bind_param("si", $reason, $ri_id);
                 $stmt_reject->execute();
                 $stmt_reject->close();
                 
-                $total_approved_items += 0; // Tambah 0
+                $total_approved_items += 0; 
                 
             } else {
-                // Jika aset mencukupi, LULUSKAN ITEM
                 
-                // a. Kemaskini reservation_items status
+                
+                
                 $stmt_update_item = $conn->prepare("UPDATE reservation_items 
                                                      SET status = 'Approved', 
                                                          approved_by = ?, 
                                                          approved_on = CURDATE(),
                                                          quantity = ? 
-                                                     WHERE id = ?"); // Set quantity to requested quantity
+                                                     WHERE id = ?"); 
                 $stmt_update_item->bind_param("iii", $technician_id, $quantity, $ri_id);
                 $stmt_update_item->execute();
                 $stmt_update_item->close();
 
-                // b. Sisip dan Kemaskini Asset Status
+                
                 $stmt_asset_insert = $conn->prepare("INSERT INTO reservation_assets (reservation_item_id, asset_id) VALUES (?, ?)");
                 $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = 'Reserved' WHERE asset_id = ?"); 
                 
@@ -519,10 +517,10 @@ case 'approve_all_items':
         }
         
         $conn->commit();
-        $message = "Berjaya memproses {$total_approved_items} item yang diluluskan untuk ID Tempahan {$reserve_id}.";
+        $message = "Successfully processed {$total_approved_items} item approved for Booking ID {$reserve_id}.";
 
-        // 3. LOGIK E-MEL BERKUMPUL
-        // Periksa semua item telah diproses (Pending = 0)
+        
+        
         $stmt_check_pending = $conn->prepare("SELECT COUNT(id) FROM reservation_items WHERE reserve_id = ? AND status = 'Pending'");
         $stmt_check_pending->bind_param("i", $reserve_id);
         $stmt_check_pending->execute();
@@ -532,8 +530,8 @@ case 'approve_all_items':
         $stmt_check_pending->close();
         
         if ($pending_count === 0) {
-            $message .= " Semua item telah diproses. E-mel notifikasi dihantar.";
-            // Panggil fungsi e-mel (dengan asumsi fetch_reservation_items_by_id kini menyertakan assigned_assets)
+            $message .= " All items have been processed. Notification email sent.";
+            
             $reservation_items_list = fetch_reservation_items_by_id($conn, $reserve_id);
             if (!empty($reservation_items_list)) {
                 $user_email = $reservation_items_list[0]['user_email'];
@@ -541,7 +539,7 @@ case 'approve_all_items':
                 sendGroupedNotificationEmail($user_email, $user_name, $reserve_id, $reservation_items_list, SMTP_USER, SMTP_PASS);
             }
         } else {
-             $message .= " Beberapa item ditolak secara automatik kerana kekurangan aset. Status keseluruhan masih 'Pending' untuk item yang belum diproses.";
+             $message .= " Some items were automatically rejected due to lack of assets. The overall status is still 'Pending' for items that have not been processed.";
         }
 
         echo json_encode(['success' => true, 'message' => $message]);
@@ -550,18 +548,18 @@ case 'approve_all_items':
         $conn->rollback();
         http_response_code(500);
         error_log("DB_TRANSACTION_ERROR (Approve All): " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Transaksi Pangkalan Data Gagal semasa kelulusan pukal: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Database Transaction Failed during approval: ' . $e->getMessage()]);
     }
     break;
 
-// --- START: Checkout All Items Case (REVISED FOR reservation_items tracking) ---
+
 case 'checkout_all_items':
     $reserve_id = isset($_POST['reserve_id']) ? (int)$_POST['reserve_id'] : 0;
     $technician_id = isset($_SESSION['person_id']) ? (int)$_SESSION['person_id'] : 0; 
     
     if ($reserve_id === 0) {
         http_response_code(400); 
-        echo json_encode(['success' => false, 'message' => 'Missing Reservation ID for bulk action.']); 
+        echo json_encode(['success' => false, 'message' => 'Missing Reservation ID for  action.']); 
         exit();
     }
     if ($technician_id === 0) {
@@ -575,7 +573,7 @@ case 'checkout_all_items':
     $total_items_updated = 0;
 
     try {
-        // 1. Dapatkan SEMUA reservation_item_id yang Approved di bawah Tempahan ini
+        
         $stmt_items = $conn->prepare("
              SELECT ri.id, i.item_name, GROUP_CONCAT(ra.asset_id) AS asset_ids 
              FROM reservation_items ri
@@ -597,8 +595,8 @@ case 'checkout_all_items':
             exit();
         }
 
-        // Prepare statements
-        // MODIFIED: Tambah checked_out_by/on ke reservation_items update
+        
+        
         $stmt_item_update = $conn->prepare("UPDATE reservation_items 
                                             SET status = 'Checked Out', 
                                                 reserve_date = CURDATE(),
@@ -608,63 +606,63 @@ case 'checkout_all_items':
 
         $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = 'Checked Out' WHERE asset_id = ?"); 
         
-        // 2. Lakukan Check Out untuk setiap item
+        
         $asset_log_details = [];
         foreach ($items_to_checkout as $item) {
             $reservation_item_id = (int)$item['id'];
             $item_name = htmlspecialchars($item['item_name']);
             $asset_ids_str = $item['asset_ids'];
             
-            if (empty($asset_ids_str)) continue; // Langkau item tanpa aset
+            if (empty($asset_ids_str)) continue; 
             
             $asset_ids = explode(',', $asset_ids_str);
             
-            // a) Update reservation_items (Sekarang termasuk staff check-out)
+            
             $stmt_item_update->bind_param("ii", $technician_id, $reservation_item_id);
             $stmt_item_update->execute();
             $total_items_updated++;
 
-            // b) Update assets status
+            
             foreach($asset_ids as $asset_id) {
                 $asset_id_int = (int)$asset_id;
 
-                // Update assets status
+                
                 $stmt_asset_update->bind_param("i", $asset_id_int);
                 $stmt_asset_update->execute();
                 $total_assets_updated++;
 
-                // NOTA: Kami TIDAK mengemaskini reservation_assets (checked_out_by) seperti permintaan anda.
+                
             }
 
-            // Simpan log butiran
+            
             $asset_log_details[] = "Item: {$item_name} (IDs: {$asset_ids_str})";
 
-            // LOGGING AKTIVITI PER ITEM (PENTING)
-            $log_desc = "Bulk Checked Out: {$item_name} for Reserve ID {$reserve_id}. Asset IDs: {$asset_ids_str}.";
-            // logActivity($conn, $technician_id, 'BULK_CHECKOUT', $log_desc, $reservation_item_id);
+            
+            $log_desc = " Checked Out: {$item_name} for Reserve ID {$reserve_id}. Asset IDs: {$asset_ids_str}.";
+            
         }
 
         $stmt_item_update->close();
         $stmt_asset_update->close();
 
-        // 3. Commit dan Pulangkan Kejayaan
+        
         $conn->commit();
         echo json_encode([
             'success' => true,
-            'message' => "Bulk Check-Out berjaya. {$total_items_updated} item dikemas kini, {$total_assets_updated} aset dikemas kini kepada 'Checked Out'. Juruteknik ID {$technician_id} direkodkan dalam reservation_items."
+            'message' => " Check-Out success. {$total_items_updated} item updated, {$total_assets_updated} asset updated to 'Checked Out'. Technician ID {$technician_id} recorded."
         ]);
 
     } catch (Exception $e) {
         $conn->rollback();
         http_response_code(500);
         error_log("DB_TRANSACTION_ERROR (Checkout All): " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Bulk Check-out gagal: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => ' Check-out gagal: ' . $e->getMessage()]);
     }
     break;
-// --- END: Checkout All Items Case (REVISED) ---
+
 
 case 'get_assets_for_checkout':
-    // TIDAK PERLU LOG, hanya operasi GET
+    
     $reservation_item_id = isset($_GET['reservation_item_id']) ? (int)$_GET['reservation_item_id'] : 0;
     if ($reservation_item_id === 0) {
         http_response_code(400); 
@@ -693,7 +691,7 @@ case 'get_assets_for_checkout':
     echo json_encode($result); 
     break;
 
-// --- START: Checkout Multi Case (REVISED FOR reservation_items tracking) ---
+
 case 'checkout_multi':
     $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
     $asset_ids_json = isset($_POST['asset_ids']) ? $_POST['asset_ids'] : '[]';
@@ -715,7 +713,7 @@ case 'checkout_multi':
     $conn->begin_transaction();
     try {
         
-        // Dapatkan Item Name untuk Log
+        
         $stmt_item_info = $conn->prepare("SELECT i.item_name FROM reservation_items ri JOIN item i ON ri.item_id = i.item_id WHERE ri.id = ?");
         $stmt_item_info->bind_param("i", $reservation_item_id);
         $stmt_item_info->execute();
@@ -723,7 +721,7 @@ case 'checkout_multi':
         $stmt_item_info->close();
         $item_name = $item_info ? htmlspecialchars($item_info['item_name']) : 'N/A';
         
-        // 1. Update reservation_items status (MODIFIED TO INCLUDE checked_out_by)
+        
         $stmt_item = $conn->prepare("UPDATE reservation_items 
                                      SET status = 'Checked Out', 
                                          reserve_date = CURDATE(),
@@ -736,7 +734,7 @@ case 'checkout_multi':
         $stmt_item->close();
 
         
-        // 2. Update assets status ke 'Checked Out'
+        
         $asset_placeholders = implode(',', array_fill(0, count($asset_ids), '?'));
         $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = 'Checked Out' WHERE asset_id IN ($asset_placeholders)");
         if (!$stmt_asset_update) throw new Exception("Prepare failed (update assets status): " . $conn->error);
@@ -746,26 +744,26 @@ case 'checkout_multi':
         $stmt_asset_update->execute();
         $stmt_asset_update->close();
 
-        // NOTA: Kami TIDAK mengemaskini reservation_assets (checked_out_by) seperti permintaan anda.
+        
 
-        // LOGGING AKTIVITI
+        
         $asset_ids_str = implode(',', $asset_ids);
         $log_desc = "Checked Out Item: {$item_name}. Assigned Assets: {$asset_ids_str}.";
-        // logActivity($conn, $technician_id, 'CHECKOUT', $log_desc, $reservation_item_id);
+        
 
         $conn->commit();
-        echo json_encode(['message' => "Item berjaya dikeluarkan. " . count($asset_ids) . " aset dikemas kini statusnya."]);
+        echo json_encode(['message' => "Item successfully issued. " . count($asset_ids) . " the asset's status has been updated."]);
     } catch (Exception $e) {
         $conn->rollback();
         http_response_code(500);
         error_log("DB_TRANSACTION_ERROR (Checkout Multi): " . $e->getMessage());
-        echo json_encode(['message' => 'Check-out gagal: ' . $e->getMessage()]);
+        echo json_encode(['message' => 'Check-out failed: ' . $e->getMessage()]);
     }
     break;
-// --- END: Checkout Multi Case (REVISED) ---
+
 
 case 'get_assets_for_checkin':
-    // TIDAK PERLU LOG, hanya operasi GET
+    
     $reservation_item_id = isset($_GET['reservation_item_id']) ? (int)$_GET['reservation_item_id'] : 0;
     if ($reservation_item_id === 0) {
         http_response_code(400); echo json_encode(['message' => 'Missing ID.']); exit();
@@ -789,7 +787,7 @@ case 'get_assets_for_checkin':
     echo json_encode($result);  
     break;
 	
-// --- START: Check-in Multi Case (REVISED FOR reservation_items tracking) ---
+
 case 'checkin_multi':
     $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
     $asset_conditions_json = isset($_POST['asset_conditions']) ? $_POST['asset_conditions'] : '[]';
@@ -816,7 +814,7 @@ case 'checkin_multi':
         $damaged_asset_codes = [];
         $available_asset_codes = [];
         
-        // 1. Dapatkan Item Name untuk Log
+        
         $stmt_item_info = $conn->prepare("SELECT i.item_name FROM reservation_items ri JOIN item i ON ri.item_id = i.item_id WHERE ri.id = ?");
         $stmt_item_info->bind_param("i", $reservation_item_id);
         $stmt_item_info->execute();
@@ -824,11 +822,11 @@ case 'checkin_multi':
         $stmt_item_info->close();
         $item_name = $item_info ? htmlspecialchars($item_info['item_name']) : 'N/A';
         
-        // 2. Prepare statements
+        
         $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = ?, last_return_date = CURDATE() WHERE asset_id = ?");
         $stmt_get_asset_code = $conn->prepare("SELECT asset_code FROM assets WHERE asset_id = ?"); 
         
-        // Tiada update reservation_assets
+        
 
         foreach ($asset_conditions as $asset) {
             $asset_id = (int)$asset['asset_id'];
@@ -836,11 +834,11 @@ case 'checkin_multi':
             
             $new_asset_status = 'Available';
             
-            if ($condition === 'Damaged/Incomplete') {
+            if ($condition === 'Damaged') {
                 $new_asset_status = 'Maintenance';
                 $damaged_count++;
                 
-                // Dapatkan asset code untuk log
+                
                 $stmt_get_asset_code->bind_param("i", $asset_id);
                 $stmt_get_asset_code->execute();
                 $code_row = $stmt_get_asset_code->get_result()->fetch_assoc();
@@ -848,7 +846,7 @@ case 'checkin_multi':
                 
             } elseif ($condition === 'Available') {
                 
-                // Dapatkan asset code untuk log
+                
                 $stmt_get_asset_code->bind_param("i", $asset_id);
                 $stmt_get_asset_code->execute();
                 $code_row = $stmt_get_asset_code->get_result()->fetch_assoc();
@@ -858,13 +856,13 @@ case 'checkin_multi':
                 continue; 
             }
             
-            // Execute assets status update
+            
             $stmt_asset_update->bind_param("si", $new_asset_status, $asset_id);
             if (!$stmt_asset_update->execute()) {
                 throw new Exception("Asset update failed for asset_id {$asset_id}: " . $stmt_asset_update->error);
             }
 
-            // Tiada update reservation_assets
+            
 
             $checked_in_count++;
             $checked_in_asset_ids[] = $asset_id;
@@ -874,7 +872,7 @@ case 'checkin_multi':
         $stmt_get_asset_code->close();
 
         
-        // 3. Periksa baki aset yang masih 'Checked Out'
+        
         $stmt_check_remaining = $conn->prepare("
               SELECT COUNT(a.asset_id) AS remaining_count
               FROM reservation_assets ra
@@ -889,14 +887,14 @@ case 'checkin_multi':
 
 
         
-        // 4. Kemaskini status reservation_item (CONDITIONAL UPDATE for checked_in_by/on)
+        
         $final_item_status = ($remaining_count > 0) ? 'Checked Out' : 'Returned';
         
-        $final_condition = ($damaged_count > 0) ? "{$damaged_count} Damaged Asset/Incomplete" : "Good";
+        $final_condition = ($damaged_count > 0) ? "{$damaged_count} Under Maintenance" : "Good";
         $final_remarks = "Checked in {$checked_in_count} asset(s).  Final status: {$final_item_status}.";
         
         if ($final_item_status === 'Returned') {
-            // Set fields check-in apabila SEMUA aset dikembalikan
+            
             $stmt_item = $conn->prepare("UPDATE reservation_items 
                                          SET status = ?, 
                                              return_condition = ?, 
@@ -910,7 +908,7 @@ case 'checkin_multi':
             $stmt_item->bind_param("sssii", $final_item_status, $final_condition, $final_remarks, $technician_id, $reservation_item_id);
 
         } else {
-            // Status masih 'Checked Out' (pulangan separa), JANGAN kemas kini bidang check-in
+            
             $stmt_item = $conn->prepare("UPDATE reservation_items 
                                          SET status = ?, 
                                              return_condition = ?, 
@@ -925,13 +923,13 @@ case 'checkin_multi':
         if (!$stmt_item->execute()) throw new Exception("Execute failed (update item): " . $stmt_item->error);
         $stmt_item->close();
 
-        // 5. LOGGING AKTIVITI
+        
         $log_desc = "Checked In Item: {$item_name}. Returned: " . implode(', ', $available_asset_codes) . ". Maintenance: " . implode(', ', $damaged_asset_codes) . ". Item Status: {$final_item_status}.";
-        // logActivity($conn, $technician_id, 'CHECKIN', $log_desc, $reservation_item_id);
+        
 
 
         $conn->commit();
-        echo json_encode(['message' => "Check-in berjaya. {$checked_in_count} aset diproses. Status tempahan dikemas kini kepada '{$final_item_status}'. {$damaged_count} aset untuk penyelenggaraan."]);
+        echo json_encode(['message' => "Check-in success. {$checked_in_count} processed assets. Booking status updated to'{$final_item_status}'. {$damaged_count} assets for maintenance."]);
 
     } catch (Exception $e) {
         $conn->rollback();
@@ -940,7 +938,7 @@ case 'checkin_multi':
         echo json_encode(['message' => 'Check-in gagal: ' . $e->getMessage()]);
     }
     break;
-// --- END: Check-in Multi Case (REVISED) ---
+
     
 }
 ?>

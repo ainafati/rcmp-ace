@@ -7,7 +7,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Mpdf\Mpdf;
 use Mpdf\MpdfException;
 
-// 1. PENGURUSAN LOGO & TEMPLAT
+
 $relative_path_to_logo = __DIR__ . '/../img/unikl_logo-removebg-preview.png';
 $logo_file_path = realpath($relative_path_to_logo);
 if ($logo_file_path === false) { 
@@ -22,13 +22,13 @@ if (!file_exists($template_path)) {
     exit();
 }
 
-// 2. TENTUKAN TARIKH DAN FILTER
+
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $asset_id_filter = isset($_GET['asset_id']) && !empty($_GET['asset_id']) ? $_GET['asset_id'] : null;
 
 
-// 3. KUERTI SQL (3 NAMA TEKNIKAL + ASSET FILTER)
+
 $sql = "SELECT 
             u.name AS user_name, 
             i.item_name, 
@@ -64,7 +64,7 @@ $sql = "SELECT
         
         WHERE ri.status = 'Returned' AND ri.return_date BETWEEN ? AND ?";
         
-// Tambah klausa Asset ID jika filter ada
+
 if ($asset_id_filter !== null) {
     $sql .= " AND a.asset_id = ?";
 }
@@ -75,12 +75,12 @@ $sql .= " ORDER BY a.asset_code ASC";
 $stmt = $conn->prepare($sql);
 if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
 
-// Tentukan jenis dan bind parameter
+
 if ($asset_id_filter !== null) {
-    // ssi: start_date (string), end_date (string), asset_id (integer)
+    
     $stmt->bind_param("ssi", $start_date, $end_date, $asset_id_filter); 
 } else {
-    // ss: start_date (string), end_date (string)
+    
     $stmt->bind_param("ss", $start_date, $end_date);
 }
 
@@ -90,12 +90,12 @@ $records = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 
-// 4. PENJANAAN BARIS JADUAL HTML
+
 $html = file_get_contents($template_path);
 $tableRows = '';
 
 if (empty($records)) {
-    // Colspan 10 = No. (1) + 9 lajur data
+    
     $tableRows = '<tr><td colspan="10" style="text-align:center; padding: 20px; color: #CC0000;">No returned items found for this period.</td></tr>';
 } else {
     $count = 1;
@@ -108,7 +108,7 @@ if (empty($records)) {
         $asset_code = !empty($record['asset_code']) ? htmlspecialchars($record['asset_code']) : 'N/A';
         $return_condition = !empty($record['return_condition']) ? htmlspecialchars($record['return_condition']) : 'Not specified'; 
         
-        // 1. Ambil 3 nama
+        
         $approved_by = !empty($record['approved_by_name']) ? htmlspecialchars($record['approved_by_name']) : 'N/A';
         $checked_out_by = !empty($record['checked_out_by_name']) ? htmlspecialchars($record['checked_out_by_name']) : 'N/A';
         $checked_in_by = !empty($record['checked_in_by_name']) ? htmlspecialchars($record['checked_in_by_name']) : 'N/A';
@@ -135,7 +135,7 @@ if (empty($records)) {
 }
 
 
-// 5. ISI TEMPLAT & OUTPUT PDF
+
 $html = str_replace('{{logo_path}}', $logo_file_path, $html); 
 $html = str_replace('{{start_date}}', date("d M Y", strtotime($start_date)), $html);
 $html = str_replace('{{end_date}}', date("d M Y", strtotime($end_date)), $html);

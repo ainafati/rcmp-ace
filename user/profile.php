@@ -3,7 +3,7 @@ session_start();
 
 include '../config.php';
 
-// --- PHP STARTS HERE ---
+
 
 if (!$conn) {
     $_SESSION['error'] = "Database connection error.";
@@ -22,7 +22,7 @@ $person_id = (int) $_SESSION['person_id'];
 $user = null;
 
 
-// Fetch user details using prepared statement for security
+
 $stmt_user = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
 
 if ($stmt_user) {
@@ -32,19 +32,19 @@ if ($stmt_user) {
     $user = $result_user->fetch_assoc();
     $stmt_user->close();
 } else {
-    // Log the error for technical staff, not the user
+    
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
 if (!$user) {
-    // If user record is not found, destroy session and redirect to login
+    
     session_destroy();
     header("Location: ../login.php");
     exit();
 }
 
 
-// Add person_id back to user array for use in the update form
+
 $user['person_id'] = $person_id; 
 
 $conn->close();
@@ -396,18 +396,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
 
-    // === JS untuk Kekalkan Mod Edit Selepas Penghantaran Borang Gagal/Berjaya ===
-    // Semak jika terdapat sebarang alert sesi (message atau error)
+    
+    
     const hasSessionAlert = <?php echo (isset($_SESSION['error']) || isset($_SESSION['message'])) ? 'true' : 'false'; ?>;
 
     if (hasSessionAlert) {
-        // Jika terdapat mesej ralat atau kejayaan, kekalkan mod edit dipaparkan
+        
         viewMode.style.display = 'none';
         editMode.style.display = 'block';
-        // Skrol ke atas untuk memastikan mesej dipaparkan
+        
         window.scrollTo(0, 0); 
     }
-    // =========================================================================
+    
 
 
     if (editBtn && cancelBtn) {
@@ -423,13 +423,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
-    // --- Logik Sidebar Offcanvas untuk Mobile ---
+    
     
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     
-    // Set initial position for mobile view
+    
     if (window.innerWidth <= 992) {
         sidebar.style.transform = 'translateX(-280px)';
     }
@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    // --- End Sidebar Logic ---
+    
 });
 </script>
 
