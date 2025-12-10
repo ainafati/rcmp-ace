@@ -14,8 +14,8 @@ function fetch_reservation_items_by_id($conn, $reserve_id) {
         SELECT
             ri.id,
             ri.quantity,
-            ri.reserve_date,
-            ri.return_date,
+            r.reserve_date,
+            r.return_date,
             ri.status,
             i.item_name,
             p.email AS user_email,
@@ -39,7 +39,7 @@ function fetch_reservation_items_by_id($conn, $reserve_id) {
         WHERE
             ri.reserve_id = ?
         GROUP BY
-            ri.id, ri.quantity, ri.reserve_date, ri.return_date, ri.status, i.item_name, p.email, p.name
+            ri.id, ri.quantity, r.reserve_date, r.return_date, ri.status, i.item_name, p.email, p.name
         ORDER BY
             ri.id
     ");

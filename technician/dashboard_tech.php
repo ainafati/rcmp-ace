@@ -3,7 +3,7 @@ session_start();
 
 include '../config.php'; 
 
-
+// --- Sekatan Akses & Pengesahan Sesi (Tiada perubahan) ---
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
@@ -13,7 +13,6 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technicia
 }
 
 $person_id = (int) $_SESSION['person_id']; 
-
 
 $stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
 $stmt->bind_param("i", $person_id);
@@ -29,10 +28,7 @@ if (!$tech) {
     exit();
 }
 
-
-
-
-
+// --- Fungsi Bantuan (Tiada perubahan) ---
 function get_reservation_item_count($conn, $status) {
     $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
     $stmt = $conn->prepare($sql);
@@ -68,56 +64,49 @@ function fetch_asset_details($conn, $status_condition_sql) {
     }
 }
 
-
+// --- Kiraan Ringkasan Data (Telah dibetulkan) ---
 $pending_count_for_badge = get_reservation_item_count($conn, 'Pending'); 
-
-
-
-
-
 
 $totalAssetsResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 $totalAssetsRow = $totalAssetsResult->fetch_assoc();
 $totalAssetsCount = isset($totalAssetsRow['total']) ? (int)$totalAssetsRow['total'] : 0;
 
-
 $availableResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status = 'Available'");
 $availableRow = $availableResult->fetch_assoc();
 $availableCount = isset($availableRow['total']) ? (int)$availableRow['total'] : 0;
-
 
 $checkedOutResult = $conn->query("SELECT COUNT(asset_id) AS total FROM assets WHERE status = 'Checked Out'");
 $checkedOutRow = $checkedOutResult->fetch_assoc();
 $checkedOutCount = isset($checkedOutRow['total']) ? (int)$checkedOutRow['total'] : 0;
 
+// *** PEMBETULAN SQL UTAMA: Tambah JOIN ke jadual reservations (r) ***
+$overdueSql = "
+    SELECT COUNT(DISTINCT ri.id) AS total 
+    FROM reservation_items ri 
+    JOIN reservations r ON ri.reserve_id = r.reserve_id 
+    WHERE ri.status = 'Checked Out' AND r.return_date < CURDATE()
+";
+$overdueResult = $conn->query($overdueSql);
+// -------------------------------------------------------------------
 
-$overdueResult = $conn->query("SELECT COUNT(DISTINCT ri.id) AS total FROM reservation_items ri WHERE ri.status = 'Checked Out' AND ri.return_date < CURDATE()");
 $overdueRow = $overdueResult->fetch_assoc();
 $overdueCount = isset($overdueRow['total']) ? (int)$overdueRow['total'] : 0;
-
 
 $sql_maintenance_count = "SELECT COUNT(*) AS maintenance_count FROM assets WHERE status = 'Maintenance'";
 $result_maintenance = $conn->query($sql_maintenance_count);
 $maintenance_count = ($result_maintenance && $result_maintenance->num_rows > 0) ? $result_maintenance->fetch_assoc()['maintenance_count'] : 0;
 
-
-
-
-
-
-
+// --- Ambil Butiran Aset (Tiada perubahan) ---
 $total_assets_details = fetch_asset_details($conn, "a.status NOT IN ('Broken', 'Decommissioned', 'Missing')");
-
-
 $available_assets_details = fetch_asset_details($conn, "a.status = 'Available'");
 
-
+// Kueri aset yang telah dikeluarkan (Checked Out) - (Tiada perubahan)
 $checked_out_sql = "
     SELECT
         a.asset_id, a.asset_code, a.status,
         i.item_name, c.category_name,
         u.name as user_name,
-        ri.return_date
+        r.return_date
     FROM assets a
     LEFT JOIN item i ON a.item_id = i.item_id
     LEFT JOIN categories c ON i.category_id = c.category_id
@@ -131,11 +120,11 @@ $checked_out_sql = "
 $checked_out_result = $conn->query($checked_out_sql);
 $checked_out_details = $checked_out_result ? $checked_out_result->fetch_all(MYSQLI_ASSOC) : [];
 
-
+// Kueri butiran aset yang telah luput (Overdue) - (Tiada perubahan, kueri ini sudah betul)
 $overdue_details_sql = "
     SELECT
         ri.id AS reservation_item_id, u.name AS user_name, u.phoneNum AS user_phone, i.item_name,
-        ri.return_date, DATEDIFF(CURDATE(), ri.return_date) AS days_overdue,
+        r.return_date, DATEDIFF(CURDATE(), r.return_date) AS days_overdue,
         GROUP_CONCAT(DISTINCT a.asset_code SEPARATOR ', ') AS assigned_assets
     FROM reservation_items ri
     JOIN reservations r ON ri.reserve_id = r.reserve_id
@@ -143,19 +132,14 @@ $overdue_details_sql = "
     JOIN item i ON ri.item_id = i.item_id
     LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
     LEFT JOIN assets a ON ra.asset_id = a.asset_id
-    WHERE ri.status = 'Checked Out' AND ri.return_date < CURDATE()
-    GROUP BY ri.id ORDER BY ri.return_date ASC ";
+    WHERE ri.status = 'Checked Out' AND r.return_date < CURDATE()
+    GROUP BY ri.id ORDER BY r.return_date ASC ";
 $overdue_details_result = $conn->query($overdue_details_sql);
 $overdue_details = $overdue_details_result ? $overdue_details_result->fetch_all(MYSQLI_ASSOC) : [];
 
-
 $maintenance_assets_details = fetch_asset_details($conn, "a.status = 'Maintenance'");
 
-
-
-
-
-
+// --- Data Carta (Tiada perubahan) ---
 $chart_sql = "
     SELECT 
         c.category_name, 
@@ -179,27 +163,23 @@ foreach ($chart_data as $row) {
 }
 $totalLoans = array_sum($chartValues);
 
-
-
-
-
-
+// --- Data Kalendar (Tiada perubahan) ---
 $events = []; 
 
-$historySql = "SELECT ri.quantity, ri.reserve_date, ri.return_date, ri.status,
+$historySql = "SELECT ri.quantity, r.reserve_date, r.return_date, ri.status,
                        u.name AS username, i.item_name
                 FROM reservation_items ri
                 JOIN reservations r ON ri.reserve_id = r.reserve_id
                 JOIN person u ON r.person_id = u.person_id
                 JOIN item i ON ri.item_id = i.item_id
                 WHERE ri.status IN ('Approved', 'Checked Out')
-                ORDER BY ri.reserve_date ASC";
+                ORDER BY r.reserve_date ASC";
 $historyResult = $conn->query($historySql);
 
 if ($historyResult) {
     while ($h = $historyResult->fetch_assoc()) {
         
-        
+        // Acara Tempahan
         $events[] = [
             'title' => "{$h['item_name']} ({$h['quantity']}) - {$h['username']}",
             'start' => date('Y-m-d', strtotime($h['reserve_date'])),
@@ -208,7 +188,7 @@ if ($historyResult) {
             'description' => 'Reservation'
         ];
 
-        
+        // Tempoh Buffer
         if ($h['status'] === 'Checked Out' && !empty($h['return_date'])) {
             $bufferStartDate = date('Y-m-d', strtotime($h['return_date'] . ' +1 day'));
             $bufferEndDate = date('Y-m-d', strtotime($h['return_date'] . ' +2 days')); 
@@ -227,8 +207,9 @@ if ($historyResult) {
     error_log("Error fetching reservation history for calendar: " . $conn->error);
 }
 
+// --- Pemberitahuan (Tiada perubahan) ---
 $tech_id = (int) $_SESSION['person_id']; 
-$tech_role_id = 2; 
+$tech_role_id = 2; // Anda menetapkan ID peranan Juruteknik kepada 2
 
 $sql_notif = "SELECT n.*
               FROM notifications n
@@ -253,22 +234,18 @@ if (!$stmt_notif) {
 
 $new_notif_count = count($new_notifications);
 
-
-
-
-
+// --- Pengekodan JSON (Tiada perubahan) ---
 $total_assets_details_json = json_encode($total_assets_details);
 $available_assets_details_json = json_encode($available_assets_details);
 $checked_out_details_json = json_encode($checked_out_details);
 $overdue_details_json = json_encode($overdue_details);
 $maintenance_assets_details_json = json_encode($maintenance_assets_details);
 $events_json = json_encode($events);
-
-
 $new_notifications_json = json_encode($new_notifications);
 
 $conn->close(); 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

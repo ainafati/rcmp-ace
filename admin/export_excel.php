@@ -28,22 +28,42 @@ if ($export_type === 'returns') {
     $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
     $report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
-    $header_row = array('Borrower Name', 'Item Name', 'Asset Code', 'Item Type', 'Asset Issuance Date', 'Asset Return Date', 'Return Condition', 'Responsible Officer');
+    // 2. KEMAS KINI HEADER CSV (Ditambah 2 lajur)
+    $header_row = array(
+        'Borrower Name', 
+        'Item Name', 
+        'Asset Code', 
+        'Category Name', 
+        'Reserve Date', 
+        'Return Date', 
+        'Return Condition', 
+        'Approved By',
+        'Checked Out By', // <<< BARIS BARU
+        'Checked In By'   // <<< BARIS BARU
+    );
 
-    $sql_select = "u.name AS user_name, i.item_name, a.asset_code, c.category_name, ri.reserve_date, ri.return_date, ri.return_condition, handler.name AS handled_by_name";
+    // 1. KEMAS KINI SQL SELECT (Ditambah 2 nama)
+    $sql_select = "u.name AS user_name, i.item_name, a.asset_code, c.category_name, r.reserve_date, r.return_date, ri.return_condition, handler.name AS approved_by_name, checkout.name AS checked_out_by_name, checkin.name AS checked_in_by_name";
     
     $sql_from_where = "FROM reservation_items ri
         JOIN reservations r ON ri.reserve_id = r.reserve_id
         JOIN person u ON r.person_id = u.person_id
         JOIN item i ON ri.item_id = i.item_id
-        JOIN categories c ON i.category_id = c.category_id
+        
+        -- Menggunakan categories & category_id (berdasarkan pembetulan terakhir)
+        JOIN categories c ON i.category_id = c.category_id 
+        
         LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
         LEFT JOIN assets a ON ra.asset_id = a.asset_id
-        LEFT JOIN person handler ON ri.approved_by = handler.person_id";
+        
+        LEFT JOIN person handler ON ri.approved_by = handler.person_id
+        LEFT JOIN person checkout ON ri.checked_out_by = checkout.person_id   -- <<< JOIN DITAMBAH
+        LEFT JOIN person checkin ON ri.checked_in_by = checkin.person_id     -- <<< JOIN DITAMBAH
+        ";
         
     $where_clauses = array(
         "ri.status = 'Returned'",
-        "ri.return_date BETWEEN ? AND ?"
+        "r.return_date BETWEEN ? AND ?"
     );
     $param_types = "ss";
     $param_values = array($report_start_date, $report_end_date);
@@ -55,10 +75,10 @@ if ($export_type === 'returns') {
     }
     
     $sql_from_where .= " WHERE " . implode(' AND ', $where_clauses);
-    $sql_order = " ORDER BY ri.return_date DESC";
+    $sql_order = " ORDER BY r.return_date DESC";
 
 } elseif ($export_type === 'activity') {
-    
+    // Bahagian activity log kekal sama
     $filename_prefix = "activity_log";
     $log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : date('Y-m-d', strtotime('-7 days'));
     $log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
@@ -96,7 +116,9 @@ if ($export_type === 'returns') {
 }
 
 
-
+// ------------------------------------------------------------------------
+// 3. EXECUTION & CSV OUTPUT
+// ------------------------------------------------------------------------
 
 $sql_full = "SELECT " . $sql_select . " " . $sql_from_where . $sql_order;
 
@@ -105,19 +127,21 @@ if ($stmt === false) { die("SQL Error: " . htmlspecialchars($conn->error)); }
 
 
 if (!empty($param_values)) {
-    $bind_params = array();
-    $bind_params[] = $param_types;
-    for ($i = 0; $i < count($param_values); $i++) {
-        $bind_params[] = &$param_values[$i];
+    $bind_params = array($param_types);
+    foreach ($param_values as $key => $value) {
+        $bind_params[] = &$param_values[$key]; 
     }
-    call_user_func_array(array($stmt, 'bind_param'), $bind_params);
+    
+    if (!call_user_func_array(array($stmt, 'bind_param'), $bind_params)) {
+         die("Binding parameters failed: " . htmlspecialchars($stmt->error));
+    }
 }
 
 $stmt->execute();
 $result = $stmt->get_result();
 
 
-
+// CSV Headers
 $filename = $filename_prefix . "_" . date('Y-m-d') . ".csv";
 header('Content-Type: text/csv; charset=utf-8');    
 header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -130,15 +154,18 @@ fputcsv($output, $header_row);
 while ($row = $result->fetch_assoc()) {
     if ($export_type === 'returns') {
         
+        // 3. KEMAS KINI OUTPUT CSV (Ditambah 2 nilai)
         fputcsv($output, array(
             $row['user_name'],
             $row['item_name'],
             $row['asset_code'],
             $row['category_name'],
-            $row['reserve_date'],    
-            $row['return_date'],      
+            $row['reserve_date'],      
+            $row['return_date'],       
             $row['return_condition'],
-            $row['handled_by_name']    
+            $row['approved_by_name'],
+            $row['checked_out_by_name'], // <<< NILAI BARU
+            $row['checked_in_by_name']   // <<< NILAI BARU
         ));
     } elseif ($export_type === 'activity') {
         
@@ -158,4 +185,4 @@ $stmt->close();
 fclose($output);
 $conn->close();    
 exit();
-?>
+// TIADA TAG PENUTUP ?>

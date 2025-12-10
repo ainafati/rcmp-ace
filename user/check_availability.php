@@ -1,11 +1,10 @@
 <?php
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-include '../config.php'; // Gantikan dengan fail sambungan DB anda
+include '../config.php'; 
 
 header('Content-Type: application/json');
 
-// PERUBAHAN UTAMA: Menerima item_id, reserve_date, dan return_date
 if (!isset($_POST['item_id'], $_POST['reserve_date'], $_POST['return_date'])) {
     echo json_encode(['success' => false, 'message' => 'Incomplete data received (Missing item ID or dates).', 'available_quantity' => 0]);
     exit();
@@ -57,21 +56,22 @@ try {
     }
     $stmt_stock->close();
     
-    // 3. Kira Kuantiti Ditempah (Bertindih dengan tempoh masa diminta)
-    // Status 'Approved' dan 'Checked Out' dianggap telah mengambil stok.
+    // 3. Kira Kuantiti Item yang telah disahkan/dikeluarkan (Booked) dalam tempoh masa
     $booked_during_period = 0;
     $sql_booked = "
         SELECT COALESCE(SUM(ri.quantity), 0) as booked_qty
         FROM reservation_items ri
+        JOIN reservations r ON ri.reserve_id = r.reserve_id  
         WHERE ri.item_id = ?
         AND ri.status IN ('Approved', 'Checked Out')
-        AND ri.reserve_date <= ?
-        AND ri.return_date >= ?";
+        /* Perubahan DB: Menggunakan r.reserve_date dan r.return_date dari jadual reservations (r) */
+        AND r.reserve_date <= ?
+        AND r.return_date >= ?";
     
     $stmt_booked = $conn->prepare($sql_booked);
     if (!$stmt_booked) throw new Exception("Prepare failed (count booked): " . $conn->error);
     
-    // Urutan bind_param: item_id (i), return_date (s), reserve_date (s)
+    
     $stmt_booked->bind_param("iss", $item_id, $return_date, $reserve_date);
     $stmt_booked->execute();
     $result_booked = $stmt_booked->get_result();

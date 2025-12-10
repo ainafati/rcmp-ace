@@ -68,7 +68,7 @@ if ($stmt_count = $conn->prepare($sql_count)) {
 
 
 $history = [];
-$sql = "SELECT ri.id AS reservation_item_id, i.item_name, ri.reserve_date, ri.return_date, ri.reason, ri.status, ri.quantity
+$sql = "SELECT ri.id AS reservation_item_id, i.item_name, r.reserve_date, r.return_date, r.reason, ri.status, ri.quantity
         FROM reservations r
         JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
         JOIN item i ON ri.item_id = i.item_id

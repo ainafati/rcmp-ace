@@ -13,7 +13,7 @@ $user_id = (int)$_SESSION['person_id'];
 $events = [];
 
 
-$sql = "SELECT i.item_name, ri.reserve_date, ri.return_date, ri.status
+$sql = "SELECT i.item_name, r.reserve_date, r.return_date, ri.status
         FROM reservations r
         JOIN reservation_items ri ON r.reserve_id = ri.reserve_id
         JOIN item i ON ri.item_id = i.item_id

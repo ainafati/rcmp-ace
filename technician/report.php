@@ -62,9 +62,10 @@ $start = ($page - 1) * $limit;
 
 
 // KUERI SQL UNTUK 3 LAJUR STAF
+// *** PERUBAHAN DI SINI: Tukar ri.reserve_date dan ri.return_date kepada r.reserve_date dan r.return_date ***
 $sql_base_select = "SELECT
              u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-             ri.reserve_date, ri.return_date, ri.return_condition,
+             r.reserve_date, r.return_date, ri.return_condition,
              approver.name AS approved_by_name, 
              checkout.name AS checked_out_by_name, 
              checkin.name AS checked_in_by_name";
@@ -81,11 +82,12 @@ $sql_base_from = " FROM reservation_items ri
              
              LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
              LEFT JOIN assets a ON ra.asset_id = a.asset_id";
-				
+                
 
 $sql_where_clauses = [
     "ri.status = 'Returned'",
-    "ri.return_date BETWEEN ? AND ?"
+    // *** PERUBAHAN DI SINI: Menggunakan r.return_date untuk penapisan tarikh ***
+    "r.return_date BETWEEN ? AND ?" 
 ];
 $param_types = "ss";
 $param_values = [$start_date, $end_date];
@@ -128,7 +130,7 @@ $total_pages = ceil($total_records / $limit);
 $stmt_count->close();
 
 
-$sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY ri.return_date DESC, a.asset_code ASC LIMIT ?, ?";
+$sql = $sql_base_select . $sql_base_from . $sql_where . " ORDER BY r.return_date DESC, a.asset_code ASC LIMIT ?, ?"; // Guna r.return_date untuk sorting juga
 $param_types .= "ii";
 $param_values[] = $start;
 $param_values[] = $limit;
@@ -370,8 +372,8 @@ $pagination_params = http_build_query([
                             <?php endforeach; endif; ?>
                         </select>
                     </div>
-					
-					<div class="col-md-3 col-6">
+                    
+                    <div class="col-md-3 col-6">
                         <label for="asset_code_filter" class="form-label fw-bold">Filter by Asset Code</label>
                         <input type="text" id="asset_code_filter" name="asset_code" class="form-control" 
                             value="<?= htmlspecialchars($asset_filter_code) ?>" placeholder="e.g., LCT-001">
@@ -420,7 +422,7 @@ $pagination_params = http_build_query([
                             <th>Return Date</th>
                             <th class="d-none d-lg-table-cell">Approved By</th>
                             <th class="d-none d-lg-table-cell">Check Out By</th>
-							<th class="d-none d-lg-table-cell">Check In By</th>
+                            <th class="d-none d-lg-table-cell">Check In By</th>
                         </tr>
                     </thead>
                     <tbody>

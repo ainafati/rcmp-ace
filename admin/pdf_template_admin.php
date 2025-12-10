@@ -87,16 +87,14 @@
 
     <table>
         <thead>
-            <tr>
-                <th style="width: 4%;">No</th>            
-                <th style="width: 15%;">Borrower's Name</th>      
-                <th style="width: 23%;">Asset Code & Item Type</th>  
-                <th style="width: 10%;">Asset Issuance Date</th>    
-                <th style="width: 10%;">Asset Return Date</th>    
-                <th style="width: 8%;">Loan Duration</th>        
-                <th style="width: 10%;">Return Condition</th>
-                <th style="width: 17%;">Responsible Officer</th> 
-                </tr>
+    <tr>
+        <th style="width: 4%;">No</th>          
+        <th style="width: 11%;">Borrower's Name</th>     
+        <th style="width: 20%;">Asset Code & Item Type</th> 
+        <th style="width: 8%;">Reserve Date</th>     
+        <th style="width: 8%;">Return Date</th>     
+        <th style="width: 9%;">Return Condition</th>
+        <th style="width: 12%;">Approved By</th>    <th style="width: 10%;">Checked Out By</th>   <th style="width: 10%;">Checked In By</th>    </tr>
         </thead>
         <tbody>
             {{table_rows}}

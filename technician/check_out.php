@@ -25,10 +25,10 @@ function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $status_placeholders = implode(',', array_fill(0, count($statuses), '?'));
 
     $sql = "SELECT
-                ri.id AS reservation_item_id, ri.status, ri.quantity, ri.reserve_date, ri.return_date,
+                ri.id AS reservation_item_id, ri.status, ri.quantity, r.reserve_date, r.return_date,
                 r.created_at AS apply_date, 
                 r.priority, r.reserve_id, /* <<< KOMA DITAMBAH DI SINI */
-                ri.reason AS reservation_reason,
+                r.reason AS reservation_reason,
                 u.name AS user_name, u.phoneNum AS user_phone,
                 u.person_id AS user_person_id,
                 i.item_name, i.item_id

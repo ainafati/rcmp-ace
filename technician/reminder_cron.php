@@ -24,43 +24,53 @@ if ($conn->connect_error) {
     exit();
 }
 
+// ------------------------------------------------------------------------
+// FUNGSI SQL (DIUBAH UNTUK MENGGUNAKAN r.reserve_date dan r.return_date)
+// ------------------------------------------------------------------------
 
+/**
+ * Mengambil item yang belum dipulangkan yang matang pada tarikh sasaran.
+ */
 function get_return_items_due($conn, $days_offset) {
     $target_date_sql = $days_offset == 0 ? "CURDATE()" : "DATE_ADD(CURDATE(), INTERVAL $days_offset DAY)";
     
     $sql = "SELECT
-                ri.id, ri.reserve_date, ri.return_date, ri.quantity,
+                ri.id, r.reserve_date, r.return_date, ri.quantity,
                 u.name AS user_name, u.email AS user_email, u.phoneNum AS user_phone,
                 i.item_name
             FROM reservation_items ri
             JOIN reservations r ON ri.reserve_id = r.reserve_id
             JOIN person u ON r.person_id = u.person_id
             JOIN item i ON ri.item_id = i.item_id
-            WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) = $target_date_sql";
+            -- Perubahan: Menggunakan r.return_date
+            WHERE ri.status = 'Checked Out' AND DATE(r.return_date) = $target_date_sql";
             
     $result = $conn->query($sql);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
+/**
+ * Mengambil item yang belum dipulangkan yang sudah tamat tempoh.
+ */
 function get_overdue_items($conn) {
     $sql = "SELECT
-                ri.id, ri.reserve_date, ri.return_date, ri.quantity,
+                ri.id, r.reserve_date, r.return_date, ri.quantity,
                 u.name AS user_name, u.email AS user_email, u.phoneNum AS user_phone,
                 i.item_name
             FROM reservation_items ri
             JOIN reservations r ON ri.reserve_id = r.reserve_id
             JOIN person u ON r.person_id = u.person_id
             JOIN item i ON ri.item_id = i.item_id
-            WHERE ri.status = 'Checked Out' AND DATE(ri.return_date) < CURDATE()";
+            -- Perubahan: Menggunakan r.return_date
+            WHERE ri.status = 'Checked Out' AND DATE(r.return_date) < CURDATE()";
             
     $result = $conn->query($sql);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-
-
-
-
+// ------------------------------------------------------------------------
+// FUNGSI PENGHANTARAN EMAIL (KEKAL SAMA)
+// ------------------------------------------------------------------------
 
 function send_email_notification($recipient_email, $recipient_name, $items, $is_today, $is_overdue = false) {
     $mail = new PHPMailer(true);
@@ -104,21 +114,22 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
             $item_list_html .= '<tr>';
             $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px;">' . htmlspecialchars($item['item_name']) . '</td>';
             $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px; text-align: center;">' . htmlspecialchars($item['quantity']) . ' unit(s)</td>';
-            $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px; text-align: center;">' . date('d M Y', strtotime($item['return_date'])) . '</td>';
+            // r.return_date kini dipaparkan di sini
+            $item_list_html .= '<td style="border: 1px solid #ddd; padding: 10px; text-align: center;">' . date('d M Y', strtotime($item['return_date'])) . '</td>'; 
             $item_list_html .= '</tr>';
         }
         $item_list_html .= '</tbody></table>';
         
         
         $body = "
-            <p style='font-family: Arial, sans-serif;'>Dear <strong>" . htmlspecialchars($recipient_name) . "</strong>,</p>
-            <p style='font-family: Arial, sans-serif;'>This is an official and automated notice from the UniKL Inventory Management System regarding items currently in your possession. We wish to inform you that the item(s) listed below are <strong>due for return on $date_str</strong>.</p>
-            <h3 style='font-family: Arial, sans-serif; color: #004d99;'>Item Return Details:</h3>
-            " . $item_list_html . "
-            <p style='font-family: Arial, sans-serif; margin-top: 20px;'>We kindly request your cooperation in ensuring these items are returned to the UniKL Technical Department <strong>promptly</strong>.</p>
-            <p style='font-family: Arial, sans-serif;'>Sincerely,</p>
-            <p style='font-family: Arial, sans-serif;'><strong>The UniKL Inventory Management Department</strong></p>
-        ";
+             <p style='font-family: Arial, sans-serif;'>Dear <strong>" . htmlspecialchars($recipient_name) . "</strong>,</p>
+             <p style='font-family: Arial, sans-serif;'>This is an official and automated notice from the UniKL Inventory Management System regarding items currently in your possession. We wish to inform you that the item(s) listed below are <strong>due for return on $date_str</strong>.</p>
+             <h3 style='font-family: Arial, sans-serif; color: #004d99;'>Item Return Details:</h3>
+             " . $item_list_html . "
+             <p style='font-family: Arial, sans-serif; margin-top: 20px;'>We kindly request your cooperation in ensuring these items are returned to the UniKL Technical Department <strong>promptly</strong>.</p>
+             <p style='font-family: Arial, sans-serif;'>Sincerely,</p>
+             <p style='font-family: Arial, sans-serif;'><strong>The UniKL Inventory Management Department</strong></p>
+         ";
 
 
         $mail->isHTML(true);
@@ -135,11 +146,9 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
     }
 }
 
-
-
-
-
-
+// ------------------------------------------------------------------------
+// LOGIK UTAMA CRON JOB (KEKAL SAMA)
+// ------------------------------------------------------------------------
 
 $today_items = get_return_items_due($conn, 0);
 if (!empty($today_items)) {
@@ -191,4 +200,4 @@ if (count($overdue_items) > 0) {
 }
 
 $conn->close();
-?>
+// TIADA TAG PENUTUP ?>

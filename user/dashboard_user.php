@@ -164,12 +164,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $total_pages = ceil($total_rows / $limit); 
 
     $data_sql = "
-        SELECT ri.id, i.item_name, ri.reserve_date, ri.status, ri.rejection_reason 
+        SELECT ri.id, i.item_name, r.reserve_date, ri.status, ri.rejection_reason 
         FROM reservation_items ri
         JOIN item i ON ri.item_id = i.item_id
         JOIN reservations r ON ri.reserve_id = r.reserve_id
         WHERE r.person_id = ? $where_clause
-        ORDER BY ri.reserve_date DESC
+        ORDER BY r.reserve_date DESC
         LIMIT ? OFFSET ?
     ";
     
@@ -265,13 +265,13 @@ $stmt_top->close();
 
 $due_date_limit = date('Y-m-d', strtotime('+3 days'));
 $due_soon_sql = "
-    SELECT ri.id, i.item_name, ri.return_date AS due_date  
+    SELECT ri.id, i.item_name, r.return_date AS due_date  
     FROM reservation_items ri
     JOIN item i ON ri.item_id = i.item_id
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     WHERE r.person_id = ? AND (ri.status = 'Approved' OR ri.status = 'Checked Out') 
-    AND ri.return_date IS NOT NULL AND ri.return_date <= ? 
-    ORDER BY ri.return_date ASC 
+    AND r.return_date IS NOT NULL AND r.return_date <= ? 
+    ORDER BY r.return_date ASC 
     LIMIT 3
 ";
 $stmt_due = $conn->prepare($due_soon_sql);
@@ -288,12 +288,12 @@ $stmt_due->close();
 
 
 $newly_approved_sql = "
-    SELECT ri.id, i.item_name, ri.reserve_date 
+    SELECT ri.id, i.item_name, r.reserve_date 
     FROM reservation_items ri
     JOIN item i ON ri.item_id = i.item_id
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     WHERE r.person_id = ? AND ri.status = 'Approved'
-    ORDER BY ri.reserve_date DESC
+    ORDER BY r.reserve_date DESC
     LIMIT 3
 ";
 $stmt_new_approved = $conn->prepare($newly_approved_sql);
@@ -313,12 +313,12 @@ $offset_initial = ($page_initial - 1) * $limit;
 $total_pages_initial = ceil($total / $limit); 
 
 $initial_data_sql = "
-    SELECT ri.id, i.item_name, ri.reserve_date, ri.status, ri.rejection_reason 
+    SELECT ri.id, i.item_name, r.reserve_date, ri.status, ri.rejection_reason 
     FROM reservation_items ri
     JOIN item i ON ri.item_id = i.item_id
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     WHERE r.person_id = ?
-    ORDER BY ri.reserve_date DESC
+    ORDER BY r.reserve_date DESC
     LIMIT ? OFFSET ?
 ";
 $stmt_initial = $conn->prepare($initial_data_sql);
@@ -337,8 +337,8 @@ $calendar_sql = "
     SELECT 
         ri.id, 
         i.item_name, 
-        ri.reserve_date, 
-        ri.return_date, 
+        r.reserve_date, 
+        r.return_date, 
         ri.status
     FROM reservation_items ri
     JOIN item i ON ri.item_id = i.item_id

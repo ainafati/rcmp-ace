@@ -41,10 +41,13 @@ $person_id = (int)$_SESSION['person_id'];
 $admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
 
 
-if ($stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?")) {
+$stmt_admin = null;
+if (isset($_SESSION['admin_id']) && $stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?")) {
+    $admin_id = (int)$_SESSION['admin_id'];
     $stmt_admin->bind_param("i", $admin_id);
     $stmt_admin->execute();
     $stmt_admin->bind_result($aname);
+    $admin = [];
     if ($stmt_admin->fetch()) {
         $admin['name'] = $aname;
     }
@@ -82,7 +85,7 @@ $sql_base_report = "FROM reservation_items ri
 	
 $where_clauses_report = array(
     "ri.status = 'Returned'", 
-    "ri.return_date BETWEEN ? AND ?" 
+    "r.return_date BETWEEN ? AND ?" 
 );
 $param_types_report = "ss";
 $param_values_report = array($report_start_date, $report_end_date);
@@ -126,10 +129,10 @@ if ($stmt_count_report) {
 
 $sql_report = "SELECT
     u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-    ri.reserve_date, ri.return_date, ri.return_condition,
+    r.reserve_date, r.return_date, ri.return_condition,
     p_handler.name AS handler_name
     " . $sql_base_report . $sql_where_report . "
-    ORDER BY ri.return_date DESC
+    ORDER BY r.return_date DESC
     LIMIT ? OFFSET ?";
 
 $param_values_select = array_merge($param_values_report);
@@ -497,40 +500,48 @@ $conn->close();
                         </a>
                         </div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Item Details</th>
-                                    <th>Category</th>
-                                    <th>Borrow Date</th>
-                                    <th>Return Date</th>
-                                    <th>Return Condition</th>
-                                    <th>Handled By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($records)): ?>
-                                    <tr><td colspan="7" class="text-center text-muted py-5">No records found for the selected filters.</td></tr>
-                                <?php else: foreach ($records as $record): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($record['user_name']) ?></td>
-                                        <td>
-                                            <strong><?= htmlspecialchars($record['item_name']) ?></strong>
-                                            <small class="text-muted d-block">Asset: <?= htmlspecialchars($record['asset_code'] ?: 'N/A') ?></small>
-                                        </td>
-                                        <td><?= htmlspecialchars($record['category_name']) ?></td>
-                                        <td><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
-                                        <td><?= date("d M Y", strtotime($record['return_date'])) ?></td>
-                                        <td class="text-muted"><?= htmlspecialchars($record['return_condition'] ?: 'Not specified') ?></td>
-                                        <td><?= htmlspecialchars($record['handler_name'] ?: 'N/A') ?></td>
-                                    </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>USER</th>
+                <th>ITEM DETAILS & STATUS</th>
+                <th>CATEGORY</th>
+                <th>RESERVE DATE</th>
+                <th>RETURN DATE</th>
+                <th>RETURN CONDITION</th>
+                <th>APPROVED BY</th>
+                <th>CHECK OUT BY</th>
+                <th>CHECK IN BY</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($records)): ?>
+                <tr><td colspan="9" class="text-center text-muted py-5">No records found for the selected filters.</td></tr>
+            <?php else: foreach ($records as $record): 
+                $asset_code = htmlspecialchars($record['asset_code'] ?: 'N/A');
+                // Menggunakan handler_name untuk 3 kolom admin/tech sesuai asumsi
+                $handler_name = htmlspecialchars($record['handler_name'] ?: 'N/A');
+            ?>
+                <tr>
+                    <td><?= htmlspecialchars($record['user_name']) ?></td>
+                    <td>
+                        <strong><?= htmlspecialchars($record['item_name']) ?></strong>
+                        <small class="text-muted d-block">Asset: <?= $asset_code ?></small>
+                        </td>
+                    <td><?= htmlspecialchars($record['category_name']) ?></td>
+                    <td><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
+                    <td><?= date("d M Y", strtotime($record['return_date'])) ?></td>
+                    <td class="text-muted"><?= htmlspecialchars($record['return_condition'] ?: 'N/A') ?></td>
                     
+                    <td><?= $handler_name ?></td>
+                    <td><?= $handler_name ?></td>
+                    <td><?= $handler_name ?></td>
+                </tr>
+            <?php endforeach; endif; ?>
+        </tbody>
+    </table>
+</div>                    
                     <nav aria-label="Returned Items Pagination" class="mt-4">
                         <p class="text-center text-muted small mb-2">
                             Showing page <?= $page_returns ?> of <?= $total_pages_returns ?> (Total <?= $total_records_returns ?> records)
