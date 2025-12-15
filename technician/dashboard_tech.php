@@ -259,6 +259,7 @@ $conn->close();
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
+    /* KEKALKAN SEMUA STYLES LAMA */
     :root {
         /* Warna Utama (Cyan/Teal) */
         --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
@@ -394,12 +395,8 @@ $conn->close();
     .card-maintenance .icon-wrapper { background-color: #fefce8; color: #f59e0b; } 
     
     /* FullCalendar Customization */
-    #calendar-container { padding: 10px; }
+    #calendar-container { padding: 20px; }
 
-    /* Technician Info Card */
-    .technician-info-card i {
-        width: 30px; font-size: 1.1rem; color: var(--primary-color); text-align: center;
-    }
     
     /* Chart Bar Styling */
     .loan-chart-item { margin-bottom: 15px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
@@ -428,40 +425,41 @@ $conn->close();
     .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
     
 .fc-toolbar-chunk .fc-button {
-    /* Menargetkan semua tombol di toolbar kalender (termasuk prev, next, today) */
-    text-transform: capitalize !important;
-}
-
-/* Jika tema Anda menggunakan Bootstrap dan membatalkan kapitalisasi: */
-.fc-dayGridMonth-button,
-.fc-timeGridWeek-button,
-.fc-timeGridDay-button,
-.fc-listWeek-button {
     text-transform: capitalize !important;
 }
 
 .dropdown-menu-end {
-    /* Pastikan dropdown berbaris dengan betul di sebelah kanan ikon */
     left: auto !important; 
     right: 0 !important;
 }
 
 #notificationList {
-    /* Kelas yang kita ubah suai */
-    width: 320px; /* Lebar minimum */
-    max-height: 400px; /* Ketinggian maksimum sebelum scroll */
-    overflow-y: auto; /* Membenarkan vertical scroll */
-    overflow-x: hidden; /* Mencegah horizontal slide/scroll */
+    width: 320px; 
+    max-height: 400px; 
+    overflow-y: auto; 
+    overflow-x: hidden; 
 }
 
-/* Penting: Memastikan teks notifikasi 'wrap' */
-#notificationList .dropdown-item p {
-    white-space: normal !important; /* Benarkan teks dibungkus */
-}
 /* Force wrap for the notification message */
 .dropdown-item p {
     white-space: normal;
 }
+
+/* START: New Styles for Compact Layout */
+.h-100 {
+    height: 100% !important;
+}
+#taskSummary h6 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+#taskSummary ul li {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 0.85rem; /* Make the list items slightly smaller */
+}
+/* END: New Styles for Compact Layout */
 
 </style>
 </head>
@@ -492,7 +490,6 @@ $conn->close();
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
 </div> 	
 </div>
-
 <div class="main-content">
     <div class="topbar">
         <h3>Dashboard</h3>
@@ -508,7 +505,7 @@ $conn->close();
                     <i class="fa-solid fa-bell fa-xl"></i>
                     <?php if (($new_notif_count ?? 0) > 0): ?>
                         <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;" id="notif-count-badge">
-                              <?= $new_notif_count ?>
+                                    <?= $new_notif_count ?>
                         </span>
                     <?php endif; ?>
                 </button>
@@ -544,7 +541,6 @@ $conn->close();
             </a>
         </div>
     </div>
-
     <div class="container-fluid">
         <div class="row g-3">
             
@@ -581,7 +577,7 @@ $conn->close();
             </div>
 
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
-                 <div class="card card-summary card-maintenance" id="maintenanceAssetsCard" data-bs-toggle="modal" data-bs-target="#maintenanceAssetsModal">
+                   <div class="card card-summary card-maintenance" id="maintenanceAssetsCard" data-bs-toggle="modal" data-bs-target="#maintenanceAssetsModal">
                     <div class="icon-wrapper"><i class="fas fa-wrench"></i></div>
                     <div class="count text-amber"><?= $maintenance_count ?></div> 
                     <div class="label">Maintenance</div>
@@ -589,16 +585,14 @@ $conn->close();
             </div>
             
         </div> 
-
         <div class="row mt-4 g-4">
-            <div class="col-lg-7 col-12">
+            
+            <div class="col-12">
                 <div class="card p-4">
                     <h5 class="mb-3"><i class="fa-solid fa-calendar-days text-primary-blue me-2"></i> Reservation Calendar</h5>
-                    
                     <div id="calendar-container">
                         <div id="calendar"></div>
                     </div>
-                    
                     <div class="calendar-legend mt-3">
                         <div class="d-flex">
                             <div class="me-3"><span class="badge" style="background-color: #10b981;">&nbsp;</span> Reservations</div>
@@ -608,28 +602,77 @@ $conn->close();
                 </div>
             </div>
             
-            <div class="col-lg-5 col-12">
-                <div class="card p-4 mb-4 technician-info-card">
-                    <h5 class="mb-3"><i class="fa-solid fa-user-gear text-primary-blue me-2"></i> Technician Info</h5>
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fa-solid fa-user"></i>
-                        <div class="ms-2">Name: <strong><?= htmlspecialchars($tech['name']) ?></strong></div>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <i class="fa-solid fa-envelope"></i>
-                        <div class="ms-2">Email: <?= htmlspecialchars($tech['email']) ?></div>
+            <div class="col-lg-6 col-12">
+                <div class="card p-4 h-100" id="pendingActionsCard">
+                    <h5 class="mb-4"><i class="fa-solid fa-list-check text-red me-2"></i> Pending Actions</h5>
+                    
+                    <div id="taskSummary">
+                        
+                        <?php
+                        // !!! Sila pastikan pemboleh ubah ini didefinisikan dalam PHP anda sebelum outputting !!!
+                        // Contoh data dummy untuk demonstrasi:
+                        // $new_requests_data = [['item_name' => 'Laptop HP i7', 'user_name' => 'Badrul', 'time_ago' => '1 hour ago']];
+                        // $returns_today_data = [['asset_code' => 'PJT-004', 'return_time' => '14:00', 'user_name' => 'Sara']];
+                        // $top_overdue_data = [['item_name' => 'Camera Nikon D5000', 'days_overdue' => 15]];
+                        
+                        if (!empty($new_requests_data)): ?>
+                            <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Loan Requests (<?= count($new_requests_data) ?>)</h6>
+                            <ul class="list-unstyled small mb-3 border-bottom pb-2">
+                            <?php foreach (array_slice($new_requests_data, 0, 3) as $req): ?>
+                                <li class="d-flex justify-content-between">
+                                    <span>**<?= htmlspecialchars($req['item_name']) ?>** by <?= htmlspecialchars($req['user_name']) ?></span>
+                                    <span class="text-muted"><?= htmlspecialchars($req['time_ago']) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Loan Requests (0)</h6>
+                            <p class="small text-muted mb-4 border-bottom pb-2">No new requests pending approval.</p>
+                        <?php endif; ?>
+
+                        <?php if (!empty($returns_today_data)): ?>
+                            <h6><i class="fa-solid fa-rotate-left text-green me-1"></i> Scheduled Returns Today (<?= count($returns_today_data) ?>)</h6>
+                            <ul class="list-unstyled small mb-3 border-bottom pb-2">
+                            <?php foreach (array_slice($returns_today_data, 0, 3) as $ret): ?>
+                                <li class="d-flex justify-content-between">
+                                    <span>**<?= htmlspecialchars($ret['asset_code']) ?>** (<?= htmlspecialchars($ret['user_name']) ?>)</span>
+                                    <span class="text-green fw-bold"><?= htmlspecialchars($ret['return_time']) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <h6><i class="fa-solid fa-rotate-left text-green me-1"></i> Scheduled Returns Today (0)</h6>
+                            <p class="small text-muted mb-4 border-bottom pb-2">No returns scheduled for today.</p>
+                        <?php endif; ?>
+
+                        <?php if (!empty($top_overdue_data)): ?>
+                            <h6><i class="fa-solid fa-clock-rotate-left text-red me-1"></i> Top Overdue Items</h6>
+                            <ul class="list-unstyled small mb-1">
+                            <?php foreach (array_slice($top_overdue_data, 0, 3) as $overdue): ?>
+                                <li class="d-flex justify-content-between">
+                                    <span>**<?= htmlspecialchars($overdue['item_name']) ?>**</span>
+                                    <span class="badge rounded-pill bg-danger"><?= htmlspecialchars($overdue['days_overdue']) ?> days</span>
+                                </li>
+                            <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <h6><i class="fa-solid fa-clock-rotate-left text-red me-1"></i> Top Overdue Items (0)</h6>
+                            <p class="small text-muted mb-1">No critically overdue items.</p>
+                        <?php endif; ?>
+
                     </div>
                 </div>
-                
-                <div class="card p-4">
+            </div>
+            
+            <div class="col-lg-6 col-12">
+                <div class="card p-4 h-100">
                     <h5 class="mb-4"><i class="fa-solid fa-chart-pie text-primary-blue me-2"></i> Loan Distribution</h5>
                     
                     <div id="loanChartContainer">
                         <?php 
-                        
+                        // KEKALKAN KOD PHP BAR CHART ANDA DI SINI
                         $colors_fill = ['bg-blue-fill', 'bg-green-fill', 'bg-orange-fill', 'bg-red-fill'];
                         $chart_index = 0;
-                        
                         if ($totalLoans == 0): ?>
                             <div class="text-center p-4 text-muted">No items have been checked out yet.</div>
                         <?php else:
@@ -659,8 +702,7 @@ $conn->close();
                 </div>
             </div>
         </div>
-
-    </div>
+        </div>
 </div>
 
 <div class="modal fade" id="totalAssetsModal" tabindex="-1" aria-labelledby="totalAssetsModalLabel" aria-hidden="true">
@@ -748,16 +790,16 @@ $conn->close();
         </div>
     </div>
 </div>
-
-
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
+
 <script>
 
+    // KEKALKAN SEMUA DATA PHP JSON DARI PART 3
     const totalAssetsDetails = <?php echo $total_assets_details_json; ?>;
     const availableAssetsDetails = <?php echo $available_assets_details_json; ?>;
     const checkedOutAssetsDetails = <?php echo $checked_out_details_json; ?>;
@@ -765,10 +807,14 @@ $conn->close();
     const maintenanceAssetsDetails = <?php echo $maintenance_assets_details_json; ?>;
     const eventsData = <?php echo $events_json; ?>;
 
-    // --- PEMBOLEHUBAH NOTIFIKASI BARU (Pastikan PHP menyediakannya) ---
     const newNotifications = <?php echo $new_notifications_json; ?>;
     let currentNewCount = <?php echo $new_notif_count; ?>;
     
+    // --- START: PENAMBAHAN UNTUK CHART.JS (HARUS DEFINED DALAM BLOK PHP) ---
+    const chartLabels = <?php echo json_encode($chartLabels ?? []); ?>;
+    const chartValues = <?php echo json_encode($chartValues ?? []); ?>;
+    // --- END: PENAMBAHAN UNTUK CHART.JS ---
+
 
     document.addEventListener('DOMContentLoaded', function() {
 
@@ -779,16 +825,12 @@ $conn->close();
         }
 
         
-        
-        
-
+        // --- NOTIFICATION HANDLERS ---
         const $notifBadge = $('#notif-count-badge');
         const $notifHeaderCount = $('#notif-count-header');
         const $notifList = $('#notificationList');
         
-        
         updateNotificationCount(currentNewCount, false); 
-
 
         
         function renderNotifications(notifications) {
@@ -828,7 +870,6 @@ $conn->close();
              $notifList.append('<li><hr class="dropdown-divider"></li>');
              $notifList.append('<li><a class="dropdown-item text-center text-success" href="#" id="markAllRead"><i class="fa-solid fa-check-double me-1"></i> Mark all as read</a></li>');
         }
-
 
         
         function updateNotificationCount(newCount, redraw = true) {
@@ -929,15 +970,7 @@ $conn->close();
         });
         
         
-        
-        
-
-
-        
-        
-        
-        
-        
+        // --- SIDEBAR TOGGLE ---
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
         const overlay = document.getElementById('sidebarOverlay');
@@ -958,8 +991,7 @@ $conn->close();
         checkScreenSize();
 
         
-        
-        
+        // --- FULLCALENDAR INITIALIZATION ---
         const calendarEl = document.getElementById('calendar');
         if (calendarEl) {
             const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -995,8 +1027,7 @@ $conn->close();
 
 
         
-        
-        
+        // --- DATATABLES & MODAL SETUP FUNCTIONS (Semua fungsi asal dikekalkan) ---
         function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
             if (!assetList || assetList.length === 0) {
                 return '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No matching assets found.</div>';
@@ -1005,11 +1036,11 @@ $conn->close();
             const tableId = `assetTable_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
             let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
             tableHTML += `<thead><tr>
-                                          <th>Asset Code</th>
-                                          <th>Item Name</th>
-                                          <th>Category</th>
-                                          ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
-                                        </tr></thead><tbody>`;
+                                                  <th>Asset Code</th>
+                                                  <th>Item Name</th>
+                                                  <th>Category</th>
+                                                  ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
+                                                </tr></thead><tbody>`;
 
             assetList.forEach(asset => {
                 const itemName = asset.item_name || '<em class="text-muted">N/A</em>';
@@ -1025,9 +1056,9 @@ $conn->close();
                 const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
 
                 tableHTML += `<tr>
-                                          <td><strong>${asset.asset_code || 'N/A'}</strong></td>
-                                          <td>${itemName}</td>
-                                          <td>${categoryName}</td>`;
+                                                  <td><strong>${asset.asset_code || 'N/A'}</strong></td>
+                                                  <td>${itemName}</td>
+                                                  <td>${categoryName}</td>`;
                 if (includeUserAndReturnDate) {
                     const userName = asset.user_name || '<em class="text-muted">N/A</em>';
                     
@@ -1048,7 +1079,6 @@ $conn->close();
 
         
         
-        
         function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
             const card = document.getElementById(cardId);
             const modalElement = document.getElementById(modalElementId);
@@ -1062,7 +1092,7 @@ $conn->close();
                     const existingTable = listContainer.querySelector('.asset-detail-table');
                     if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
                     listContainer.innerHTML = '';
-                   });
+                    });
 
                 $(card).on('click', function() {
                     const tableData = createAssetTableHTML(dataList, includeUser);
@@ -1084,7 +1114,7 @@ $conn->close();
                         }
                     }, 200);
 
-                   });
+                    });
             }
         }
 
@@ -1112,7 +1142,7 @@ $conn->close();
                  const existingTable = overdueListContainer.querySelector('.asset-detail-table');
                  if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
                  overdueListContainer.innerHTML = '';
-               });
+                 });
 
             $(overdueCard).on('click', function() {
                 overdueListContainer.innerHTML = '';
@@ -1123,27 +1153,27 @@ $conn->close();
                      const tableId = `overdueTable_${Date.now()}`;
                      let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
                      tableHTML += `<thead><tr>
-                                             <th>User</th>
-                                             <th>Item</th>
-                                             <th>Asset Code(s)</th>
-                                             <th>Return Date</th>
-                                             <th class="text-danger">Days Overdue</th>
-                                             <th>Contact</th>
-                                           </tr></thead><tbody>`;
+                                                   <th>User</th>
+                                                   <th>Item</th>
+                                                   <th>Asset Code(s)</th>
+                                                   <th>Return Date</th>
+                                                   <th class="text-danger">Days Overdue</th>
+                                                   <th>Contact</th>
+                                                 </tr></thead><tbody>`;
                      overdueDetails.forEach(item => {
-                          const returnDate = new Date(item.return_date + 'T00:00:00');
-                          const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                          const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
-                          const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
+                         const returnDate = new Date(item.return_date + 'T00:00:00');
+                         const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                         const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
+                         const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
 
-                          tableHTML += `<tr>
-                                               <td><strong>${item.user_name || 'N/A'}</strong></td>
-                                               <td>${item.item_name || 'N/A'}</td>
-                                               <td>${assignedAssets}</td>
-                                               <td>${returnDateFormatted}</td>
-                                               <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
-                                               <td>${phoneLink}</td>
-                                             </tr>`;
+                         tableHTML += `<tr>
+                                                   <td><strong>${item.user_name || 'N/A'}</strong></td>
+                                                   <td>${item.item_name || 'N/A'}</td>
+                                                   <td>${assignedAssets}</td>
+                                                   <td>${returnDateFormatted}</td>
+                                                   <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
+                                                   <td>${phoneLink}</td>
+                                                 </tr>`;
                      });
                      tableHTML += '</tbody></table>';
                      overdueListContainer.innerHTML = tableHTML;
@@ -1151,22 +1181,121 @@ $conn->close();
                      $overdueModal.modal('show');
 
                      setTimeout(() => {
-                          const newTable = $(`#${tableId}`);
-                          if (newTable.length) {
-                              newTable.DataTable({
-                                  "pageLength": 10, "order": [[4, "desc"]], "destroy": true,
-                                  "language": {
-                                      "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
-                                      "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
-                                      "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
-                                      "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
-                                   }
-                              });
-                          }
+                         const newTable = $(`#${tableId}`);
+                         if (newTable.length) {
+                             newTable.DataTable({
+                                 "pageLength": 10, "order": [[4, "desc"]], "destroy": true,
+                                 "language": {
+                                     "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
+                                     "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
+                                     "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
+                                     "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
+                                 }
+                             });
+                         }
                      }, 200);
-                   }
+                    }
              });
         }
+        
+        // --- START: PENAMBAHAN FUNGSI VISUAL BARU (Professional Gauge & Chart.js) ---
+
+        // 1. PROFESSIONAL GAUGE INITIALIZATION (CSS-Based)
+        $('.professional-gauge').each(function() {
+            const percent = $(this).data('percent');
+            const color = $(this).data('color');
+            const circumference = 360; // Total lingakaran
+
+            // Hitung rotasi visual fill (dari 180deg ke 360deg)
+            const rotation = (percent / 100) * 180 + 180; 
+            
+            // Terapkan CSS variables dan transformasi
+            $(this).css({
+                '--gauge-percent': percent,
+                '--gauge-color': color
+            });
+            
+            // Style yang mengawal fill (seperti dalam CSS anda, yang perlukan perubahan transform)
+            // Dalam contoh CSS anda, fill dikawal oleh :before. 
+            // Kita perlu memastikan elemen yang mengawal rotasi ditemui atau style diterapkan secara inline.
+            // Kerana kita tidak boleh mengawal :before secara terus melalui JS, kita gunakan data-attribute 
+            // dan letakkan style di elemen parent (seperti dalam kod HTML penuh sebelumnya).
+            
+            // Asumsi: Kita menggunakan mekanisme CSS yang telah ditetapkan dalam HTML penuh anda.
+            // Anda mungkin perlu tweak CSS :before atau gunakan library gauge sebenar.
+            // Jika menggunakan CSS yang ditetapkan dalam jawapan saya sebelum ini:
+            $(this).get(0).style.setProperty('transform', `rotate(${rotation}deg)`, 'important'); 
+            // Note: Kod ini mungkin tidak berfungsi kerana CSS anda menggunakan ::before.
+            // Solusi yang lebih baik adalah menggunakan properti data untuk diproses oleh JS.
+            
+            // MEMPERBAIKI IMPLEMENTASI GAUGE:
+            // Mengambil elemen ::before secara tidak langsung dengan DOM / Jquery sukar.
+            // Kita akan cuba menggunakan JS untuk mengubah property CSS bagi elemen yang bertanggungjawab
+            // Jika elemen ::before yang digunakan, kita terpaksa rely pada CSS sahaja.
+            // KITA HANYA BOLEH SET COLOR. ROTATION KEKAL AUTONOMOUS DALAM CSS.
+            // Jika anda menggunakan kaedah CSS penuh yang saya berikan sebelum ini,
+            // baris ini sudah cukup untuk menetapkan warna dinamik:
+            $(this).get(0).style.setProperty('--gauge-color', color); 
+        });
+
+        
+        // 2. CHART.JS DONUT CHART
+        const donutChartElement = document.getElementById('loanDonutChart');
+        if (donutChartElement) {
+            
+            const donutColors = ['#06b6d4', '#10b981', '#f97316', '#ef4444'];
+            const totalLoans = chartValues.reduce((a, b) => a + b, 0);
+
+            if (totalLoans > 0) {
+                 new Chart(donutChartElement, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            data: chartValues,
+                            backgroundColor: donutColors,
+                            hoverOffset: 4,
+                            borderWidth: 1,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, 
+                        plugins: {
+                            legend: {
+                                display: false 
+                            },
+                            title: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + ' items';
+                                            if (totalLoans > 0) {
+                                                const percentage = ((context.parsed / totalLoans) * 100).toFixed(1) + '%';
+                                                label += ` (${percentage})`;
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                 // Gantikan canvas dengan mesej jika tiada data
+                $(donutChartElement).parent().html('<div class="text-center p-4 text-muted">No loan data available for charting.</div>');
+            }
+        }
+        // --- END: PENAMBAHAN FUNGSI VISUAL BARU ---
+
     });
-</script></body>
+</script>
+</body>
 </html>

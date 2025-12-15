@@ -254,136 +254,359 @@ $conn->close();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden;}
-        
-        /* DESKTOP STYLES */
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
-        .sidebar-overlay.active { display: block; }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
-        .topbar .admin-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .admin-name { font-weight: 600; font-size: 15px; color: #334155; }
-        .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: #1e293b; }
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-        .table tbody td { border-bottom: 1px solid #f1f5f9; }
-        .table tbody tr:last-child td { border-bottom: none; }
-        .badge { font-size: 0.8rem; padding: 0.4em 0.6em; }
-        /* Gaya untuk Tab */
-        .nav-tabs { border-bottom: 2px solid #e2e8f0; margin-bottom: 0; }
-        .nav-tabs .nav-link {
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: #64748b;
-            font-weight: 600;
-            padding: 12px 20px;
-            margin-bottom: -2px;
-        }
-        .nav-tabs .nav-link.active {
-            color: #3b82f6;
-            background-color: transparent;
-            border-color: #3b82f6;
-        }
-        .tab-content .tab-pane .card {
-            border-top-left-radius: 0;
-            border-top: none;
-        }
-        /* Gaya untuk Pagination */
-        .pagination .page-item .page-link {
-            border-radius: 8px;
-            margin: 0 3px;
-            border: 1px solid #e2e8f0;
-            color: #3b82f6;
-        }
-        .pagination .page-item.active .page-link {
-            background-color: #3b82f6;
-            border-color: #3b82f6;
-            color: #fff;
-        }
-        .pagination .page-item.disabled .page-link {
-            color: #94a3b8;
-        }
+<style>
+    /* Definisi Pembolehubah CSS */
+    :root {
+        --primary-color: #06b6d4;
+        --primary-hover: #0891b2;
+        --danger-color: #ef4444;
 
-        /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e5e7eb;
+    }
+
+    body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background-color: var(--bg-light-gray); /* Menggunakan pembolehubah */
+        color: #334155;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    /* DESKTOP STYLES */
+    .sidebar {
+        width: 250px;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        background: var(--card-bg); /* Menggunakan pembolehubah */
+        padding: 20px;
+        border-right: 1px solid var(--border-color); /* Menggunakan pembolehubah */
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 30px;
+    }
+
+    .logo-icon {
+        width: 40px;
+        height: 40px;
+        background-color: var(--primary-color); /* Perubahan dari #3b82f6 */
+        color: white;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    .logo-text strong {
+        display: block;
+        font-size: 16px;
+        color: var(--text-dark); /* Menggunakan pembolehubah */
+    }
+
+    .logo-text span {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .sidebar a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--text-muted); /* Menggunakan pembolehubah */
+        text-decoration: none;
+        padding: 12px 15px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 15px;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .sidebar a.active, .sidebar a:hover {
+        background: var(--primary-color); /* Perubahan dari #3b82f6 */
+        color: #fff;
+    }
+
+    .sidebar a.logout-link {
+        color: var(--danger-color); /* Menggunakan pembolehubah */
+        font-weight: 600;
+        margin-top: auto;
+    }
+
+    .sidebar a.logout-link:hover {
+        color: #fff;
+        background: var(--danger-color); /* Menggunakan pembolehubah */
+    }
+
+    .main-content {
+        margin-left: 250px;
+        transition: margin-left 0.3s ease;
+    }
+
+    .topbar {
+        background: var(--card-bg); /* Menggunakan pembolehubah */
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color); /* Menggunakan pembolehubah */
+    }
+
+    .topbar h3 {
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-dark); /* Menggunakan pembolehubah */
+        font-size: 22px;
+    }
+
+    .topbar .admin-profile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .topbar .admin-name {
+        font-weight: 600;
+        font-size: 15px;
+        color: #334155;
+    }
+
+    .container-fluid {
+        padding: 30px;
+    }
+
+    .card {
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        background: var(--card-bg); /* Menggunakan pembolehubah */
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .card h5 {
+        font-weight: 600;
+        color: var(--text-dark); /* Menggunakan pembolehubah */
+    }
+
+    .table thead th {
+        background: var(--bg-light-gray); /* Menggunakan pembolehubah */
+        color: var(--text-muted); /* Menggunakan pembolehubah */
+        border: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+    }
+
+    .table tbody td {
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .badge {
+        font-size: 0.8rem;
+        padding: 0.4em 0.6em;
+    }
+
+    /* Gaya untuk Tab */
+    .nav-tabs {
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 0;
+    }
+
+    .nav-tabs .nav-link {
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted); /* Menggunakan pembolehubah */
+        font-weight: 600;
+        padding: 12px 20px;
+        margin-bottom: -2px;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: var(--primary-color); /* Perubahan dari #3b82f6 */
+        background-color: transparent;
+        border-color: var(--primary-color); /* Perubahan dari #3b82f6 */
+    }
+
+    .tab-content .tab-pane .card {
+        border-top-left-radius: 0;
+        border-top: none;
+    }
+
+    /* Gaya untuk Pagination */
+    .pagination .page-item .page-link {
+        border-radius: 8px;
+        margin: 0 3px;
+        border: 1px solid #e2e8f0;
+        color: var(--primary-color); /* Perubahan dari #3b82f6 */
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: var(--primary-color); /* Perubahan dari #3b82f6 */
+        border-color: var(--primary-color); /* Perubahan dari #3b82f6 */
+        color: #fff;
+    }
+
+    .pagination .page-item.disabled .page-link {
+        color: #94a3b8;
+    }
+
+    /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+    #sidebar-toggle-btn {
+        display: none; /* Default: hide on desktop */
+        background: none;
+        border: none;
+        color: #334155;
+        font-size: 20px;
+        padding: 0;
+        margin-right: 15px;
+    }
+
+    @media (max-width: 768px) {
+        /* GENERAL LAYOUT */
         #sidebar-toggle-btn {
-            display: none; /* Default: hide on desktop */
-            background: none;
-            border: none;
-            color: #334155;
-            font-size: 20px;
-            padding: 0;
-            margin-right: 15px;
+            display: block;
         }
 
-        @media (max-width: 768px) {
-            /* GENERAL LAYOUT */
-            #sidebar-toggle-btn { display: block; }
-            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; width: 100%; }
-            .topbar { padding: 10px 15px; justify-content: flex-start; }
-            .topbar h3 { font-size: 16px; flex-grow: 1; }
-            .topbar .admin-name { display: none; }
-            .topbar .admin-profile { margin-left: auto; }
-            .container-fluid { padding: 10px 5px; }
-            .card { padding: 15px; margin-bottom: 15px; }
-            
-            /* TABS */
-            .nav-tabs .nav-link { padding: 10px 12px; font-size: 14px; }
-
-            /* FILTER FORMS */
-            #reportForm .row, #logForm .row {
-                --bs-gutter-x: 0.5rem;
-            }
-            #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6,
-            #logForm .col-md-3 {
-                width: 100%;
-                margin-bottom: 8px;
-            }
-            .form-label { font-size: 14px; }
-            
-            /* TABLES */
-            .table-responsive { overflow-x: auto; display: block; width: 100%; }
-            .table { width: 100%; min-width: 650px; } /* Force minimum width to enable scrolling */
-            
-            .table thead th {
-                font-size: 10px;
-                padding: 0.5rem 0.3rem;
-                white-space: nowrap;
-            }
-            .table tbody td {
-                padding: 0.4rem 0.3rem;
-                font-size: 14px;
-            }
-            /* Export buttons layout */
-            .d-flex.justify-content-between.align-items-center.mb-3 {
-                flex-direction: column;
-                align-items: flex-start !important;
-                gap: 10px;
-            }
-            .d-flex.justify-content-between.align-items-center.mb-3 > div,
-            .d-flex.justify-content-between.align-items-center.mb-3 > a,
-            .d-flex.justify-content-between.align-items-center.mb-3 > div a {
-                width: 100%;
-                text-align: center;
-            }
-            .d-flex.justify-content-between.align-items-center.mb-3 > div a:first-child {
-                margin-bottom: 5px;
-            }
+        .sidebar {
+            transform: translateX(-100%);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+            z-index: 1050;
         }
-    </style>
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .main-content {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .topbar {
+            padding: 10px 15px;
+            justify-content: flex-start;
+        }
+
+        .topbar h3 {
+            font-size: 16px;
+            flex-grow: 1;
+        }
+
+        .topbar .admin-name {
+            display: none;
+        }
+
+        .topbar .admin-profile {
+            margin-left: auto;
+        }
+
+        .container-fluid {
+            padding: 10px 5px;
+        }
+
+        .card {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        /* TABS */
+        .nav-tabs .nav-link {
+            padding: 10px 12px;
+            font-size: 14px;
+        }
+
+        /* FILTER FORMS */
+        #reportForm .row, #logForm .row {
+            --bs-gutter-x: 0.5rem;
+        }
+
+        #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6,
+        #logForm .col-md-3 {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .form-label {
+            font-size: 14px;
+        }
+
+        /* TABLES */
+        .table-responsive {
+            overflow-x: auto;
+            display: block;
+            width: 100%;
+        }
+
+        .table {
+            width: 100%;
+            min-width: 650px;
+        } /* Force minimum width to enable scrolling */
+
+        .table thead th {
+            font-size: 10px;
+            padding: 0.5rem 0.3rem;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            padding: 0.4rem 0.3rem;
+            font-size: 14px;
+        }
+
+        /* Export buttons layout */
+        .d-flex.justify-content-between.align-items-center.mb-3 {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 10px;
+        }
+
+        .d-flex.justify-content-between.align-items-center.mb-3 > div,
+        .d-flex.justify-content-between.align-items-center.mb-3 > a,
+        .d-flex.justify-content-between.align-items-center.mb-3 > div a {
+            width: 100%;
+            text-align: center;
+        }
+
+        .d-flex.justify-content-between.align-items-center.mb-3 > div a:first-child {
+            margin-bottom: 5px;
+        }
+    }
+</style>
 </head>
 <body>
 
@@ -494,9 +717,9 @@ $conn->close();
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">Returned Items (<?= $total_records_returns ?> records found)</h5>
                         <div>
-                            <a href="generate_pdf_admin.php?start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i>Export as PDF</a>
+                            <a href="generate_pdf_admin.php?start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i></a>
                             <a href="export_excel.php?export=returns&start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-success">
-                            <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
+                            <i class="fa-solid fa-file-excel me-2"></i>
                         </a>
                         </div>
                     </div>
@@ -605,7 +828,7 @@ $conn->close();
                     <h5 class="mb-0">Log Records (<?= $total_records_logs ?> records found)</h5>
                     
                     <a href="export_excel.php?export=activity&log_start_date=<?= urlencode($log_start_date) ?>&log_end_date=<?= urlencode($log_end_date) ?>&user_type=<?= urlencode($log_user_type) ?>&search=<?= urlencode($log_search) ?>" target="_blank" class="btn btn-success">
-                        <i class="fa-solid fa-file-excel me-2"></i>Export to Excel (CSV)
+                        <i class="fa-solid fa-file-excel me-2"></i>
                     </a>
                     </div>
                        <div class="table-responsive">

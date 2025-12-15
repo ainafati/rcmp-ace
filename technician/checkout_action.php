@@ -366,7 +366,7 @@ try {
  $stmt_r = $conn->prepare("UPDATE reservation_items 
 SET status = 'Rejected', 
  rejection_reason = ?,
- partial_reason = NULL// <--- DITAMBAH
+ partial_reason = NULL
 WHERE id = ?");
  if (!$stmt_r) throw new Exception("Prepare failed (reject update): " . $conn->error);
  $stmt_r->bind_param("si", $reason, $reservation_item_id);
@@ -524,8 +524,8 @@ quantity = ?
  SET status = 'Approved',
 approved_by = ?,
 approved_on = CURDATE(),
-partial_reason = NULL, // <--- DITAMBAH
-rejection_reason = NULL, // <--- DITAMBAH
+partial_reason = NULL, 
+rejection_reason = NULL, 
 quantity = ?
  WHERE id = ?");
  $stmt_update_item->bind_param("iii", $technician_id, $quantity, $ri_id);
@@ -1031,7 +1031,7 @@ case 'checkin_multi':
             $conn->commit();
             echo json_encode([
                 'success' => true,
-                'message' => "Check-in success. {$checked_in_count} processed assets. Booking status updated to '{$final_item_status}'. {$damaged_count} assets for maintenance."
+                'message' => "Check-in success. {$checked_in_count} processed assets. Booking status updated to '{$final_item_status}'"
             ]);
 
         } catch (Exception $e) {

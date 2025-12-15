@@ -38,306 +38,429 @@ $stmt_admin->close();
 $admin_id_for_log = $person_id_session;
 $admin_name_for_log = $admin_data['name']; 
 
-function safe_unlink($filepath) {
-    if ($filepath && file_exists($filepath) && is_file($filepath)) {
-        @unlink($filepath); 
+function safe_unlink($db_filepath) {
+    if (!$db_filepath) return;
+    
+    
+    $server_path = '../' . $db_filepath; 
+    if (file_exists($server_path) && is_file($server_path)) {
+        @unlink($server_path);
     }
 }
 
-$stmt_admin = $conn->prepare("
-    SELECT p.name 
-    FROM person p
-    JOIN person_roles pr ON p.person_id = pr.person_id
-    JOIN roles r ON pr.role_id = r.role_id
-    WHERE p.person_id = ? AND r.role_name = 'admin'
-");
-$stmt_admin->bind_param("i", $person_id_session);
-$stmt_admin->execute();
-$result_admin = $stmt_admin->get_result();
-if ($data = $result_admin->fetch_assoc()) {
-    $admin_data = $data;
+function handleImageUpload($fileInputName, $dbSubDir) {
+    global $conn;
+    
+    
+    if (empty($dbSubDir)) $dbSubDir = 'assets/'; 
+    if (substr($dbSubDir, -1) !== '/') { $dbSubDir .= '/'; }
+
+    
+    $targetDir = '../' . $dbSubDir; 
+
+    if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] != UPLOAD_ERR_OK) {
+        return NULL; 
+    }
+
+    $file = $_FILES[$fileInputName];
+    $fileExt = strtolower(pathinfo(basename($file["name"]), PATHINFO_EXTENSION));
+    
+    
+    if ($file["size"] > 5000000) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Image size is too large (max 5MB).']; return NULL; }
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Only JPG, JPEG, PNG, & WEBP files are allowed.']; return NULL; }
+
+    $newFileName = uniqid('img_', true) . "." . $fileExt;
+    $server_path = $targetDir . $newFileName; 
+    $db_path = $dbSubDir . $newFileName;     
+
+    
+    if (!is_dir($targetDir)) {
+        if (!mkdir($targetDir, 0777, true)) {
+             $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat mencipta direktori muat naik atau kebenaran tidak mencukupi.'];
+             return NULL;
+        }
+    }
+
+    if (move_uploaded_file($file["tmp_name"], $server_path)) {
+        return $db_path; 
+    } else {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat memuat naik imej (Semak kebenaran fail).'];
+        return NULL;
+    }
 }
-$stmt_admin->close();
+
+function generateItemAcronym($itemName) {
+    
+    $cleanedName = preg_replace('/[^a-zA-Z\s]/', '', $itemName);
+    
+    
+    $words = explode(' ', $cleanedName);
+    $acronym = '';
+    
+    
+    foreach ($words as $word) {
+        if (!empty($word)) {
+            $acronym .= strtoupper($word[0]);
+        }
+    }
+    
+    
+    if (empty($acronym) && strlen($cleanedName) >= 2) {
+        $acronym = strtoupper(substr($cleanedName, 0, 2));
+    } elseif (empty($acronym)) {
+        $acronym = 'XX'; 
+    }
+
+    
+    return substr($acronym, 0, 3);
+}
 
 
-$admin_id_for_log = $person_id_session;
-$admin_name_for_log = $admin_data['name']; 
 
+function refValues($arr){
+    if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
+        $refs = array();
+        foreach($arr as $key => $value)
+            $refs[$key] = &$arr[$key];
+        return $refs;
+    }
+    return $arr;
+}
+
+
+
+
+
+
+$pending_count_for_badge = 0; 
+
+$stmt_badge = $conn->prepare("SELECT COUNT(DISTINCT reserve_id) FROM reservation_items WHERE status = 'Pending'");
+
+if ($stmt_badge) {
+    $stmt_badge->execute();
+    $stmt_badge->bind_result($pending_count_for_badge);
+    $stmt_badge->fetch();
+    $stmt_badge->close();
+}
+
+
+
+$categories = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
+
+
+$item_details_query = "
+    SELECT 
+        i.item_id,
+        i.item_name,
+        i.description,
+        i.image_url,
+        c.category_name,
+        c.category_id,
+        COUNT(a.asset_id) AS total_units,
+        SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) AS available_units
+    FROM item i
+    JOIN categories c ON i.category_id = c.category_id
+    LEFT JOIN assets a ON i.item_id = a.item_id
+    GROUP BY i.item_id
+    ORDER BY i.item_name ASC
+";
+$item_details = [];
+$result = $conn->query($item_details_query);
+if ($result) {
+    $item_details = $result->fetch_all(MYSQLI_ASSOC);
+} 
 
 
 
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
-    $db_path = "";
-
-    if (isset($_FILES['category_image']) && $_FILES['category_image']['error'] === 0) {
-        $image = $_FILES['category_image'];
-        $image_name = uniqid('cat_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
-        $db_path = 'uploads/' . $image_name;
-        $server_path = '../' . $db_path; 
-        if (!move_uploaded_file($image['tmp_name'], $server_path)) {
-            $db_path = "";
+    
+    if (!empty($category_name)) {
+        
+        $stmt = $conn->prepare("INSERT INTO categories (category_name) VALUES (?)");
+        
+        if ($stmt === FALSE) {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Add Cat): ' . $conn->error];
+        } else {
+            $stmt->bind_param("s", $category_name);
+            
+            if ($stmt->execute()) {
+                $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
+            } else {
+                $_SESSION['message'] = ['type' => 'error', 'text' => 'Error adding category: ' . $stmt->error];
+            }
+            $stmt->close();
         }
-    }
-    
-    $stmt = $conn->prepare("INSERT INTO categories (category_name, image_url) VALUES (?, ?)");
-    $stmt->bind_param("ss", $category_name, $db_path);
-    
-    if ($stmt->execute()) {
-        $new_cat_id = $stmt->insert_id;
-        
-        
-        $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah menambah kategori baru: '{$category_name}' (ID: {$new_cat_id}).";
-        log_activity($conn, 'admin', $admin_id_for_log, 'ADD_CATEGORY', $log_details);
-        
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
     } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Gagal menambah kategori.'];
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Category name cannot be empty.'];
     }
-    $stmt->close();
-    header("Location: manageItem_admin.php"); 
+    header("Location: manageItem_tech.php");
     exit();
 }
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
     $category_id = (int)$_POST['edit_category_id'];
     $category_name = trim($_POST['edit_category_name']);
     
-    if (isset($_FILES['edit_category_image']) && $_FILES['edit_category_image']['error'] === 0) {
-        $stmt_old = $conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
-        $stmt_old->bind_param("i", $category_id);
-        $stmt_old->execute();
-        $stmt_old->bind_result($old_image_url);
-        if ($stmt_old->fetch() && !empty($old_image_url)) {
-            safe_unlink('../' . $old_image_url);
-        }
-        $stmt_old->close();
-        
-        $image = $_FILES['edit_category_image'];
-        $image_name = uniqid('cat_', true) . '.' . strtolower(pathinfo(basename($image['name']), PATHINFO_EXTENSION));
-        $db_path = 'uploads/' . $image_name;
-        $server_path = '../' . $db_path;
-        
-        if (move_uploaded_file($image['tmp_name'], $server_path)) {
-            $stmt = $conn->prepare("UPDATE categories SET category_name = ?, image_url = ? WHERE category_id = ?");
-            $stmt->bind_param("ssi", $category_name, $db_path, $category_id);
-        } else {
-            
-            $stmt = $conn->prepare("UPDATE categories SET category_name = ? WHERE category_id = ?");
-            $stmt->bind_param("si", $category_name, $category_id);
-        }
-    } else {
-        $stmt = $conn->prepare("UPDATE categories SET category_name = ? WHERE category_id = ?");
-        $stmt->bind_param("si", $category_name, $category_id);
-    }
+    $update_fields = ["category_name = ?"];
+    $update_params = [$category_name];
+    $types = "s";
     
-    if (isset($stmt)) {
+    
+    $update_params[] = $category_id;
+    $types .= "i";
+    
+    $update_query = "UPDATE categories SET " . implode(", ", $update_fields) . " WHERE category_id = ?";
+    $stmt = $conn->prepare($update_query);
+
+    if ($stmt === FALSE) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Edit Cat): ' . $conn->error];
+    } else {
+        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
+
         if ($stmt->execute()) {
-            
-            
-            $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah mengemas kini kategori (ID: {$category_id}) kepada nama '{$category_name}'.";
-            log_activity($conn, 'admin', $admin_id_for_log, 'EDIT_CATEGORY', $log_details);
-            
             $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
+        } else {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'Error updating category: ' . $stmt->error];
         }
         $stmt->close();
-    } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Category update failed.'];
     }
-    header("Location: manageItem_admin.php"); 
-    exit();
+    
+    header("Location: manageItem_tech.php"); exit();
 }
+
 
 if (isset($_GET['delete_category_id'])) {
     $delete_id = (int)$_GET['delete_category_id'];
     
-    $stmt_info = $conn->prepare("SELECT category_name, image_url FROM categories WHERE category_id = ?");
+    
+    $stmt_info = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?"); 
     $stmt_info->bind_param("i", $delete_id);
     $stmt_info->execute();
-    $stmt_info->bind_result($category_name_to_delete, $image_url_to_delete);
+    $stmt_info->bind_result($category_name_to_delete);
     $stmt_info->fetch();
     $stmt_info->close();
     
-    if (!empty($image_url_to_delete)) {
-        safe_unlink('../' . $image_url_to_delete);
+    $check_item = $conn->prepare("SELECT COUNT(*) FROM item WHERE category_id = ?");
+    $check_item->bind_param("i", $delete_id);
+    $check_item->execute();
+    $check_item->bind_result($item_count);
+    $check_item->fetch();
+    $check_item->close();
+
+    if ($item_count > 0) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot delete category: ' . $item_count . ' item type(s) are still linked to it.'];
+        header("Location: manageItem_tech.php"); exit();
     }
     
     $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
     $stmt->bind_param("i", $delete_id);
-    
     if ($stmt->execute()) {
-        
-        
-        $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah memadam kategori: '{$category_name_to_delete}' (ID: {$delete_id}).";
-        log_activity($conn, 'admin', $admin_id_for_log, 'DELETE_CATEGORY', $log_details);
-        
         $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
     } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category. It is likely in use.'];
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category: ' . $stmt->error];
     }
     $stmt->close();
-    header("Location: manageItem_admin.php"); 
-    exit();
+    header("Location: manageItem_tech.php"); exit();
 }
 
 
 
-
-
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
-    $item_name = trim($_POST['item_name']);
+    
+    $item_name = ucwords (trim($_POST['item_name']));
     $category_id = (int)$_POST['category_id'];
     $description = trim($_POST['description']);
     $quantity = (int)$_POST['quantity'];
     $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
+    
+    
+    $image_path = handleImageUpload('item_image', 'assets/item_images'); 
 
     $conn->begin_transaction();
     try {
-        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description) VALUES (?, ?, ?)");
-        $stmt_item->bind_param("sis", $item_name, $category_id, $description);
-        $stmt_item->execute();
+        
+        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
+        if ($stmt_item === FALSE) throw new Exception("SQL Prepare Error (Add Item): " . $conn->error);
+        
+        
+        $image_path_to_bind = isset($image_path) ? $image_path : '';          
+        $stmt_item->bind_param("siss", $item_name, $category_id, $description, $image_path_to_bind);
+        if (!$stmt_item->execute()) throw new Exception("Error adding item type: " . $stmt_item->error);
         $new_item_id = $conn->insert_id;
         $stmt_item->close();
-
+        
         if ($new_item_id > 0 && $quantity > 0) {
+            
+            
+            $akronim = generateItemAcronym($item_name); 
 
-            $stmt_cat = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
-            $stmt_cat->bind_param("i", $category_id);
-            $stmt_cat->execute();
-            $stmt_cat->bind_result($category_name);
-            $stmt_cat->fetch();
-            $stmt_cat->close();
             
-            $prefix = strtoupper(substr($category_name, 0, 3));
-            $like_prefix = $prefix . '-%';
+            
+            $asset_status = 'Available';
+            $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
+            if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Add Asset): " . $conn->error);
+            
+            
+            $start_count = 0; 
+            $first_code = '';
+            $last_code = '';
 
-            $stmt_last = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code LIKE ? ORDER BY CAST(SUBSTRING(asset_code, 5) AS UNSIGNED) DESC LIMIT 1");
-            $stmt_last->bind_param("s", $like_prefix);
-            $stmt_last->execute();
-            $stmt_last->bind_result($last_code);
-            $stmt_last->fetch();
-            $stmt_last->close();
-            
-            $last_num = $last_code ? (int)substr($last_code, -4) : 0;
-            
-            for ($i = 0; $i < $quantity; $i++) {
-                $next_num = $last_num + 1 + $i;
-                $new_asset_code = $prefix . '-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
+            for ($i = 1; $i <= $quantity; $i++) {
+                $asset_number = $start_count + $i;
                 
-                $stmt_insert = $conn->prepare("INSERT INTO assets (item_id, asset_code, status, brand, model) VALUES (?, ?, 'Available', ?, ?)");
-                $stmt_insert->bind_param("isss", $new_item_id, $new_asset_code, $batch_brand, $batch_model);
-                $stmt_insert->execute();
-                $stmt_insert->close();
+                $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
+
+                if ($i == 1) $first_code = $asset_code;
+                if ($i == $quantity) $last_code = $asset_code;
+
+                $asset_insert_stmt->bind_param("issss", $new_item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
+                if (!$asset_insert_stmt->execute()) throw new Exception("Error adding asset unit: " . $asset_insert_stmt->error);
             }
-        }
-        
-        $conn->commit(); 
-
-        
-        $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah menambah item baru: '{$item_name}' (ID: {$new_item_id}) dengan {$quantity} unit.";
-        log_activity($conn, 'admin', $admin_id_for_log, 'ADD_ITEM_WITH_UNITS', $log_details);
-
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Successfully created ' . htmlspecialchars($item_name) . ' with ' . $quantity . ' units.'];
-
-    } catch (Exception $e) {
-        $conn->rollback(); 
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
-    }
-    header("Location: manageItem_admin.php"); 
-    exit();
-}
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
-    $item_id = (int)$_POST['edit_item_id'];
-    $item_name = trim($_POST['edit_item_name']);
-    $category_id = (int)$_POST['edit_category_id'];
-    $description = trim($_POST['edit_description']);
-    
-    $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
-    $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
-    $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
-
-    $conn->begin_transaction();
-    try {
-        $stmt_update = $conn->prepare("UPDATE item SET item_name = ?, category_id = ?, description = ? WHERE item_id = ?");
-        $stmt_update->bind_param("sisi", $item_name, $category_id, $description, $item_id);
-        $stmt_update->execute();
-        $stmt_update->close();
-
-        $message_part_2 = "";
-
-        if ($quantity > 0) {
-            $stmt_cat = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?");
-            $stmt_cat->bind_param("i", $category_id);
-            $stmt_cat->execute();
-            $stmt_cat->bind_result($category_name);
-            $stmt_cat->fetch();
-            $stmt_cat->close();
-            
-            $prefix = strtoupper(substr($category_name, 0, 3));
-            $like_prefix = $prefix . '-%';
-
-            $stmt_last = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code LIKE ? ORDER BY CAST(SUBSTRING(asset_code, 5) AS UNSIGNED) DESC LIMIT 1");
-            $stmt_last->bind_param("s", $like_prefix);
-            $stmt_last->execute();
-            $stmt_last->bind_result($last_code);
-            $stmt_last->fetch();
-            $stmt_last->close();
-            
-            $last_num = $last_code ? (int)substr($last_code, -4) : 0;
-            
-            for ($i = 0; $i < $quantity; $i++) {
-                $next_num = $last_num + 1 + $i;
-                $new_asset_code = $prefix . '-' . str_pad($next_num, 4, '0', STR_PAD_LEFT);
-                
-                $stmt_insert = $conn->prepare("INSERT INTO assets (item_id, asset_code, status, brand, model) VALUES (?, ?, 'Available', ?, ?)");
-                $stmt_insert->bind_param("isss", $item_id, $new_asset_code, $batch_brand, $batch_model);
-                $stmt_insert->execute();
-                $stmt_insert->close();
-            }
-            $message_part_2 = " and added " . $quantity . " new units";
+            $asset_insert_stmt->close();
         }
 
         $conn->commit();
-
-        
-        $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah mengemas kini item '{$item_name}' (ID: {$item_id}).{$message_part_2}.";
-        log_activity($conn, 'admin', $admin_id_for_log, 'EDIT_ITEM_WITH_UNITS', $log_details);
-
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item updated successfully' . $message_part_2 . '!'];
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item Type and ' . $quantity . ' unit successfully added! (Code: ' . $first_code . ' until ' . $last_code . ')'];
 
     } catch (Exception $e) {
         $conn->rollback();
+        safe_unlink($image_path); 
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
     }
-    
-    header("Location: manageItem_admin.php"); 
+
+    header("Location: manageItem_tech.php");
     exit();
 }
 
 
-if (isset($_GET['delete_item_id'])) {
-    $delete_id = (int)$_GET['delete_item_id'];
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     
+    $item_id = (int)$_POST['edit_item_id'];
+    $item_name = ucwords(trim($_POST['edit_item_name']));
+    $category_id = (int)$_POST['edit_category_id'];
+    $description = trim($_POST['edit_description']);
+    $quantity_to_add = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
+    $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
+    $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
 
-    $stmt_name = $conn->prepare("SELECT item_name FROM item WHERE item_id = ?");
-    $stmt_name->bind_param("i", $delete_id);
-    $stmt_name->execute();
-    $stmt_name->bind_result($item_name_to_delete);
-    $stmt_name->fetch();
-    $stmt_name->close();
+    if ($item_id <= 0 || $category_id <= 0) {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID selected for update.'];
+        header("Location: manageItem_tech.php"); exit();
+    }
 
     $conn->begin_transaction();
+
     try {
+        $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
+        $update_params = [$item_name, $category_id, $description];
+        $types = "sis";
+        $old_image_path = NULL;
         
+        
+        $new_image_path = handleImageUpload('edit_item_image', 'assets/item_images');
+
+        $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
+        $old_img_stmt->bind_param("i", $item_id);
+        $old_img_stmt->execute();
+        $old_img_stmt->bind_result($old_image_path);
+        $old_img_stmt->fetch();
+        $old_img_stmt->close();
+
+        if ($new_image_path) {
+            $update_fields[] = "image_url = ?";
+            $update_params[] = $new_image_path;
+            $types .= "s";
+            safe_unlink($old_image_path); 
+        }
+
+        $update_params[] = $item_id;
+        $types .= "i";
+
+        $update_query = "UPDATE item SET " . implode(", ", $update_fields) . " WHERE item_id = ?";
+        $stmt = $conn->prepare($update_query);
+        if ($stmt === FALSE) throw new Exception("SQL Prepare Error (Update Item): " . $conn->error);
+        
+        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
+
+        if (!$stmt->execute()) throw new Exception("Error updating item type: " . $stmt->error);
+        $stmt->close();
+        
+        $message_part_2 = "";
+        $first_new_code = '';
+
+        if ($quantity_to_add > 0) {
+            
+            
+            $akronim = generateItemAcronym($item_name); 
+
+            
+            
+            
+            $asset_stmt = $conn->prepare("SELECT COUNT(*) AS max_num FROM assets WHERE item_id = ?");
+            if ($asset_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Asset Max Count): " . $conn->error);
+            
+            $asset_stmt->bind_param("i", $item_id);
+            $asset_stmt->execute();
+            $asset_stmt->bind_result($max_num);
+            $asset_stmt->fetch();
+            $asset_stmt->close();
+            
+            $start_count = intval($max_num); 
+
+            
+            
+            $asset_status = 'Available';
+            $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
+            if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Add Asset): " . $conn->error);
+            
+            for ($i = 1; $i <= $quantity_to_add; $i++) {
+                
+                $asset_number = $start_count + $i;
+                $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
+
+                if ($i == 1) $first_new_code = $asset_code;
+
+                $asset_insert_stmt->bind_param("issss", $item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
+                if (!$asset_insert_stmt->execute()) throw new Exception("Error adding new asset unit: " . $asset_insert_stmt->error);
+            }
+            $asset_insert_stmt->close();
+            $message_part_2 = " and add " . $quantity_to_add . " new unit (Asset Code starts: " . $first_new_code . ").";
+        }
+
+        $conn->commit();
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item berjaya dikemas kini' . $message_part_2 . '!'];
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        safe_unlink($new_image_path);
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
+    }
+
+    header("Location: manageItem_tech.php");
+    exit();
+}
+
+if (isset($_GET['delete_item_id'])) {
+    
+    $delete_id = (int)$_GET['delete_item_id'];
+    
+    $stmt_info = $conn->prepare("SELECT item_name, image_url FROM item WHERE item_id = ?");
+    $stmt_info->bind_param("i", $delete_id);
+    $stmt_info->execute();
+    $stmt_info->bind_result($item_name_to_delete, $image_to_delete);
+    $stmt_info->fetch();
+    $stmt_info->close();
+    
+    $conn->begin_transaction();
+    
+    try {
         $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
         $asset_ids = [];
-        while ($row = $assets_to_delete_res->fetch_assoc()) { 
-            $asset_ids[] = $row['asset_id']; 
-        }
-        
+        while ($row = $assets_to_delete_res->fetch_assoc()) { $asset_ids[] = $row['asset_id']; }
         if (!empty($asset_ids)) {
             $asset_id_list = implode(',', $asset_ids);
             
@@ -353,224 +476,234 @@ if (isset($_GET['delete_item_id'])) {
         $stmt->execute();
         $stmt->close();
         
-        $conn->commit(); 
-
-
+        $conn->commit();
         
-        $log_details = "Admin '{$admin_name_for_log}' (ID: {$admin_id_for_log}) telah memadam item '{$item_name_to_delete}' (ID: {$delete_id}) dan semua unit asetnya.";
-        log_activity($conn, 'admin', $admin_id_for_log, 'DELETE_ITEM_TYPE', $log_details);
-
-
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item type and all its units have been deleted.'];
-
+        safe_unlink($image_to_delete);
+        $_SESSION['message'] = ['type' => 'success', 'text' => 'The item type and all its units have been deleted.'];
+        
     } catch (Exception $e) {
         $conn->rollback();
-
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete. The item may be part of an old reservation record.'];
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot deleted item.It may be part of booking record: ' . $e->getMessage()];
     }
-    header("Location: manageItem_admin.php"); 
-    exit();
+    header("Location: manageItem_tech.php"); exit();
 }
 
 
-
-
-
-$categories = $conn->query("SELECT * FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
-
-$item_details = $conn->query("
-    SELECT 
-        i.item_id, i.item_name, i.category_id, i.description, c.category_name, 
-        COUNT(a.asset_id) AS total_units,
-        SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) AS available_units
-    FROM item i
-    JOIN categories c ON i.category_id = c.category_id
-    LEFT JOIN assets a ON i.item_id = a.item_id
-    GROUP BY i.item_id
-    ORDER BY i.item_name ASC
-")->fetch_all(MYSQLI_ASSOC);
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Manage Inventory — UniKL Admin</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1"> 
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Inventory — UniKL Technician</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { 
-            font-family: 'Inter', 'Segoe UI', sans-serif; 
-            background-color: #f8fafc; 
-            color: #334155; 
-            min-height: 100vh; 
-            overflow-x: hidden; 
+        :root {
+            --primary-color: #06b6d4; 
+            --primary-hover: #0891b2; 
+            --danger-color: #ef4444; 
+            
+            --bg-light-gray: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #1e293b; 
+            --text-muted: #64748b; 
+            --border-color: #e5e7eb;
         }
+
+        /* BASE & TYPOGRAPHY */
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
         
-        /* CSS Sidebar (Desktop View) */
+        /* SIDEBAR */
         .sidebar { 
-            width: 250px; 
-            position: fixed; 
-            top: 0; 
-            bottom: 0; 
-            left: 0; 
-            background: #ffffff; 
-            padding: 20px; 
-            border-right: 1px solid #e5e7eb; 
-            z-index: 1000; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            transition: transform 0.3s ease; 
+            width: 250px; position: fixed; top: 0; bottom: 0; left: 0; 
+            background: var(--card-bg); padding: 20px; 
+            border-right: 1px solid var(--border-color); z-index: 1000; 
+            display: flex; flex-direction: column; justify-content: space-between; 
         }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
+        
+        /* LOGO ICON (Using --primary-color) */
+        .logo-icon { 
+            width: 40px; height: 40px; 
+            background-color: var(--primary-color); /* Cyan */
+            color: white; border-radius: 8px; 
+            display: flex; align-items: center; justify-content: center; font-size: 20px; 
+        }
+        
+        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
         .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
         
-        /* CSS Main Content (Desktop View) */
-        .main-content { 
-            margin-left: 250px; 
-            transition: margin-left 0.3s ease;
+        .sidebar a { 
+            display: flex; align-items: center; gap: 12px; 
+            color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
+            margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; 
         }
-        .topbar { 
-            background: #ffffff; 
-            padding: 15px 30px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #e5e7eb; 
+        
+        /* ACTIVE & HOVER LINK (Using --primary-color) */
+        .sidebar a.active, .sidebar a:hover { 
+            background: var(--primary-color); /* Cyan */
+            color: #fff; 
         }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
+
+        /* LOGOUT LINK */
+        .sidebar a.logout-link { 
+            color: var(--danger-color); 
+            font-weight: 600; 
+            margin-top: auto; 
+        } 
+        .sidebar a.logout-link:hover { 
+            color: #fff; 
+            background: var(--danger-color); 
+        }
+        
+        /* SIDEBAR BADGE STYLE */
+        .sidebar a .badge {
+            margin-left: auto; 
+            font-size: 0.75rem;
+            padding: 0.4em 0.6em;
+            font-weight: 700;
+            border-radius: 10px;
+            background-color: var(--danger-color); 
+            color: white;
+        }
+
+        /* Badge on Active/Hover state */
+        .sidebar a.active .badge, .sidebar a:hover .badge {
+            background-color: #ffffff;
+            color: var(--danger-color); 
+        }
+
+        /* MAIN CONTENT & TOPBAR */
+        .main-content { margin-left: 250px; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); } 
+        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
         .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
+        .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
         .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
         
-        /* Gaya Umum Jadual */
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+        /* CARD & TABLE */
+        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .card h5, .modal-title { font-weight: 600; color: var(--text-dark); }
+        .table thead th { background: var(--bg-light-gray); color: var(--text-muted); border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
         .table tbody td { border-bottom: 1px solid #f1f5f9; }
-        
-        /* Gaya Button Actions (Desktop - Kekal Sebaris) */
-        .table td.action-cell {
-            white-space: nowrap; 
-            padding-right: 10px;
-            padding-left: 10px;
-        }
-        .table td.action-cell .btn {
-            padding: 0.5rem 0.8rem; 
-            font-size: 0.85rem; 
-            margin-right: 2px; 
-            display: inline-block;
-        }
+        .table tbody tr:last-child td { border-bottom: none; }
         .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-
-        /* --- CSS MOBILE VIEW --- */
-        #sidebar-toggle-btn {
-            display: none; /* Sembunyi secara default */
-            background: none;
-            border: none;
-            color: #334155;
-            font-size: 20px;
-            padding: 0;
-            margin-right: 15px;
+        
+        /* FORM & BUTTONS */
+        .form-label { font-weight: 500; color: #334155; }
+        .form-control, .form-select { border-radius: 8px; }
+        .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
+        
+        /* PRIMARY BUTTON (Using --primary-color and --primary-hover) */
+        .btn-primary { 
+            background-color: var(--primary-color); /* Cyan */
+            border: none; 
+        }
+        .btn-primary:hover { 
+            background-color: var(--primary-hover); /* Darker Cyan */
         }
         
-        @media (max-width: 768px) {
-            #sidebar-toggle-btn {
-                display: block; 
-            }
-            
-            /* Sidebar */
+        .item-img-sm { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-right: 15px; }
+        
+        /* Hide menu toggle on desktop */
+        .menu-toggle {
+            display: none;
+        }
+
+        /* --- MOBILE VIEW CODE (RESPONSIVE) STARTS --- */
+        @media (max-width: 992px) {
             .sidebar {
-                transform: translateX(-100%); 
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
-                z-index: 1050; 
-            }
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0; 
-                width: 100%;
-            }
-            
-            /* Topbar - KEKALKAN TAJUK */
-            .topbar {
-                padding: 10px 15px;
-                justify-content: space-between;
-            }
-            .topbar .d-flex:first-child h3 {
-                display: block; /* Kekalkan Tajuk */
-                font-size: 16px; 
-                margin-right: auto;
-            }
-.topbar .user-profile {
-    /* display: none; */ /* Komenkan baris ini */
-    display: flex; /* Tukar kepada flex untuk memastikan ikon dan nama dipaparkan */
-    font-size: 14px; /* Laraskan saiz font supaya muat */
-}
-.topbar .user-profile .user-name {
-     /* Sembunyikan nama, kekalkan ikon sahaja jika ruang tak cukup */
-     display: none;
-}            
-            /* Pelarasan Content & Cards */
-            .container-fluid {
-                padding: 10px 5px; /* Kurangkan padding keseluruhan */
-            }
-            .card {
-                padding: 15px; 
-                margin-bottom: 15px;
-            }
-            
-            /* JADUAL PADAT */
-            .table thead th {
-                font-size: 10px; 
-                padding: 0.5rem 0.3rem; 
-            }
-            .table tbody td {
-                padding: 0.4rem 0.3rem;
-            }
-            
-            /* BADGE PADAT */
-            .badge.rounded-pill {
-                padding: .3em .6em; 
-                font-size: 0.75rem;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+                width: 280px; 
                 display: block; 
-                width: 100%;
             }
 
-            /* BUTANG ACTIONS MENEGAK */
-            .table td.action-cell {
-                white-space: normal;
-                padding-right: 0px; 
-                padding-left: 0px; 
-                text-align: center; 
-                width: 50px; 
+            /* New class for active mobile sidebar */
+            .sidebar.active {
+                transform: translateX(0);
+                box-shadow: 4px 0 10px rgba(0,0,0,0.1);
             }
-            .table td.action-cell .btn {
-                padding: 0.3rem 0.4rem; 
-                font-size: 0.7rem;      
-                margin: 1px auto; 
-                display: block; 
-                width: 80%; 
+
+            /* Main content uses 100% width, no left margin */
+            .main-content {
+                margin-left: 0;
             }
-            .table tbody td:nth-child(2) {
-                display: none; 
+            
+            /* Add top padding for topbar clearance */
+            body {
+                padding-top: 70px;
             }
-            .table tbody td:first-child {
-                max-width: 150px;
-                white-space: normal;
+
+            /* Fix topbar to the top */
+            .topbar {
+                position: fixed; 
+                top: 0; 
+                left: 0; 
+                right: 0;
+                z-index: 999;
+                padding: 15px 20px;
+                flex-wrap: wrap; 
+                gap: 10px;
+            }
+            .topbar h3 {
+                font-size: 20px;
+                margin-left: 15px; 
+                flex-grow: 1; 
+            }
+
+            /* Show menu toggle on mobile */
+            .menu-toggle {
+                display: block !important; 
+                font-size: 24px;
+                cursor: pointer;
+                color: #334155;
+            }
+
+            /* Ensure form (col-lg-4) is stacked above table (col-lg-8) on mobile */
+            .col-lg-4, .col-lg-8 {
+                width: 100% !important;
+            }
+
+            /* Adjust container padding */
+            .container-fluid {
+                padding: 20px;
+            }
+
+            /* Table: Ensure horizontal scrollability */
+            .table-responsive {
+                overflow-x: auto;
             }
         }
+        /* --- MOBILE VIEW CODE (RESPONSIVE) ENDS --- */
     </style>
 </head>
 <body>
+<?php 
+
+if (isset($_SESSION['message'])):
+    $message = $_SESSION['message'];
+    $type = $message['type'] === 'success' ? 'success' : 'error';
+    $text = $message['text'];
+    
+    unset($_SESSION['message']);
+    
+    echo "<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            Swal.fire({
+                icon: '{$type}',
+                title: 'Operation Status', 
+                text: '{$text}', 
+                showConfirmButton: true
+            });
+        });
+    </script>";
+endif;
+?>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
@@ -582,27 +715,24 @@ $item_details = $conn->query("
         </div>
         <a href="manageItem_admin.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-        <a href="report_admin.php"><i class="fa-solid fa-chart-pie"></i> System Report</a>
+        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
 <div class="main-content">
     <div class="topbar">
-        <div class="d-flex align-items-center">
-             <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
-            <h3>Inventory Management</h3>
-        </div>
+        <i class="fa fa-bars menu-toggle" id="sidebarToggle"></i>
         
-<div class="d-flex align-items-center gap-3">
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
-    <div class="user-profile">
-        <span class="user-name"><?= htmlspecialchars($_SESSION['name']) ?></span>
-        <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-            <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
-        </a>
-    </div>
-</div>
+        <h3>Inventory Management</h3>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
+            <div class="user-profile">
+<span class="user-name d-none d-sm-inline"><?= $admin_name_for_log ?></span>                <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
+                    <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+                </a>
+            </div>
+        </div>
     </div>
 
     <div class="container-fluid">
@@ -610,8 +740,8 @@ $item_details = $conn->query("
             <div class="col-lg-4">
                 <div class="card shadow-sm p-4 mb-4">
                     <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
-                    <p class="text-muted small">Create a new item type and add initial stock in one step.</p>
-                    <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
+                    <p class="text-muted small">Create a new item type and add initial stock in one step. <strong>Asset Codes are generated automatically from the Item Name acronym (e.g., PS-0001).</strong></p>
+                    <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                         <input type="hidden" name="add_item_type_and_units" value="1">
                         <h6 class="mt-3">A. Item Type Information</h6>
                         <hr class="mt-1">
@@ -619,6 +749,13 @@ $item_details = $conn->query("
                             <label class="form-label">Item Type Name</label>
                             <input type="text" name="item_name" class="form-control" required>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Item Image (Optional)</label>
+                            <input type="file" name="item_image" class="form-control" accept="image/*">
+                            <small class="text-muted">Upload an image representing this item type.</small>
+                        </div>
+                        
                         <div class="mb-3">
                             <label class="form-label">Category</label>
                             <select name="category_id" class="form-select" required>
@@ -632,7 +769,7 @@ $item_details = $conn->query("
                             <label class="form-label">Description</label>
                             <textarea name="description" class="form-control" rows="2"></textarea>
                         </div>
-                        <h6 class="mt-4">B. Unit Details (Optional)</h6>
+                        <h6 class="mt-4">B. Item Details (Optional)</h6>
                         <hr class="mt-1">
                         <div class="mb-3">
                             <label class="form-label">Brand</label>
@@ -647,7 +784,7 @@ $item_details = $conn->query("
                         <div class="mb-3">
                             <label class="form-label">Number of Units to Add</label>
                             <input type="number" name="quantity" class="form-control" min="1" value="1" required>
-                            <small class="text-muted">Each unit will get a unique asset code.</small>
+                            <small class="text-muted">Each unit will get a unique asset code based on Item Name acronym (e.g., PS-0001).</small>
                         </div>
                         <button type="submit" class="btn btn-success w-100 mt-3">Create Item & Add Units</button>
                     </form>
@@ -657,28 +794,31 @@ $item_details = $conn->query("
                 <div class="card h-100">
                     <h5><i class="fa fa-list-check me-2 text-primary"></i> Item Type Summary</h5>
                     <p class="text-muted small">Overview of all item types. Click <i class="fa fa-eye"></i> to view individual units.</p>
+                    
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
-                            <thead><tr><th>Item Type</th><th class="d-none d-sm-table-cell">Category</th><th class="text-center">Total</th><th class="text-center">Available</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Item Type</th><th>Category</th><th class="text-center">Total</th><th class="text-center">Available</th><th>Actions</th></tr></thead>
                             <tbody>
                             <?php if (empty($item_details)): ?>
                                 <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-box-open fa-2x mb-2"></i><br>No items found. Add one using the form.</td></tr>
                             <?php else: foreach($item_details as $item): ?>
                                 <tr>
                                     <td>
-                                        <strong><?= htmlspecialchars($item['item_name']) ?></strong>
-                                        <span class="d-block d-sm-none text-muted small">(<?= htmlspecialchars($item['category_name']) ?>)</span>
+                                        <?php if (!empty($item['image_url'])): ?>
+                                            <img src="<?= htmlspecialchars('../' . $item['image_url']) ?>" class="item-img-sm" alt="Item Image">
+                                        <?php endif; ?>
+                                        <strong><?= ucwords (htmlspecialchars($item['item_name'])) ?></strong>
                                     </td>
-                                    <td class="d-none d-sm-table-cell"><?= htmlspecialchars($item['category_name']) ?></td>
-                                    
+                                    <td><?= htmlspecialchars($item['category_name']) ?></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-success"><?= $item['available_units'] ?></span></td>
-                                    <td class="action-cell">
-                                        <a href="view_assets.php?item_id=<?= $item['item_id'] ?>" class="btn btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
-                                        <button class="btn btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
+                                    
+                                    <td class="d-flex gap-2">
+                                        <a href="view_assets.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
+                                        <button class="btn btn-sm btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
                                     </td>
-                                </tr>
+                                    </tr>
                             <?php endforeach; endif; ?>
                             </tbody>
                         </table>
@@ -701,15 +841,11 @@ $item_details = $conn->query("
                     <div class="col-md-5">
                         <h6>Add New Category</h6>
                         <hr>
-                        <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
+                        <form method="post" action="manageItem_tech.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
                                 <label for="category_name" class="form-label">Category Name</label>
                                 <input type="text" class="form-control" id="category_name" name="category_name" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="category_image" class="form-label">Category Image (Optional)</label>
-                                <input type="file" class="form-control" id="category_image" name="category_image" accept="image/*">
                             </div>
                             <button type="submit" class="btn btn-primary w-100">Add Category</button>
                         </form>
@@ -722,10 +858,7 @@ $item_details = $conn->query("
                                 <p class="text-center text-muted">No categories found.</p>
                             <?php else: foreach($categories as $cat): ?>
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <?php if (!empty($cat['image_url'])): ?>
-                                            <img src="../<?= htmlspecialchars($cat['image_url']) ?>" class="category-img-sm" alt="">
-                                        <?php endif; ?>
+                                    <div class="d-flex align-items-center">
                                         <span><?= htmlspecialchars($cat['category_name']) ?></span>
                                     </div>
                                     <div>
@@ -749,7 +882,7 @@ $item_details = $conn->query("
                 <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
+            <form method="post" action="manageItem_tech.php">
                 <div class="modal-body">
                     <input type="hidden" name="edit_category" value="1">
                     <input type="hidden" id="edit_category_id" name="edit_category_id">
@@ -757,12 +890,7 @@ $item_details = $conn->query("
                         <label for="edit_category_name" class="form-label">Category Name</label>
                         <input type="text" class="form-control" id="edit_category_name" name="edit_category_name" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="edit_category_image" class="form-label">New Image (Optional)</label>
-                        <input type="file" class="form-control" id="edit_category_image" name="edit_category_image" accept="image/*">
-                        <small class="text-muted">Uploading a new image will replace the old one.</small>
                     </div>
-                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -772,17 +900,25 @@ $item_details = $conn->query("
     </div>
 </div>
 
+
 <div class="modal fade" id="editItemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Edit Item Type</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
+            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
 
                     <h6>Item Details</h6>
                     <div class="mb-3"><label class="form-label">Item Name</label><input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required></div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">New Item Image (Optional)</label>
+                        <input type="file" name="edit_item_image" class="form-control" accept="image/*">
+                        <small class="text-muted">Upload a new image to replace the old one.</small>
+                    </div>
+
                     <div class="mb-3"><label class="form-label">Category</label>
                         <select id="edit_category_id_select" name="edit_category_id" class="form-select" required>
                             <?php foreach($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option><?php endforeach; ?>
@@ -792,7 +928,7 @@ $item_details = $conn->query("
 
                     <hr>
                     <h6 class="mt-3">Add More Units (Optional)</h6>
-                    <p class="small text-muted">Fill this section only if you want to add new stock for this item.</p>
+                    <p class="small text-muted">New unit Asset Codes will be generated based on the updated Item Name acronym.</p>
                     <div class="mb-3">
                         <label class="form-label">Number of New Units to Add</label>
                         <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
@@ -815,117 +951,87 @@ $item_details = $conn->query("
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-
     document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('admin-sidebar');
-        const toggleBtn = document.getElementById('sidebar-toggle-btn');
-        const overlay = document.getElementById('sidebar-overlay');
         
-        if (toggleBtn) {
+        const sidebar = document.getElementById('offcanvasSidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
 
-            function toggleSidebar() {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-            }
-
-
-            toggleBtn.addEventListener('click', toggleSidebar);
-            overlay.addEventListener('click', toggleSidebar);
-            
-
-            const sidebarLinks = sidebar.querySelectorAll('a');
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function() {
-
-                    if (window.innerWidth <= 768) {
-                        setTimeout(() => { 
-                            sidebar.classList.remove('open');
-                            overlay.classList.remove('active');
-                        }, 100);
-                    }
-                });
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('active');
             });
         }
+        
+        
+        document.querySelector('.main-content').addEventListener('click', function(e) {
+            if (window.innerWidth <= 992 && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
+                sidebar.classList.remove('active');
+            }
+        });
+
     });
 
-    <?php
-
-    if (isset($_SESSION['message'])) {
-        $message = $_SESSION['message'];
-        $message_text_js = str_replace("'", "\'", $message['text']);
-        echo "Swal.fire({
-            icon: '{$message['type']}',
-            title: '{$message_text_js}', 
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3500,
-            timerProgressBar: true
-        });";
-        unset($_SESSION['message']);
-    }
-    ?>
-
+    /**
+     * Function to open the Edit Category modal and populate data.
+     * @param {object} category - Category data object.
+     */
     function openEditCategoryModal(category) {
         document.getElementById('edit_category_id').value = category.category_id;
         document.getElementById('edit_category_name').value = category.category_name;
         
-        var editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
         
-        var mainModalEl = document.getElementById('categoryModal');
-        var mainModal = bootstrap.Modal.getInstance(mainModalEl);
-        if (mainModal) {
-            mainModal.hide();
-        }
-        
-        editModal.show();
+        var editCategoryModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+        editCategoryModal.show();
     }
+    
+    /**
+     * Function to open the Edit Item Type modal and populate data.
+     * @param {object} item - Item data object.
+     */
+    function openEditItemModal(item) {
+        document.getElementById('edit_item_id').value = item.item_id;
+        document.getElementById('edit_item_name').value = item.item_name;
+        document.getElementById('edit_description').value = item.description;
+        
+        
+        document.getElementById('edit_category_id_select').value = item.category_id;
 
+        
+        document.getElementById('edit_item_quantity').value = 0;
+        document.getElementById('edit_item_brand').value = '';
+        document.getElementById('edit_item_model').value = '';
+        
+        var editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+        editItemModal.show();
+    }
     function deleteCategory(id, name) {
         Swal.fire({
-            title: `Delete '${name}'?`,
-            text: "This action cannot be undone. Items under this category might prevent deletion.",
+            title: 'Are you sure?',
+            text: "You are about to delete the category: " + name + ". This action cannot be undone and can only be performed if no item types are linked to it.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
+            cancelButtonColor: '#3085d6',
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = 'manageItem_admin.php?delete_category_id=' + id;
+                window.location.href = 'manageItem_tech.php?delete_category_id=' + id;
             }
         });
     }
 
-    function openEditItemModal(item) {
-
-        document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('edit_item_name').value = item.item_name;
-
-        document.getElementById('edit_category_id_select').value = item.category_id;
-        document.getElementById('edit_description').value = item.description;
-
-
-        document.getElementById('edit_item_quantity').value = 0;
-        document.getElementById('edit_item_brand').value = '';
-        document.getElementById('edit_item_model').value = '';
-
-        new bootstrap.Modal(document.getElementById('editItemModal')).show();
-    }
-
-
     function deleteItem(id, name) {
         Swal.fire({
-            title: `Delete '${name}' and all its units?`,
-            text: "This will permanently delete the item type AND all of its associated asset units. This action cannot be undone!",
-            icon: 'error', 
+            title: 'Are you sure?',
+            text: "You are about to delete the item type: " + name + ". This will delete ALL associated units (Assets) and records. This action cannot be undone.",
+            icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
+            cancelButtonColor: '#3085d6',
             confirmButtonText: 'Yes, delete everything!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = 'manageItem_admin.php?delete_item_id=' + id;
+                window.location.href = 'manageItem_tech.php?delete_item_id=' + id;
             }
         });
     }

@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 	
 	
-    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@gmail.com'];
+    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@gmail.com', '@s.unikl.edu.my'];
     $lower_email = strtolower($email);
     $is_valid_domain = false;
 	

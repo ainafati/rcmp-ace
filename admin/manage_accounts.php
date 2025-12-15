@@ -20,7 +20,7 @@ $sql = "
         p.person_id AS person_unique_id,
         p.name,
         p.email,
-        p.id AS id,             -- Menggunakan lajur 'id' dari jadual person (Staff/Student ID)
+        p.id AS id,              -- Menggunakan lajur 'id' dari jadual person (Staff/Student ID)
         p.status,
         p.suspension_remarks,
         p.phoneNum,
@@ -55,89 +55,361 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden; }
-        
-        /* DESKTOP STYLES */
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
-        .sidebar-overlay.active { display: block; }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        /* THEME: Corporate Blue */
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
-        .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
-        .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5, .modal-title { font-weight: 600; color: #1e293b; }
-        .table thead th { background: #f8fafc; color: #64748b; border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-        .table tbody td { border-bottom: 1px solid #f1f5f9; vertical-align: middle;}
-        .table tbody tr:last-child td { border-bottom: none; }
-        .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-        .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-        .btn-primary { background-color: #3b82f6; border: none; }
-        .btn-primary:hover { background-color: #2563eb; }
-        .search-bar { display:flex; gap:10px; margin-bottom:20px; }
-        .search-bar input, .search-bar select { border-radius: 8px; }
-        #editRemarksContainer { margin-top: 1rem; }
+<style>
+    /* Definisi Pembolehubah CSS */
+    :root {
+        --primary-color: #06b6d4;
+        --primary-hover: #0891b2;
+        --danger-color: #ef4444;
 
-        /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+        --bg-light-gray: #f8fafc;
+        --card-bg: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e5e7eb;
+    }
+
+    body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        background-color: var(--bg-light-gray);
+        color: #334155;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    /* DESKTOP STYLES */
+    .sidebar {
+        width: 250px;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        background: var(--card-bg);
+        padding: 20px;
+        border-right: 1px solid var(--border-color);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 30px;
+    }
+
+    /* THEME: Corporate Blue -> Cyan */
+    .logo-icon {
+        width: 40px;
+        height: 40px;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    .logo-text strong {
+        display: block;
+        font-size: 16px;
+        color: var(--text-dark);
+    }
+
+    .logo-text span {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .sidebar a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 12px 15px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 15px;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .sidebar a.active, .sidebar a:hover {
+        background: var(--primary-color);
+        color: #fff;
+    }
+
+    .sidebar a.logout-link {
+        color: var(--danger-color);
+        font-weight: 600;
+        margin-top: auto;
+    }
+
+    .sidebar a.logout-link:hover {
+        color: #fff;
+        background: var(--danger-color);
+    }
+
+    .main-content {
+        margin-left: 250px;
+        transition: margin-left 0.3s ease;
+    }
+
+    .topbar {
+        background: var(--card-bg);
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .topbar h3 {
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-dark);
+        font-size: 22px;
+    }
+
+    .topbar .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .topbar .user-name {
+        font-weight: 600;
+        font-size: 15px;
+        color: #334155;
+    }
+
+    .container-fluid {
+        padding: 30px;
+    }
+
+    .card {
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        background: var(--card-bg);
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .card h5, .modal-title {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .table thead th {
+        background: var(--bg-light-gray);
+        color: var(--text-muted);
+        border: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+    }
+
+    .table tbody td {
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* KEMASKINI: Gaya untuk ikon dalam badge (RINGKAS) */
+    .badge.rounded-pill {
+        padding: .4em .8em;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 30px;
+        gap: 0;
+    }
+
+    /* KEMASKINI: Status (Active/Suspended) - Saiz tetap */
+    .badge.text-bg-success, .badge.text-bg-danger {
+        width: 30px; 
+    }
+
+    /* KEMASKINI: Role - Saiz auto untuk tooltip */
+    .badge.text-bg-info { 
+        background-color: #64748b !important; 
+        color: white !important; 
+        width: auto; 
+        padding: .4em .8em;
+    } 
+    
+    /* Warna badge menggunakan pembolehubah */
+    .badge.text-bg-success { background-color: var(--primary-color) !important; color: white !important; }
+    .badge.text-bg-danger { background-color: var(--danger-color) !important; color: white !important; }
+
+    .btn {
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 500;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        border: none;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--primary-hover);
+    }
+
+    .search-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .search-bar input, .search-bar select {
+        border-radius: 8px;
+    }
+
+    #editRemarksContainer {
+        margin-top: 1rem;
+    }
+
+    /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
+    #sidebar-toggle-btn {
+        display: none;
+        background: none;
+        border: none;
+        color: #334155;
+        font-size: 20px;
+        padding: 0;
+        margin-right: 15px;
+    }
+
+    @media (max-width: 768px) {
+        /* GENERAL LAYOUT */
         #sidebar-toggle-btn {
-            display: none; /* Default: hide on desktop */
-            background: none;
-            border: none;
-            color: #334155;
-            font-size: 20px;
-            padding: 0;
-            margin-right: 15px;
+            display: block;
         }
 
-        @media (max-width: 768px) {
-            /* GENERAL LAYOUT */
-            #sidebar-toggle-btn { display: block; }
-            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; width: 100%; }
-            .topbar { padding: 10px 15px; justify-content: flex-start; } 
-            .topbar h3 { font-size: 16px; flex-grow: 1; }
-            .topbar .d-flex { display: flex; align-items: center; }
-            .topbar .btn { font-size: 12px; padding: .4rem .6rem; white-space: nowrap; }
-            .topbar .user-name { display: none; } 
-            .container-fluid { padding: 10px 5px; }
-            .card { padding: 15px; margin-bottom: 15px; }
-            
-            /* FILTER & SEARCH BAR */
-            .search-bar { flex-direction: column; gap: 8px; }
-            .search-bar input, .search-bar select { font-size: 14px; }
-
-            /* TABLE STYLES */
-            .table-responsive { overflow-x: auto; display: block; width: 100%; }
-            .table { width: 100%; min-width: 650px; } 
-
-            .table thead th {
-                font-size: 10px;
-                padding: 0.5rem 0.3rem;
-                white-space: nowrap;
-            }
-            .table tbody td {
-                padding: 0.4rem 0.3rem;
-                font-size: 14px;
-            }
-            .table tbody td:nth-child(2) { white-space: normal; }
-            .table tbody td:nth-child(5) { white-space: nowrap; min-width: 100px; }
-            .table tbody td .btn-sm { padding: 0.3rem 0.4rem; font-size: 0.7rem; }
+        .sidebar {
+            transform: translateX(-100%);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+            z-index: 1050;
         }
-    </style>
-</head>
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .main-content {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .topbar {
+            padding: 10px 15px;
+            justify-content: flex-start;
+        }
+
+        .topbar h3 {
+            font-size: 16px;
+            flex-grow: 1;
+        }
+
+        .topbar .d-flex {
+            display: flex;
+            align-items: center;
+        }
+
+        .topbar .btn {
+            font-size: 12px;
+            padding: .4rem .6rem;
+            white-space: nowrap;
+        }
+
+        .topbar .user-name {
+            display: none;
+        }
+
+        .container-fluid {
+            padding: 10px 5px;
+        }
+
+        .card {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        /* FILTER & SEARCH BAR */
+        .search-bar {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .search-bar input, .search-bar select {
+            font-size: 14px;
+        }
+
+        /* TABLE STYLES */
+        .table-responsive {
+            overflow-x: auto;
+            display: block;
+            width: 100%;
+        }
+
+        .table {
+            width: 100%;
+            min-width: 650px;
+        }
+
+        .table thead th {
+            font-size: 10px;
+            padding: 0.5rem 0.3rem;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            padding: 0.4rem 0.3rem;
+            font-size: 14px;
+        }
+
+        .table tbody td:nth-child(2) {
+            white-space: normal;
+        }
+
+        .table tbody td:nth-child(5) {
+            white-space: nowrap;
+            min-width: 100px;
+        }
+
+        .table tbody td .btn-sm {
+            padding: 0.3rem 0.4rem;
+            font-size: 0.7rem;
+        }
+    }
+</style></head>
 <body>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -162,7 +434,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add Account</button>
             <div class="user-profile">
-<span class="user-name"><?= $admin_name ?></span>               
+<span class="user-name"><?= $admin_name ?></span>
                 <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
@@ -208,29 +480,46 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                     <?= htmlspecialchars($a['email']) ?><br>
                                     <small class="text-muted"><?= htmlspecialchars(isset($a['phoneNum']) ? $a['phoneNum'] : 'N/A') ?></small>
                                 </td>
-                                <td><span class="badge rounded-pill <?= strtolower($a['status']) === 'active' ? 'text-bg-success' : 'text-bg-danger' ?>"><?= htmlspecialchars($a['status']) ?></span></td>
-<td><span class="badge rounded-pill text-bg-info"><?= htmlspecialchars($a['roles_list']) ?></span></td>                                 <td>
-                                    <button class="btn btn-sm btn-outline-warning" title="Edit User"
-                                        onclick="editUser(
-                                            '<?= $a['person_unique_id'] ?>',
-                                            '<?= htmlspecialchars(addslashes($a['name'])) ?>',
-                                            '<?= htmlspecialchars(addslashes($a['email'])) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>',  '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
-                                            '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>',
-                                            '<?= htmlspecialchars(addslashes($a['status'])) ?>',
-                                            '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
-                                        )">
-                                        <i class="fa-solid fa-pen"></i>
-                                    </button>
-                                    
-                                    <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this account? This action cannot be undone.');">
-                                        <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
-                                        <input type="hidden" name="role" value="<?= htmlspecialchars($a['roles_list']) ?>">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </form>
+                                <td>
+                                    <?php 
+                                        $status_class = strtolower($a['status']) === 'active' ? 'text-bg-success' : 'text-bg-danger';
+                                        $status_icon = strtolower($a['status']) === 'active' ? 'fa-check-circle' : 'fa-times-circle';
+                                    ?>
+                                    <span title="<?= htmlspecialchars($a['status']) ?>">
+                                        <span class="badge rounded-pill <?= $status_class ?>">
+                                            <i class="fa-solid <?= $status_icon ?>"></i> 
+                                        </span>
+                                    </span>
                                 </td>
+                                <td>
+                                    <span title="<?= htmlspecialchars($a['roles_list']) ?>">
+                                        <span class="badge rounded-pill text-bg-info">
+                                            <i class="fa-solid fa-user-tag"></i> 
+                                        </span>
+                                    </span>
+                                </td>
+                                 <td>
+                                     <button class="btn btn-sm btn-outline-warning" title="Edit User"
+                                         onclick="editUser(
+                                             '<?= $a['person_unique_id'] ?>',
+                                             '<?= htmlspecialchars(addslashes($a['name'])) ?>',
+                                             '<?= htmlspecialchars(addslashes($a['email'])) ?>',
+                                             '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>', '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
+                                             '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>',
+                                             '<?= htmlspecialchars(addslashes($a['status'])) ?>',
+                                             '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
+                                         )">
+                                         <i class="fa-solid fa-pen"></i>
+                                     </button>
+                                     
+                                     <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this account? This action cannot be undone.');">
+                                         <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
+                                         <input type="hidden" name="role" value="<?= htmlspecialchars($a['roles_list']) ?>">
+                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
+                                             <i class="fa-solid fa-trash"></i>
+                                         </button>
+                                     </form>
+                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
                             <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-users-slash fa-2x mb-2"></i><br>No accounts found.</td></tr>
@@ -259,7 +548,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
                 
                 <div class="mb-3"><label class="form-label">Staff ID</label>
-                    <input type="text" name="id" class="form-control" required          
+                    <input type="text" name="id" class="form-control" required        
                         pattern="\d{6,12}" 
                         title="Enter staff ID (6 to 12 digits)"
                         placeholder="e.g., 990101">
@@ -385,10 +674,13 @@ function filterTable() {
     rows.forEach(row => {
         const name = row.cells[0].textContent.toLowerCase();
         const emailPhone = row.cells[1].textContent.toLowerCase();
-        const statusSpan = row.cells[2].querySelector('.badge');
-        const userStatus = statusSpan ? statusSpan.textContent.toLowerCase().trim() : '';
-        const roleSpan = row.cells[3].querySelector('.badge');
-        const userRole = roleSpan ? roleSpan.textContent.toLowerCase().trim() : '';
+        
+        // Ambil status dan role dari atribut title (tooltip) pada wrapper <span>
+        const statusSpanWrapper = row.cells[2].querySelector('span[title]');
+        const userStatus = statusSpanWrapper ? statusSpanWrapper.getAttribute('title').toLowerCase().trim() : '';
+        const roleSpanWrapper = row.cells[3].querySelector('span[title]');
+        const userRole = roleSpanWrapper ? roleSpanWrapper.getAttribute('title').toLowerCase().trim() : '';
+
 
         const matchSearch = name.includes(search) || emailPhone.includes(search);
         const matchRole = role === '' || userRole.includes(role); 

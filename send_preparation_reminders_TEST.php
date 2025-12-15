@@ -1,9 +1,5 @@
 <?php
-// send_preparation_reminders_TEST.php
-
-// Sertakan fail konfigurasi dan pangkalan data anda
-include __DIR__ . '/../config.php'; 
-
+include __DIR__ . '/config.php';
 // Tentukan alamat e-mel Admin/Teknisi yang perlu menerima peringatan
 // GANTIKAN DENGAN ALAMAT E-MEL SEBENAR ANDA UNTUK UJIAN
 $technician_email = "ainafthhj@gmail.com"; 
@@ -16,9 +12,6 @@ $technician_email = "ainafthhj@gmail.com";
 $target_date = date('Y-m-d'); 
 $is_test = true;
 
-// ---------------------------------------------------------------------
-// 2. SQL Query: Cari tempahan untuk hari ini
-// ---------------------------------------------------------------------
 
 $sql = "SELECT 
             r.reserve_id, 
@@ -36,10 +29,10 @@ $sql = "SELECT
         
         WHERE r.reserve_date = ? 
         AND ri.status = 'Pending'  
-        GROUP BY ri.id  
-        ORDER BY r.reserve_id ASC";
+        -- *** KLAUSA GROUP BY DIBUANG DI SINI ***
+        ORDER BY r.reserve_id ASC"; // Baris 39 kini adalah baris 37
 
-
+// ... (Sambungan kod kekal sama) ...
 $stmt = $conn->prepare($sql);
 if ($stmt === false) {
     echo "SQL Prepare Error: " . $conn->error;

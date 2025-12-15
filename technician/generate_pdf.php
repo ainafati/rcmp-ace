@@ -11,7 +11,7 @@ use Mpdf\MpdfException;
 // 1. PATH RESOLUTION & ERROR CHECK
 // ------------------------------------------------------------------------
 
-$relative_path_to_logo = __DIR__ . '/../img/unikl_logo-removebg-preview.png';
+$relative_path_to_logo = __DIR__ . '/../img/logo_latest-Photoroom.png';
 $logo_file_path = realpath($relative_path_to_logo);
 if ($logo_file_path === false) { 
     // Fallback jika realpath gagal
