@@ -3,8 +3,6 @@ session_start();
 
 include '../config.php';
 
-
-
 if (!$conn) {
     $_SESSION['error'] = "Database connection error.";
     header("Location: ../login.php");
@@ -18,10 +16,7 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int) $_SESSION['person_id'];
 
-
 $user = null;
-
-
 
 $stmt_user = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
 
@@ -32,20 +27,18 @@ if ($stmt_user) {
     $user = $result_user->fetch_assoc();
     $stmt_user->close();
 } else {
-    
     error_log("Failed to prepare user statement: " . $conn->error);
 }
 
 if (!$user) {
-    
+    error_log("SECURITY ALERT: User with person_id " . $person_id . " was not found.");
     session_destroy();
+    $_SESSION['error'] = "User data not found or session invalid.";
     header("Location: ../login.php");
     exit();
 }
 
-
-
-$user['person_id'] = $person_id; 
+$user['person_id'] = $person_id;
 
 $conn->close();
 ?>
@@ -61,17 +54,17 @@ $conn->close();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    /* --- CSS STYLES (Dikekalkan) --- */
+    /* --- CSS STYLES --- */
     :root {
-        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
-        --primary-light: #f0f9ff; /* Biru Sangat Muda untuk Latar Belakang Aktif */
-        --primary-hover: #0891b2; /* Cyan 700 */
-        --bg-light-gray: #f4f7f9; /* Latar belakang luar */
-        --card-bg: #ffffff; /* Latar belakang Sidebar/Topbar/Card */
+        --primary-color: #06b6d4; 
+        --primary-light: #f0f9ff; 
+        --primary-hover: #0891b2; 
+        --bg-light-gray: #f4f7f9; 
+        --card-bg: #ffffff; 
         --text-dark: #1e293b;
         --text-muted: #64748b;
         --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
-        --danger-color: #ef4444; /* Merah untuk Logout */
+        --danger-color: #ef4444; 
     }
     
     body {
@@ -81,18 +74,30 @@ $conn->close();
         min-height: 100vh;
     }
     
-    /* Sidebar, Topbar, dll CSS dikekalkan... */
     .sidebar {
         width: 280px; position: fixed; top: 0; bottom: 0; left: 0;
         background: var(--card-bg); padding: 20px;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1000;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1050; 
         display: flex; flex-direction: column; justify-content: space-between;
+        /* Default pada desktop, tiada transform. Transform hanya diletakkan di media query */
         transition: transform 0.3s ease-in-out;
     }
+
+    /* KAWALAN DESKTOP (Lebar > 992px) */
+    .main-content { 
+        margin-left: 280px; /* Kuncinya di sini: margin wajib untuk desktop */
+    }
+    
+    /* KOD BARU/DIUBAHSUAI UNTUK KAWALAN SIDEBAR PADA MOBILE */
+    .sidebar.active {
+        transform: translateX(0px) !important;
+    }
+    
     .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
     .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
     .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    
     .sidebar a {
         display: flex; align-items: center; gap: 15px;
         color: var(--text-muted); text-decoration: none;
@@ -110,7 +115,6 @@ $conn->close();
     .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: 20px; }
     .sidebar a i { width: 20px; text-align: center; }
 
-    .main-content { margin-left: 280px; }
     .topbar { 
         background: var(--card-bg); 
         padding: 18px 30px; 
@@ -118,31 +122,15 @@ $conn->close();
         justify-content: space-between; 
         align-items: center; 
         border-bottom: 1px solid #eef1f4; 
-        z-index: 999; 
+        z-index: 1040; 
         position: sticky; 
         top: 0; 
     }
     .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
     .container-fluid { padding: 30px; }
     
-    /* === CSS PENTING UNTUK CENTER & BOLD NAMA PENGGUNA === */
-    .user-profile {
-        display: flex;
-        align-items: center;
-        /* Tambah ini jika anda mahu ia berpusat di antara elemen dalam div ini. */
-        justify-content: center; 
-    }
-    .user-profile .user-name {
-        font-weight: 700 !important; /* Force BOLD */
-        color: var(--text-dark);
-        /* Flexbox sudah handle vertical centering. */
-        /* Kita hanya perlu adjust margin. */
-        margin-right: 10px; 
-        
-        /* Untuk memastikan ia berpusat secara mendatar jika ia dalam bekas yang lebih besar,
-           tetapi dalam topbar ini, flexbox memastikan penjajaran yang baik. */
-    }
-    /* ============================================== */
+    .user-profile { display: flex; align-items: center; justify-content: center; }
+    .user-profile .user-name { font-weight: 700 !important; color: var(--text-dark); margin-right: 10px; }
     
     .card {
         border-radius: 12px; box-shadow: var(--shadow-light);
@@ -216,18 +204,39 @@ $conn->close();
     }
     .btn-primary:hover { background-color: var(--primary-hover); }
 
+    /* MEDIA QUERIES UNTUK RESPONSIVITI MOBILE (< 992px) */
     @media (max-width: 992px) {
-        .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
+        .sidebar { transform: translateX(-280px); left: 0; width: 280px; } 
         .main-content { margin-left: 0; width: 100%; }
         .topbar { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
         .topbar h3 { font-size: 20px; }
         .container-fluid { padding: 15px; }
     }
+    
+    /* KAWALAN BACKDROP */
+    #sidebar-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        visibility: hidden;
+        z-index: 1045; 
+        transition: opacity 0.3s ease-in-out;
+        display: none; 
+    }
+
+    #sidebar-backdrop.active {
+        opacity: 1;
+        visibility: visible;
+    }
 </style>
 </head>
 <body>
 
-<div class="offcanvas-backdrop fade" id="sidebar-backdrop" style="display: none; z-index: 1040;"></div>
+<div class="offcanvas-backdrop fade" id="sidebar-backdrop"></div>
 
 <div class="sidebar" id="offcanvasSidebar">
     <div>
@@ -350,7 +359,7 @@ $conn->close();
                                         </div>
                                     </div>
                                     
-                                   <hr class="mt-4">
+                                    <hr class="mt-4">
                                     <p class="text-muted fw-bold">Change Password (optional)</p>
                                     
                                     <div class="alert alert-info py-2" role="alert">
@@ -390,25 +399,19 @@ $conn->close();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    
+    // 1. LOGIK PERTUKARAN MOD VIEW/EDIT
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
 
-    
-    
     const hasSessionAlert = <?php echo (isset($_SESSION['error']) || isset($_SESSION['message'])) ? 'true' : 'false'; ?>;
 
     if (hasSessionAlert) {
-        
         viewMode.style.display = 'none';
         editMode.style.display = 'block';
-        
         window.scrollTo(0, 0); 
     }
-    
-
 
     if (editBtn && cancelBtn) {
         editBtn.addEventListener('click', () => {
@@ -423,41 +426,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
-    
-    
+    // 2. LOGIK KAWALAN SIDEBAR (OFF-CANVAS) - DIBETULKAN UNTUK MENGHORMATI DESKTOP CSS
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     
-    
-    if (window.innerWidth <= 992) {
-        sidebar.style.transform = 'translateX(-280px)';
-    }
+    // Fungsi untuk mengawal sidebar HANYA pada mobile
+    function toggleSidebar() {
+        if (window.innerWidth <= 992) {
+            const isActive = sidebar.classList.contains('active');
 
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-            if (window.innerWidth <= 992) {
-                const isHidden = sidebar.style.transform === 'translateX(-280px)' || sidebar.style.transform === '';
-                
-                if (isHidden) {
-                    sidebar.style.transform = 'translateX(0px)';
-                    backdrop.style.display = 'block';
-                } else {
-                    sidebar.style.transform = 'translateX(-280px)';
-                    backdrop.style.display = 'none';
-                }
+            sidebar.classList.toggle('active');
+
+            if (!isActive) {
+                backdrop.classList.add('active');
+                backdrop.style.display = 'block'; 
+            } else {
+                backdrop.classList.remove('active');
+                setTimeout(() => { 
+                    backdrop.style.display = 'none'; 
+                }, 300); 
             }
-        });
-
-        if (backdrop) {
-             backdrop.addEventListener('click', () => {
-                if (window.innerWidth <= 992) {
-                    sidebar.style.transform = 'translateX(-280px)';
-                    backdrop.style.display = 'none';
-                }
-            });
         }
     }
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleSidebar);
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', toggleSidebar); 
+    }
+
+    // Fungsi run-once pada muatan (LOAD)
+    function initializeSidebar() {
+        if (window.innerWidth <= 992) {
+             // Sembunyikan sidebar pada muatan jika mobile
+             sidebar.style.transform = 'translateX(-280px)'; 
+        } else {
+             // Pastikan sidebar berada di tempat yang betul pada desktop
+             sidebar.style.transform = 'translateX(0px)';
+             // Hapus kelas aktif jika ada (untuk mencegah isu selepas resize)
+             sidebar.classList.remove('active');
+             backdrop.classList.remove('active');
+             backdrop.style.display = 'none';
+        }
+    }
+
+    // PENTING: Panggil fungsi pada muatan
+    initializeSidebar(); 
+    
+    // Mengendalikan perubahan saiz skrin
+    window.addEventListener('resize', initializeSidebar);
     
 });
 </script>

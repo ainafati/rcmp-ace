@@ -742,6 +742,17 @@ $stmt_notif_list->close();
             .table { min-width: 450px; font-size: 13px; }
             .table thead th, .table tbody td { padding: 10px 12px; }
         }
+		
+		@media (max-width: 576px) { /* Sasarkan telefon yang sangat kecil (sm breakpoint) */
+            .table tbody td {
+                padding: 10px 10px !important; /* Mengurangkan padding */
+                font-size: 13px;
+            }
+            .table thead th {
+                padding: 10px 10px;
+                font-size: 10px; /* Menjadikan header lebih kecil */
+            }
+        }
     </style>
 </head>
 <body>

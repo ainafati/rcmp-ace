@@ -250,8 +250,8 @@ $conn->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>Technician Dashboard | UniKL ACE</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
@@ -286,6 +286,7 @@ $conn->close();
     .text-red { color: #ef4444; }
     .text-amber { color: #f59e0b; }
 
+    /* DEFINISI SIDEBAR (MOBILE & DESKTOP) */
     .sidebar { 
         width: 250px; 
         position: fixed; 
@@ -297,7 +298,8 @@ $conn->close();
         border-right: 1px solid #e5e7eb; 
         display: flex; 
         flex-direction: column; 
-        z-index: 1000;
+        z-index: 1050; /* Naikkan Z-index sedikit untuk overlay/toggle */
+        transition: transform 0.3s ease; /* Tambah Transisi */
     }
     .sidebar-header { padding: 0 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
     
@@ -355,12 +357,13 @@ $conn->close();
     }
 
     /* MAIN LAYOUT & TOPBAR (Kekal Sama, guna primary-color baru) */
-    .main-content { margin-left: 250px; }
-    .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #e5e7eb; }
+    .main-content { margin-left: 250px; min-height: 100vh; /* Pastikan ia meliputi seluruh ketinggian */ }
+    .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #e5e7eb; z-index: 1020; }
     .container-fluid { padding: 30px; }
     .topbar h3 { margin-right: auto; font-weight: 700; color: var(--text-dark); }
     
-    /* SUMMARY CARD STYLES */
+    /* ... (CSS Summary Card, FullCalendar, Chart, Badge kekal sama) ... */
+    
     .card-summary {
         background-color: #ffffff;
         border-radius: 12px;
@@ -461,6 +464,77 @@ $conn->close();
 }
 /* END: New Styles for Compact Layout */
 
+
+@media (max-width: 991.98px) {
+    
+	#calendar-container {
+        padding: 10px; /* Kurangkan padding kalendar */
+        width: 100%;
+        overflow-x: auto; /* Benarkan scroll jika FullCalendar itu sendiri terlalu lebar */
+    }
+	
+    /* Sidebar mesti tersembunyi secara default, dan muncul apabila kelas .toggled dikeluarkan */
+    .sidebar {
+        /* Pindahkan sidebar ke luar skrin secara default pada skrin kecil */
+        transform: translateX(-250px); 
+        transition: transform 0.3s ease;
+        z-index: 1050; /* Pastikan ia berada di atas segala-galanya apabila dibuka */
+    }
+
+    /* Keadaan apabila toggle diklik (sidebar tersembunyi) */
+    .sidebar.toggled {
+        /* Kembali ke kedudukan asal (tersembunyi) */
+        transform: translateX(-250px); 
+    }
+    
+    /* Keadaan apabila toggle diklik (sidebar dipaparkan) */
+    .sidebar:not(.toggled) {
+        transform: translateX(0); /* Alihkan ke skrin */
+    }
+
+    /* 2. Main Content mesti mengambil lebar penuh pada Mobile */
+    .main-content {
+        /* Buang margin kiri yang digunakan pada desktop */
+        margin-left: 0; 
+        width: 100%; /* Lebar penuh */
+    }
+
+    /* 3. Sidebar Overlay (Jika anda mempunyai elemen overlay) */
+    #sidebarOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1040; /* Di bawah sidebar, di atas main-content */
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    #sidebarOverlay.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    
+    /* 4. Topbar Button & Heading Adjustment */
+    .topbar {
+        padding-left: 15px; /* Kurangkan padding pada mobile */
+        padding-right: 15px;
+        z-index: 1030; /* Pastikan topbar berada di atas main content */
+    }
+    
+    .topbar h3 {
+        font-size: 1.2rem; /* Kecilkan tajuk */
+    }
+
+    /* 5. Kurangkan padding container-fluid */
+    .container-fluid {
+        padding: 15px;
+    }
+}
+
 </style>
 </head>
 <body>
@@ -491,11 +565,15 @@ $conn->close();
 </div> 	
 </div>
 <div class="main-content">
-    <div class="topbar">
-        <h3>Dashboard</h3>
-        <button class="btn d-lg-none text-primary-blue" type="button" id="sidebarToggle">
-            <i class="fa-solid fa-bars"></i>
-        </button>
+<div class="topbar">
+    <button id="sidebarToggle" class="btn btn-link d-lg-none" type="button">
+        <i class="fas fa-bars fa-lg"></i>
+    </button>
+
+    <h3>Dashboard</h3> 
+
+    <div class="topbar-right">
+        </div>
 
         <div class="technician-profile d-flex align-items-center">
             <span class="technician-name me-2 d-none d-sm-block"><?= htmlspecialchars($tech['name']) ?></span> 
@@ -796,7 +874,6 @@ $conn->close();
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
-
 <script>
 
     // KEKALKAN SEMUA DATA PHP JSON DARI PART 3
@@ -970,7 +1047,7 @@ $conn->close();
         });
         
         
-        // --- SIDEBAR TOGGLE ---
+        // --- SIDEBAR TOGGLE (KEMASKINI DENGAN LOGIK MOBILE) ---
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
         const overlay = document.getElementById('sidebarOverlay');
@@ -981,16 +1058,26 @@ $conn->close();
         }
         if (toggleBtn) { toggleBtn.addEventListener('click', toggleSidebar); }
         if (overlay) { overlay.addEventListener('click', toggleSidebar); }
-        function checkScreenSize() {
-             if (window.innerWidth > 991.98) {
-                 sidebar.classList.remove('toggled');
-                 overlay.classList.remove('active');
-             }
-        }
-        window.addEventListener('resize', checkScreenSize);
-        checkScreenSize();
 
-        
+function checkScreenSize() {
+     const sidebar = document.getElementById('admin-sidebar'); // Pastikan elemen didefinisikan atau diakses di sini
+     const overlay = document.getElementById('sidebarOverlay'); // Pastikan elemen didefinisikan atau diakses di sini
+     
+     if (window.innerWidth > 991.98) {
+         // Desktop: Pastikan sidebar kelihatan (default)
+         sidebar.classList.remove('toggled');
+         overlay.classList.remove('active');
+     } else {
+         // Mobile: Pastikan sidebar tersembunyi
+         // KELAS 'toggled' MESTI MENGANDUNGI CSS UNTUK MENYEMBUNYIKAN SIDEBAR
+         sidebar.classList.add('toggled'); 
+         overlay.classList.remove('active');
+     }
+}
+
+window.addEventListener('resize', checkScreenSize);
+checkScreenSize(); // Ini MESTI dijalankan semasa muatan
+
         // --- FULLCALENDAR INITIALIZATION ---
         const calendarEl = document.getElementById('calendar');
         if (calendarEl) {
@@ -1027,7 +1114,7 @@ $conn->close();
 
 
         
-        // --- DATATABLES & MODAL SETUP FUNCTIONS (Semua fungsi asal dikekalkan) ---
+        // --- DATATABLES & MODAL SETUP FUNCTIONS (Sertakan responsive: true) ---
         function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
             if (!assetList || assetList.length === 0) {
                 return '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No matching assets found.</div>';
@@ -1036,11 +1123,11 @@ $conn->close();
             const tableId = `assetTable_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
             let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
             tableHTML += `<thead><tr>
-                                                  <th>Asset Code</th>
-                                                  <th>Item Name</th>
-                                                  <th>Category</th>
-                                                  ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
-                                                </tr></thead><tbody>`;
+                                <th>Asset Code</th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                ${includeUserAndReturnDate ? '<th>Checked Out To</th><th>Return Due</th>' : '<th>Status</th>'}
+                              </tr></thead><tbody>`;
 
             assetList.forEach(asset => {
                 const itemName = asset.item_name || '<em class="text-muted">N/A</em>';
@@ -1056,9 +1143,9 @@ $conn->close();
                 const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
 
                 tableHTML += `<tr>
-                                                  <td><strong>${asset.asset_code || 'N/A'}</strong></td>
-                                                  <td>${itemName}</td>
-                                                  <td>${categoryName}</td>`;
+                                    <td><strong>${asset.asset_code || 'N/A'}</strong></td>
+                                    <td>${itemName}</td>
+                                    <td>${categoryName}</td>`;
                 if (includeUserAndReturnDate) {
                     const userName = asset.user_name || '<em class="text-muted">N/A</em>';
                     
@@ -1077,6 +1164,7 @@ $conn->close();
         }
 
 
+        
         
         
         function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
@@ -1103,7 +1191,10 @@ $conn->close();
                         const newTable = $(`#${tableData.id}`);
                         if (newTable.length) {
                             newTable.DataTable({
-                                "pageLength": 10, "order": [], "destroy": true,
+                                "pageLength": 10, 
+                                "order": [], 
+                                "destroy": true,
+                                "responsive": true, // <-- PENAMBAHAN UNTUK MOBILE
                                 "language": {
                                     "search": "Search:", "lengthMenu": "Show _MENU_ assets",
                                     "info": "Showing _START_ to _END_ of _TOTAL_ assets", "infoEmpty": "No assets found",
@@ -1153,27 +1244,27 @@ $conn->close();
                      const tableId = `overdueTable_${Date.now()}`;
                      let tableHTML = `<table class="table table-sm table-striped table-hover asset-detail-table" id="${tableId}">`;
                      tableHTML += `<thead><tr>
-                                                   <th>User</th>
-                                                   <th>Item</th>
-                                                   <th>Asset Code(s)</th>
-                                                   <th>Return Date</th>
-                                                   <th class="text-danger">Days Overdue</th>
-                                                   <th>Contact</th>
-                                                 </tr></thead><tbody>`;
+                                     <th>User</th>
+                                     <th>Item</th>
+                                     <th>Asset Code(s)</th>
+                                     <th>Return Date</th>
+                                     <th class="text-danger">Days Overdue</th>
+                                     <th>Contact</th>
+                                    </tr></thead><tbody>`;
                      overdueDetails.forEach(item => {
-                         const returnDate = new Date(item.return_date + 'T00:00:00');
-                         const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                         const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
-                         const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
+                          const returnDate = new Date(item.return_date + 'T00:00:00');
+                          const returnDateFormatted = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                          const phoneLink = item.user_phone ? `<a href="tel:${item.user_phone}">${item.user_phone}</a>` : 'N/A';
+                          const assignedAssets = item.assigned_assets ? `<span class="badge rounded-pill badge-status-default">${item.assigned_assets}</span>` : '<em class="text-muted">None Assigned</em>';
 
-                         tableHTML += `<tr>
-                                                   <td><strong>${item.user_name || 'N/A'}</strong></td>
-                                                   <td>${item.item_name || 'N/A'}</td>
-                                                   <td>${assignedAssets}</td>
-                                                   <td>${returnDateFormatted}</td>
-                                                   <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
-                                                   <td>${phoneLink}</td>
-                                                 </tr>`;
+                          tableHTML += `<tr>
+                                     <td><strong>${item.user_name || 'N/A'}</strong></td>
+                                     <td>${item.item_name || 'N/A'}</td>
+                                     <td>${assignedAssets}</td>
+                                     <td>${returnDateFormatted}</td>
+                                     <td><span class="badge rounded-pill badge-status-danger">${item.days_overdue}</span></td>
+                                     <td>${phoneLink}</td>
+                                    </tr>`;
                      });
                      tableHTML += '</tbody></table>';
                      overdueListContainer.innerHTML = tableHTML;
@@ -1181,20 +1272,23 @@ $conn->close();
                      $overdueModal.modal('show');
 
                      setTimeout(() => {
-                         const newTable = $(`#${tableId}`);
-                         if (newTable.length) {
-                             newTable.DataTable({
-                                 "pageLength": 10, "order": [[4, "desc"]], "destroy": true,
-                                 "language": {
-                                     "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
-                                     "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
-                                     "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
-                                     "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
-                                 }
-                             });
-                         }
+                          const newTable = $(`#${tableId}`);
+                          if (newTable.length) {
+                              newTable.DataTable({
+                                  "pageLength": 10, 
+                                  "order": [[4, "desc"]], 
+                                  "destroy": true,
+                                  "responsive": true, // <-- PENAMBAHAN UNTUK MOBILE
+                                  "language": {
+                                      "search": "Search:", "lengthMenu": "Show _MENU_ overdue items",
+                                      "info": "Showing _START_ to _END_ of _TOTAL_ overdue items", "infoEmpty": "No overdue items found",
+                                      "infoFiltered": "(filtered from _MAX_ total items)", "zeroRecords": "No matching overdue items found",
+                                      "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
+                                  }
+                              });
+                          }
                      }, 200);
-                    }
+                     }
              });
         }
         
@@ -1215,26 +1309,7 @@ $conn->close();
                 '--gauge-color': color
             });
             
-            // Style yang mengawal fill (seperti dalam CSS anda, yang perlukan perubahan transform)
-            // Dalam contoh CSS anda, fill dikawal oleh :before. 
-            // Kita perlu memastikan elemen yang mengawal rotasi ditemui atau style diterapkan secara inline.
-            // Kerana kita tidak boleh mengawal :before secara terus melalui JS, kita gunakan data-attribute 
-            // dan letakkan style di elemen parent (seperti dalam kod HTML penuh sebelumnya).
-            
-            // Asumsi: Kita menggunakan mekanisme CSS yang telah ditetapkan dalam HTML penuh anda.
-            // Anda mungkin perlu tweak CSS :before atau gunakan library gauge sebenar.
-            // Jika menggunakan CSS yang ditetapkan dalam jawapan saya sebelum ini:
-            $(this).get(0).style.setProperty('transform', `rotate(${rotation}deg)`, 'important'); 
-            // Note: Kod ini mungkin tidak berfungsi kerana CSS anda menggunakan ::before.
-            // Solusi yang lebih baik adalah menggunakan properti data untuk diproses oleh JS.
-            
-            // MEMPERBAIKI IMPLEMENTASI GAUGE:
-            // Mengambil elemen ::before secara tidak langsung dengan DOM / Jquery sukar.
-            // Kita akan cuba menggunakan JS untuk mengubah property CSS bagi elemen yang bertanggungjawab
-            // Jika elemen ::before yang digunakan, kita terpaksa rely pada CSS sahaja.
             // KITA HANYA BOLEH SET COLOR. ROTATION KEKAL AUTONOMOUS DALAM CSS.
-            // Jika anda menggunakan kaedah CSS penuh yang saya berikan sebelum ini,
-            // baris ini sudah cukup untuk menetapkan warna dinamik:
             $(this).get(0).style.setProperty('--gauge-color', color); 
         });
 
@@ -1248,49 +1323,49 @@ $conn->close();
 
             if (totalLoans > 0) {
                  new Chart(donutChartElement, {
-                    type: 'doughnut',
-                    data: {
-                        labels: chartLabels,
-                        datasets: [{
-                            data: chartValues,
-                            backgroundColor: donutColors,
-                            hoverOffset: 4,
-                            borderWidth: 1,
-                            borderColor: '#ffffff'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false, 
-                        plugins: {
-                            legend: {
-                                display: false 
-                            },
-                            title: {
-                                display: false
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.label || '';
-                                        if (label) { label += ': '; }
-                                        if (context.parsed !== null) {
-                                            label += context.parsed + ' items';
-                                            if (totalLoans > 0) {
-                                                const percentage = ((context.parsed / totalLoans) * 100).toFixed(1) + '%';
-                                                label += ` (${percentage})`;
-                                            }
-                                        }
-                                        return label;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
+                     type: 'doughnut',
+                     data: {
+                         labels: chartLabels,
+                         datasets: [{
+                             data: chartValues,
+                             backgroundColor: donutColors,
+                             hoverOffset: 4,
+                             borderWidth: 1,
+                             borderColor: '#ffffff'
+                         }]
+                     },
+                     options: {
+                         responsive: true,
+                         maintainAspectRatio: false, 
+                         plugins: {
+                             legend: {
+                                 display: false 
+                             },
+                             title: {
+                                 display: false
+                             },
+                             tooltip: {
+                                 callbacks: {
+                                     label: function(context) {
+                                         let label = context.label || '';
+                                         if (label) { label += ': '; }
+                                         if (context.parsed !== null) {
+                                             label += context.parsed + ' items';
+                                             if (totalLoans > 0) {
+                                                 const percentage = ((context.parsed / totalLoans) * 100).toFixed(1) + '%';
+                                                 label += ` (${percentage})`;
+                                             }
+                                         }
+                                         return label;
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 });
             } else {
                  // Gantikan canvas dengan mesej jika tiada data
-                $(donutChartElement).parent().html('<div class="text-center p-4 text-muted">No loan data available for charting.</div>');
+                 $(donutChartElement).parent().html('<div class="text-center p-4 text-muted">No loan data available for charting.</div>');
             }
         }
         // --- END: PENAMBAHAN FUNGSI VISUAL BARU ---

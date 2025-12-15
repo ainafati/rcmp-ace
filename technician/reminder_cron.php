@@ -1,7 +1,6 @@
 <?php
 
-define('ROOT_DIR', 'C:\\laragon\\www\\UniKL ACE\\');
-
+define('ROOT_DIR', '../');
 
 require ROOT_DIR . 'config.php';
 
@@ -24,13 +23,6 @@ if ($conn->connect_error) {
     exit();
 }
 
-// ------------------------------------------------------------------------
-// FUNGSI SQL (DIUBAH UNTUK MENGGUNAKAN r.reserve_date dan r.return_date)
-// ------------------------------------------------------------------------
-
-/**
- * Mengambil item yang belum dipulangkan yang matang pada tarikh sasaran.
- */
 function get_return_items_due($conn, $days_offset) {
     $target_date_sql = $days_offset == 0 ? "CURDATE()" : "DATE_ADD(CURDATE(), INTERVAL $days_offset DAY)";
     
@@ -145,10 +137,6 @@ function send_email_notification($recipient_email, $recipient_name, $items, $is_
         return false;
     }
 }
-
-// ------------------------------------------------------------------------
-// LOGIK UTAMA CRON JOB (KEKAL SAMA)
-// ------------------------------------------------------------------------
 
 $today_items = get_return_items_due($conn, 0);
 if (!empty($today_items)) {

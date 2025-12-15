@@ -3,16 +3,15 @@
 session_start();
 include '../config.php';
 
-
+// SEMAK LOG MASUK
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
-
 $person_id = (int)$_SESSION['person_id'];
 
-
+// AMBIL DATA PENGGUNA
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -25,15 +24,14 @@ $result = $stmt->get_result();
 $admin = $result->fetch_assoc(); 
 $stmt->close();
 
-
 if (!$admin) {
     session_destroy();
     header("Location: ../login.php"); 
     exit();
 }
 
-
-
+// Untuk memastikan pautan aktif, anda boleh tetapkan halaman ini sebagai aktif.
+$current_page = 'profile_admin.php'; 
 
 ?>
 <!DOCTYPE html>
@@ -41,121 +39,88 @@ if (!$admin) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1"> 
-    <title>My Profile — Admin</title>
+    <title>My Profile — UniKL Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* CSS Lengkap & Seragam Untuk Tema Anda */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; min-height: 100vh; overflow-x: hidden; }
-        
-        /* DESKTOP STYLES */
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: #ffffff; padding: 20px; border-right: 1px solid #e5e7eb; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
+        /* TEMA WARNA CYAN DARI FAIL SEBELUM INI */
+        :root {
+            --primary-color: #06b6d4;   /* Cyan */
+            --primary-hover: #0891b2;   /* Darker Cyan */
+            --danger-color: #ef4444;    /* Red */
+            
+            --bg-light-gray: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #1e293b; 
+            --text-muted: #64748b; 
+            --border-color: #e5e7eb;
+        }
+
+        /* BASE & TYPOGRAPHY */
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; overflow-x: hidden; }
+
+        /* SIDEBAR */
+        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: var(--card-bg); padding: 20px; border-right: 1px solid var(--border-color); z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
         .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
         .sidebar-overlay.active { display: block; }
-
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        .logo-icon { width: 40px; height: 40px; background-color: #3b82f6; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text strong { display: block; font-size: 16px; color: #1e293b; }
+        
+        /* LOGO ICON (Menggunakan --primary-color) */
+        .logo-icon { width: 40px; height: 40px; background-color: var(--primary-color); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        
+        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
         .logo-text span { font-size: 12px; color: #94a3b8; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #64748b; text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        .sidebar a.active, .sidebar a:hover { background: #3b82f6; color: #fff; }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: #ef4444; }
         
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
+        
+        /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
+        .sidebar a.active, .sidebar a:hover { background: var(--primary-color); color: #fff; }
+        
+        .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: auto; }
+        .sidebar a.logout-link:hover { color: #fff; background: var(--danger-color); }
+        
+        /* MAIN CONTENT & TOPBAR */
         .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
-        
-        .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; }
-        .topbar h3 { font-weight: 600; margin: 0; color: #1e293b; font-size: 22px; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
         .container-fluid { padding: 30px; }
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: #fff; margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: #1e293b; }
+
+        /* CARD & BUTTONS */
+        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .card h5 { font-weight: 600; color: var(--text-dark); }
         .profile-header-card { text-align: center; }
-        .avatar { width: 100px; height: 100px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 48px; font-weight: 600; }
+        .avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 48px; font-weight: 600; }
         .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-        .btn-primary { background-color: #3b82f6; border: none; }
-        .btn-primary:hover { background-color: #2563eb; }
         
-        /* Tambah ini untuk mobile tables */
-        .table-responsive-sm {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch; 
-        }
+        /* PRIMARY BUTTON (Menggunakan --primary-color) */
+        .btn-primary { background-color: var(--primary-color); border: none; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+
+        /* Tambah ini untuk mobile tables (tidak digunakan di sini, tetapi baik untuk konsistensi) */
+        .table-responsive-sm { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
         /* --- MOBILE VIEW (MAX-WIDTH 992px) --- */
-        #sidebar-toggle-btn {
-            display: none; 
-            background: none;
-            border: none;
-            color: #334155;
-            font-size: 20px;
-            padding: 0;
-            margin-right: 15px;
-        }
+        #sidebar-toggle-btn { display: none; background: none; border: none; color: #334155; font-size: 20px; padding: 0; margin-right: 15px; }
 
         @media (max-width: 992px) {
-            /* General Layout & Sidebar */
             #sidebar-toggle-btn { display: block; }
-            .sidebar { 
-                transform: translateX(-100%); 
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); 
-                z-index: 1050; 
-            }
-            .sidebar.open { 
-                transform: translateX(0); 
-            }
-            .main-content { 
-                margin-left: 0; 
-                width: 100%; 
-            }
+            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; width: 100%; }
+            .topbar { padding: 10px 15px; justify-content: space-between; } 
+            .topbar h3 { font-size: 18px; flex-grow: 1; text-align: center; margin-left: -35px; }
+            .topbar .d-flex { margin-left: auto; }
+            .container-fluid { padding: 15px; }
+            .card { padding: 20px; }
+            .col-lg-4, .col-lg-8 { width: 100%; }
+            .profile-header-card { margin-bottom: 15px; }
 
-            /* Topbar - Diperkemas */
-            .topbar { 
-                padding: 10px 15px; 
-                justify-content: space-between; 
-            } 
-            .topbar h3 { 
-                font-size: 18px; 
-                flex-grow: 1;
-                text-align: center;
-                margin-left: -35px; 
-            }
-            .topbar .d-flex {
-                margin-left: auto;
-            }
-            
-            /* Content Area */
-            .container-fluid { 
-                padding: 15px; 
-            }
-            .card {
-                padding: 20px;
-            }
-
-            /* Profile Card Stacks Vertically */
-            .col-lg-4, .col-lg-8 {
-                width: 100%; 
-            }
-            .profile-header-card {
-                margin-bottom: 15px;
-            }
-
-            /* Buttons */
-            #viewMode .d-flex {
-                flex-direction: column;
-                align-items: flex-start !important;
-            }
-            #viewMode .d-flex button {
-                width: 100%;
-                margin-top: 15px;
-            }
-            #editMode .btn {
-                width: 100%;
-                margin-top: 10px;
-            }
-            #editMode .btn-secondary {
-                margin-top: 0; 
-            }
+            /* Mobile button stacking */
+            #viewMode .d-flex { flex-direction: column; align-items: flex-start !important; }
+            #viewMode .d-flex button { width: 100%; margin-top: 15px; }
+            #editMode .btn { width: 100%; margin-top: 10px; }
+            #editMode .btn-secondary { margin-top: 0; }
         }
     </style>
 </head>
@@ -182,7 +147,7 @@ if (!$admin) {
         <h3>My Profile</h3>
         <div class="d-flex align-items-center">
             <a href="profile_admin.php" title="My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+                <i class="fa-solid fa-user-circle fa-2x" style="color: var(--primary-color);"></i>
             </a>
         </div>
     </div>
@@ -202,15 +167,21 @@ if (!$admin) {
             <div class="col-lg-8">
                 <div class="card">
                     <?php if (isset($_SESSION['message'])): ?>
-                        <div class="alert alert-success"><?= $_SESSION['message']; unset($_SESSION['message']); ?></div>
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <?= $_SESSION['message']; unset($_SESSION['message']); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                     <?php endif; ?>
                     <?php if (isset($_SESSION['error'])): ?>
-                        <div class="alert alert-danger"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <?= $_SESSION['error']; unset($_SESSION['error']); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                     <?php endif; ?>
 
                     <div id="viewMode">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5><i class="fa-solid fa-id-card me-2 text-primary"></i> Personal Information</h5>
+                            <h5><i class="fa-solid fa-id-card me-2" style="color: var(--primary-color);"></i> Personal Information</h5>
                             <button id="editBtn" class="btn btn-primary"><i class="fa-solid fa-pen me-2"></i> Edit Profile</button>
                         </div>
                         <hr>
@@ -220,7 +191,7 @@ if (!$admin) {
                     </div>
 
                     <div id="editMode" style="display: none;">
-                        <h5><i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Edit Your Information</h5>
+                        <h5><i class="fa-solid fa-pen-to-square me-2" style="color: var(--primary-color);"></i> Edit Your Information</h5>
                         <hr>
                         <form action="update_profile_admin.php" method="POST">
                             <div class="mb-3">
@@ -267,6 +238,7 @@ if (!$admin) {
         
         if (toggleBtn) {
             function toggleSidebar() {
+                // Gunakan kelas 'open' untuk mobile, seperti yang didefinisikan dalam CSS @media
                 sidebar.classList.toggle('open');
                 overlay.classList.toggle('active');
             }
@@ -274,6 +246,7 @@ if (!$admin) {
             toggleBtn.addEventListener('click', toggleSidebar);
             overlay.addEventListener('click', toggleSidebar);
             
+            // Tambah logik untuk menutup sidebar apabila pautan diklik (untuk mobile)
             const sidebarLinks = sidebar.querySelectorAll('a');
             sidebarLinks.forEach(link => {
                 link.addEventListener('click', function() {
@@ -286,22 +259,22 @@ if (!$admin) {
                 });
             });
         }
-    });
 
+        // Logik Toggle Edit Mode
+        const viewMode = document.getElementById('viewMode');
+        const editMode = document.getElementById('editMode');
+        const editBtn = document.getElementById('editBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
 
-    const viewMode = document.getElementById('viewMode');
-    const editMode = document.getElementById('editMode');
-    const editBtn = document.getElementById('editBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
+        editBtn.addEventListener('click', () => {
+            viewMode.style.display = 'none';
+            editMode.style.display = 'block';
+        });
 
-    editBtn.addEventListener('click', () => {
-        viewMode.style.display = 'none';
-        editMode.style.display = 'block';
-    });
-
-    cancelBtn.addEventListener('click', () => {
-        editMode.style.display = 'none';
-        viewMode.style.display = 'block';
+        cancelBtn.addEventListener('click', () => {
+            editMode.style.display = 'none';
+            viewMode.style.display = 'block';
+        });
     });
 </script>
 

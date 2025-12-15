@@ -549,6 +549,19 @@ if (isset($_GET['delete_item_id'])) {
             font-weight: 600; 
             margin-top: auto; 
         } 
+		
+		/* Dalam Bahagian 2, di dalam tag <style> */
+
+/* LOGOUT LINK */
+.sidebar a.logout-link { 
+    color: var(--danger-color); 
+    font-weight: 600; 
+    margin-top: 10px; /* Tukar 10px ini jika ada */
+}
+/* Tambah atau pastikan baris ini ada: */
+.sidebar > a.logout-link { /* Guna selector yang lebih spesifik jika perlu */
+    margin-top: auto; /* KUNCI UNTUK MENDAPATKANNYA DI BAWAH */
+}
         .sidebar a.logout-link:hover { 
             color: #fff; 
             background: var(--danger-color); 
@@ -812,11 +825,11 @@ endif;
                                     <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>
                                     <td class="text-center"><span class="badge rounded-pill text-bg-success"><?= $item['available_units'] ?></span></td>
                                     
-                                    <td class="d-flex gap-2">
-                                        <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
-                                        <button class="btn btn-sm btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
-                                    </td>
+                                   <td class="d-flex gap-1 flex-nowrap"> 
+    <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info flex-shrink-0" title="View Units"><i class="fa fa-eye"></i></a>
+    <button class="btn btn-sm btn-outline-warning flex-shrink-0" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
+    <button class="btn btn-sm btn-outline-danger flex-shrink-0" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
+</td>
                                     </tr>
                             <?php endforeach; endif; ?>
                             </tbody>

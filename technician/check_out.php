@@ -423,8 +423,25 @@ function create_request_table($requests) {
     .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
     .dataTables_info { font-size: 0.9rem; color: var(--text-muted); padding-top: 0.5rem !important; }
 
-    /* --- PEMBETULAN (Performance & Accessibility) --- */
-    @media (max-width: 991.98px) {
+@media (max-width: 767.98px) {
+    /* Sasarkan butang "Check Out All" sahaja */
+    .checkout-all-btn {
+        /* Tukar saiz fon kepada yang lebih kecil */
+        font-size: 0.75rem !important; /* Contoh: 12px */
+        
+        /* Kurangkan padding butang untuk menjadikannya lebih nipis */
+        padding: 0.3rem 0.6rem !important;
+        
+        /* Pastikan ia tidak cuba mengambil lebar penuh */
+        max-width: fit-content;
+        
+        /* Pastikan teks kekal sebaris */
+        white-space: nowrap !important;
+        
+        /* Jarakkan dari elemen sebelah kiri jika ada */
+        margin-left: 5px;
+    }
+
         .sidebar {
             transform: translateX(-100%); 
             transition: transform 0.3s ease-in-out;
@@ -487,7 +504,7 @@ function create_request_table($requests) {
             <h3>Manage Requests</h3>
         </div>
         <div class="d-flex align-items-center gap-3">
-            <span class="fw-bold"><?= htmlspecialchars($tech['name']) ?></span>
+            <span class="fw-bold d-none d-md-block"><?= htmlspecialchars($tech['name']) ?></span>
             <a href="profile_tech.php" title="My Profile" aria-label="View My Profile">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
             </a>

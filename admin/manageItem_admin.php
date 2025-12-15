@@ -195,7 +195,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     } else {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Category name cannot be empty.'];
     }
-    header("Location: manageItem_tech.php");
+    header("Location: manageItem_admin.php");
     exit();
 }
 
@@ -228,7 +228,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
         $stmt->close();
     }
     
-    header("Location: manageItem_tech.php"); exit();
+    header("Location: manageItem_admin.php"); exit();
 }
 
 
@@ -252,7 +252,7 @@ if (isset($_GET['delete_category_id'])) {
 
     if ($item_count > 0) {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot delete category: ' . $item_count . ' item type(s) are still linked to it.'];
-        header("Location: manageItem_tech.php"); exit();
+        header("Location: manageItem_admin.php"); exit();
     }
     
     $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
@@ -263,7 +263,7 @@ if (isset($_GET['delete_category_id'])) {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category: ' . $stmt->error];
     }
     $stmt->close();
-    header("Location: manageItem_tech.php"); exit();
+    header("Location: manageItem_admin.php"); exit();
 }
 
 
@@ -332,7 +332,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
     }
 
-    header("Location: manageItem_tech.php");
+    header("Location: manageItem_admin.php");
     exit();
 }
 
@@ -349,7 +349,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
     if ($item_id <= 0 || $category_id <= 0) {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID selected for update.'];
-        header("Location: manageItem_tech.php"); exit();
+        header("Location: manageItem_admin.php"); exit();
     }
 
     $conn->begin_transaction();
@@ -440,7 +440,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
     }
 
-    header("Location: manageItem_tech.php");
+    header("Location: manageItem_admin.php");
     exit();
 }
 
@@ -485,7 +485,7 @@ if (isset($_GET['delete_item_id'])) {
         $conn->rollback();
         $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot deleted item.It may be part of booking record: ' . $e->getMessage()];
     }
-    header("Location: manageItem_tech.php"); exit();
+    header("Location: manageItem_admin.php"); exit();
 }
 
 
@@ -741,7 +741,7 @@ endif;
                 <div class="card shadow-sm p-4 mb-4">
                     <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
                     <p class="text-muted small">Create a new item type and add initial stock in one step. <strong>Asset Codes are generated automatically from the Item Name acronym (e.g., PS-0001).</strong></p>
-                    <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+                    <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
                         <input type="hidden" name="add_item_type_and_units" value="1">
                         <h6 class="mt-3">A. Item Type Information</h6>
                         <hr class="mt-1">
@@ -841,7 +841,7 @@ endif;
                     <div class="col-md-5">
                         <h6>Add New Category</h6>
                         <hr>
-                        <form method="post" action="manageItem_tech.php">
+                        <form method="post" action="manageItem_admin.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
                                 <label for="category_name" class="form-label">Category Name</label>
@@ -882,7 +882,7 @@ endif;
                 <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="post" action="manageItem_tech.php">
+            <form method="post" action="manageItem_admin.php">
                 <div class="modal-body">
                     <input type="hidden" name="edit_category" value="1">
                     <input type="hidden" id="edit_category_id" name="edit_category_id">
@@ -905,7 +905,7 @@ endif;
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Edit Item Type</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
@@ -953,7 +953,7 @@ endif;
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
-        const sidebar = document.getElementById('offcanvasSidebar');
+        const sidebar = document.getElementById('admin-sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
 
         if (sidebarToggle) {
@@ -1015,7 +1015,7 @@ endif;
             confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = 'manageItem_tech.php?delete_category_id=' + id;
+                window.location.href = 'manageItem_admin.php?delete_category_id=' + id;
             }
         });
     }
@@ -1031,7 +1031,7 @@ endif;
             confirmButtonText: 'Yes, delete everything!'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = 'manageItem_tech.php?delete_item_id=' + id;
+                window.location.href = 'manageItem_admin.php?delete_item_id=' + id;
             }
         });
     }

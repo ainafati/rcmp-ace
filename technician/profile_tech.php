@@ -1,22 +1,25 @@
 <?php
 session_start();
 
+// --- PHP INITIATION & DATABASE CONNECTION ---
+// Include file konfigurasi database
 include '../config.php';
 
-
+// Pastikan pengguna log masuk
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
 $person_id = (int)$_SESSION['person_id'];
-$tech_id = $person_id; 
+$tech_id = $person_id; // Menggunakan person_id sebagai tech_id
 
+// Semak sambungan database
 if (!isset($conn) || $conn->connect_error) {
     die("Database Connection Error.");
 }
 
-
+// Dapatkan butiran Juruteknik (Selamat: Menggunakan prepared statements)
 $stmt = $conn->prepare("SELECT id AS staff_id, name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -29,16 +32,17 @@ $tech = $result->fetch_assoc();
 $stmt->close();
 
 if (!$tech) {
+    // Jika data pengguna tidak dijumpai, hancurkan sesi dan redirect ke login
     session_destroy();
     header("Location: ../login.php");
     exit();
 }
 
-
+// Pengurusan Mod Edit (Untuk kekal dalam mod edit jika update gagal)
 $keep_edit_mode = false;
 if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) {
     $keep_edit_mode = true;
-    unset($_SESSION['keep_edit_mode']); 
+    unset($_SESSION['keep_edit_mode']); // Bersihkan sesi selepas digunakan
 }
 ?>
 <!DOCTYPE html>
@@ -76,8 +80,10 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     .sidebar {
         width: 280px; position: fixed; top: 0; bottom: 0; left: 0;
         background: var(--card-bg); padding: 20px;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1000;
-        display: flex; flex-direction: column; justify-content: space-between;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); 
+        z-index: 1050; /* KEMAS KINI PENTING: MESTI lebih tinggi daripada backdrop (1040) */
+        display: flex; flex-direction: column; 
+        justify-content: space-between; 
         transition: transform 0.3s ease-in-out;
     }
     .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
@@ -98,7 +104,18 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
     }
     .sidebar a:hover:not(.active) { background: #eef1f4; color: var(--text-dark); }
-    .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: 20px; }
+    
+    /* LOGOUT LINK CSS */
+    .sidebar a.logout-link { 
+        color: var(--danger-color); 
+        font-weight: 600; 
+        margin-top: auto; 
+    }
+    .sidebar a.logout-link:hover {
+        background: var(--danger-color);
+        color: white;
+    }
+    
     .sidebar a i { width: 20px; text-align: center; }
 
     /* --- Content & Topbar Styles --- */
@@ -106,7 +123,7 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     .topbar { background: var(--card-bg); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eef1f4; z-index: 999; position: sticky; top: 0; }
     .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
     .container-fluid { padding: 30px; }
-        
+    
     .card {
         border-radius: 12px; box-shadow: var(--shadow-light);
         background: var(--card-bg); margin-bottom: 25px;
@@ -134,11 +151,8 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         border: 5px solid white;
         box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.3);
     }
-    .basic-info strong { font-size: 1.5rem; font-weight: 700; display: block; margin-bottom: 5px; color: white; }
-    .basic-info span { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; }
-
-
-    /* Reka Bentuk Maklumat Dalam View Mode (Cards Pinned) */
+    
+    /* Reka Bentuk Maklumat Dalam View Mode */
     .info-card-container { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
     .info-card {
         padding: 18px 25px;
@@ -150,98 +164,39 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         border: 1px solid #eef1f4;
         transition: transform 0.2s, box-shadow 0.2s;
     }
-    .info-card:hover {
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
-    }
-    /* Icon khusus untuk ID */
-    .info-icon-wrapper.id-wrapper {
-        background-color: var(--text-muted); /* Kelabu */
-    }
+    .info-icon-wrapper.id-wrapper { background-color: var(--text-muted); }
     .info-icon-wrapper {
-        width: 45px;
-        height: 45px;
-        border-radius: 50%;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        flex-shrink: 0;
+        width: 45px; height: 45px; border-radius: 50%;
+        color: white; display: flex; align-items: center; justify-content: center;
+        font-size: 20px; flex-shrink: 0;
     }
     .info-details strong {
-        display: block;
-        font-size: 13px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        margin-bottom: 2px;
+        display: block; font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;
     }
     .info-details span {
-        font-weight: 700;
-        color: var(--text-dark);
-        font-size: 17px;
+        font-weight: 700; color: var(--text-dark); font-size: 17px;
     }
-
-    /* --- CSS BARU UNTUK CENTER DAN BOLD NAMA --- */
-    .info-details.text-center-name {
-        flex-grow: 1; 
-        text-align: center;
-    }
-    .info-details.text-center-name span {
-        font-weight: 900; 
-        font-size: 1.25rem;
-    }
-    .info-details.text-center-name strong {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-    }
-    /* --- AKHIR CSS BARU --- */
 
     /* === CSS TAMBAHAN UNTUK TOPBAR NAMA === */
     .topbar .user-profile {
-        display: flex; 
-        align-items: center; 
-        gap: 10px;
+        display: flex; align-items: center; gap: 10px;
     }
     .topbar .user-name {
-        font-weight: 700; /* Untuk Bold */
+        font-weight: 700; 
         color: var(--text-dark); 
-        /* Penjajaran kekal kanan kerana ia di topbar */
         font-size: 1rem;
     }
-    /* === AKHIR CSS TAMBAHAN === */
-
-
-    /* Form Styles */
-    .form-control:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 0.25rem rgba(6, 182, 212, 0.25);
-    }
-    /* Untuk input yang Readonly agar kelihatan berbeza */
-    .form-control[readonly] {
-        background-color: #e9ecef; /* Slightly darker background */
-        opacity: 0.8;
-        cursor: not-allowed;
-    }
-    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 600; }
-    .btn-primary {
-        background-color: var(--primary-color);
-        border: none;
-        transition: background-color 0.2s;
-    }
-    .btn-primary:hover { background-color: var(--primary-hover); }
     
-    /* CSS tambahan untuk list requirement */
-    .alert-info ul {
-        list-style: none;
-        padding-left: 0;
-        margin-top: 5px;
-    }
-    .alert-info li {
-        margin-bottom: 3px;
-    }
+    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 600; }
+    .btn-primary { background-color: var(--primary-color); border: none; transition: background-color 0.2s; }
+    .btn-primary:hover { background-color: var(--primary-hover); }
 
     /* Mobile Optimizations */
+    .offcanvas-backdrop.show {
+        opacity: 0.5;
+        transition: opacity 0.3s ease-in-out;
+    }
+    
     @media (max-width: 992px) {
         .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
         .main-content { margin-left: 0; width: 100%; }
@@ -276,12 +231,12 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
             <i class="fa-solid fa-bars"></i>
         </button>
         <h3>My Profile</h3>
-            <div class="user-profile">
+        <div class="user-profile">
             <span class="user-name d-none d-md-inline fw-bold"><?= htmlspecialchars($tech['name'] ?? '') ?></span>
             <a href="#" title="My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>
-            </div>
+        </div>
     </div>
     <div class="container-fluid">
         <div class="row justify-content-center">
@@ -312,6 +267,7 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             <?php endif; ?>
+
                             <div id="viewMode" style="display: <?= $keep_edit_mode ? 'none' : 'block' ?>;">
                                 <div class="d-flex justify-content-between align-items-center mb-4">
                                     <h5 class="mb-0"><i class="fa-solid fa-id-card me-2 text-primary"></i> Contact Information</h5>
@@ -426,18 +382,20 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
+    
+    // Sidebar Elements
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
     
-    
+    // --- View/Edit Mode Toggles ---
     function switchToEditMode() {
         viewMode.style.display = 'none';
         editMode.style.display = 'block';
     }
 
     function switchToViewMode() {
-        
+        // Clear password fields upon canceling
         document.querySelector('input[name="new_password"]').value = '';
         document.querySelector('input[name="confirm_password"]').value = '';
         
@@ -445,20 +403,32 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         viewMode.style.display = 'block';
     }
 
-    editBtn.addEventListener('click', switchToEditMode);
-    cancelBtn.addEventListener('click', switchToViewMode);
+    if(editBtn) editBtn.addEventListener('click', switchToEditMode);
+    if(cancelBtn) cancelBtn.addEventListener('click', switchToViewMode);
 
-
-    
+    // --- Sidebar Toggle Logic (Optimized for Mobile Backdrop) ---
     function toggleSidebar() {
-        if (sidebar.style.transform === 'translateX(0px)' || window.getComputedStyle(sidebar).transform === 'matrix(1, 0, 0, 1, 0, 0)') {
+        // Menggunakan window.getComputedStyle untuk mendapatkan nilai transform yang tepat
+        const transformValue = window.getComputedStyle(sidebar).getPropertyValue('transform');
+        const isOpen = transformValue !== 'none' && transformValue !== 'matrix(1, 0, 0, 1, -280, 0)';
+        
+        if (isOpen) {
+            // Close Sidebar
             sidebar.style.transform = 'translateX(-280px)';
             backdrop.classList.remove('show');
-            backdrop.style.display = 'none';
+            
+            // Delay hide display to allow fade out transition
+            setTimeout(() => {
+                backdrop.style.display = 'none';
+            }, 300); 
+            
         } else {
+            // Open Sidebar
+            backdrop.style.display = 'block'; // Show backdrop immediately
+            setTimeout(() => {
+                backdrop.classList.add('show'); // Trigger fade-in
+            }, 10);
             sidebar.style.transform = 'translateX(0px)';
-            backdrop.style.display = 'block';
-            backdrop.classList.add('show');
         }
     }
 
@@ -470,33 +440,30 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         backdrop.addEventListener('click', toggleSidebar);
     }
 
-    window.addEventListener('load', () => {
-        
+    // --- Responsive Behavior ---
+    function handleResize() {
         if (window.innerWidth >= 992) {
+            // Desktop: Sidebar sentiasa terbuka
             sidebar.style.transform = 'translateX(0px)';
+            backdrop.style.display = 'none'; // Sembunyikan backdrop
+        } else if (sidebar.style.transform === 'translateX(0px)' || window.getComputedStyle(sidebar).getPropertyValue('transform') === 'matrix(1, 0, 0, 1, 0, 0)') {
+            // Mobile: Biarkan terbuka jika sudah dibuka, jika tidak, pastikan ia tersembunyi
+            // Tiada tindakan, biarkan ia di kedudukan semasa (0px jika terbuka)
         } else {
-            sidebar.style.transform = 'translateX(-280px)';
+             sidebar.style.transform = 'translateX(-280px)';
+             backdrop.style.display = 'none';
         }
+    }
 
-        
-        
+    window.addEventListener('load', () => {
+        handleResize();
+        // Cek jika perlu kekal dalam mod Edit selepas load
         if (shouldKeepEditMode) {
-            
-            viewMode.style.display = 'none';
-            editMode.style.display = 'block';
+            switchToEditMode();
         }
-        
     });
 
-    window.addEventListener('resize', () => {
-        if (window.innerWidth >= 992) {
-            sidebar.style.transform = 'translateX(0px)';
-            backdrop.style.display = 'none';
-        } else if (window.getComputedStyle(sidebar).transform !== 'translateX(0px)') {
-            sidebar.style.transform = 'translateX(-280px)';
-            backdrop.style.display = 'none';
-        }
-    });
+    window.addEventListener('resize', handleResize);
 </script>
 
 </body>

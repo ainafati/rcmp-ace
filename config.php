@@ -27,7 +27,7 @@ if (!defined('BASE_URL')) {
 
 
 if (!defined('TECHNICIAN_GROUP_EMAIL')) {
-    define('TECHNICIAN_GROUP_EMAIL', 'it.rcmp@unikl.edu.my');
+    define('TECHNICIAN_GROUP_EMAIL', 'aina.fatihah@t.unikl.edu.my');
 }
 
 
