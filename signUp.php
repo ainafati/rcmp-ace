@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 	
 	
-    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@gmail.com', '@s.unikl.edu.my'];
+    $allowed_domains = ['@unikl.edu.my', '@t.unikl.edu.my', '@s.unikl.edu.my'];
     $lower_email = strtolower($email);
     $is_valid_domain = false;
 	
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     if (!$is_valid_domain) { 
-        $_SESSION['error'] = "Only <strong>UniKL official email</strong> (@unikl.edu.my or @t.unikl.edu.my) addresses are allowed for sign up.";
+        $_SESSION['error'] = "Only <strong>UniKL official email</strong> addresses are allowed for sign up.";
         header("Location: signUp.php");
         exit();
     }

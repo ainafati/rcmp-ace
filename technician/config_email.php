@@ -2,7 +2,7 @@
 
 if (!defined('LOCAL_MAIL_TEST_CHECK')) {
 
-    define('LOCAL_MAIL_TEST', true); 
+    define('LOCAL_MAIL_TEST', false); 
 
     
     define('LIVE_SMTP_HOST', 'smtp.office365.com'); 
