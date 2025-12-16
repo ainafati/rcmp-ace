@@ -352,7 +352,7 @@ function sendNewReservationNotification($technician_email, $reserve_id, $user_na
         
         $mail->addAddress($technician_email, 'Inventory Technician'); 
 
-		$mail->addBCC('aina.fatihah@t.unikl.edu.my','IT Monitoring');
+		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
 
         $mail->isHTML(true);
         $mail->Subject = "NEW RESERVATION: Item - {$item_name} by {$user_name}";
