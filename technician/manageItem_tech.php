@@ -1,16 +1,12 @@
 <?php
-
-
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-
 session_start();
-
 include '../config.php'; 
 
-
+// 1. CHECK ACCESS
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
@@ -21,21 +17,17 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technicia
 
 $person_id = (int) $_SESSION['person_id']; 
 
+// 2. GET TECH DATA
 $stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
-if ($stmt_tech === FALSE) { session_unset(); session_destroy(); header("Location: ../logout.php"); exit(); }
 $stmt_tech->bind_param("i", $person_id);
 $stmt_tech->execute();
-$result_tech = $stmt_tech->get_result();
-$tech_data = $result_tech->fetch_assoc();
+$tech_data = $stmt_tech->get_result()->fetch_assoc();
 $stmt_tech->close();
-
 $tech_name = $tech_data ? htmlspecialchars($tech_data['name']) : 'Technician Unknown'; 
 
-
+// --- HELPER FUNCTIONS ---
 function safe_unlink($db_filepath) {
     if (!$db_filepath) return;
-    
-    
     $server_path = '../' . $db_filepath; 
     if (file_exists($server_path) && is_file($server_path)) {
         @unlink($server_path);
@@ -44,12 +36,8 @@ function safe_unlink($db_filepath) {
 
 function handleImageUpload($fileInputName, $dbSubDir) {
     global $conn;
-    
-    
     if (empty($dbSubDir)) $dbSubDir = 'assets/'; 
     if (substr($dbSubDir, -1) !== '/') { $dbSubDir .= '/'; }
-
-    
     $targetDir = '../' . $dbSubDir; 
 
     if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] != UPLOAD_ERR_OK) {
@@ -58,428 +46,190 @@ function handleImageUpload($fileInputName, $dbSubDir) {
 
     $file = $_FILES[$fileInputName];
     $fileExt = strtolower(pathinfo(basename($file["name"]), PATHINFO_EXTENSION));
-    
-    
-    if ($file["size"] > 5000000) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Image size is too large (max 5MB).']; return NULL; }
-    if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) { $_SESSION['message'] = ['type' => 'error', 'text' => 'Only JPG, JPEG, PNG, & WEBP files are allowed.']; return NULL; }
+    if ($file["size"] > 5000000) return NULL;
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) return NULL;
 
     $newFileName = uniqid('img_', true) . "." . $fileExt;
     $server_path = $targetDir . $newFileName; 
     $db_path = $dbSubDir . $newFileName;     
 
-    
-    if (!is_dir($targetDir)) {
-        if (!mkdir($targetDir, 0777, true)) {
-             $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat mencipta direktori muat naik atau kebenaran tidak mencukupi.'];
-             return NULL;
-        }
-    }
-
-    if (move_uploaded_file($file["tmp_name"], $server_path)) {
-        return $db_path; 
-    } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Ralat memuat naik imej (Semak kebenaran fail).'];
-        return NULL;
-    }
+    if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+    if (move_uploaded_file($file["tmp_name"], $server_path)) return $db_path; 
+    return NULL;
 }
 
 function generateItemAcronym($itemName) {
-    
     $cleanedName = preg_replace('/[^a-zA-Z\s]/', '', $itemName);
-    
-    
     $words = explode(' ', $cleanedName);
     $acronym = '';
-    
-    
-    foreach ($words as $word) {
-        if (!empty($word)) {
-            $acronym .= strtoupper($word[0]);
-        }
-    }
-    
-    
-    if (empty($acronym) && strlen($cleanedName) >= 2) {
-        $acronym = strtoupper(substr($cleanedName, 0, 2));
-    } elseif (empty($acronym)) {
-        $acronym = 'XX'; 
-    }
-
-    
+    foreach ($words as $word) { if (!empty($word)) $acronym .= strtoupper($word[0]); }
+    if (empty($acronym)) $acronym = 'ITEM';
     return substr($acronym, 0, 3);
 }
 
-
-
-function refValues($arr){
-    if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
-        $refs = array();
-        foreach($arr as $key => $value)
-            $refs[$key] = &$arr[$key];
-        return $refs;
-    }
-    return $arr;
-}
-
-
-
-
-
-
-$pending_count_for_badge = 0; 
-
-$stmt_badge = $conn->prepare("SELECT COUNT(DISTINCT reserve_id) FROM reservation_items WHERE status = 'Pending'");
-
-if ($stmt_badge) {
-    $stmt_badge->execute();
-    $stmt_badge->bind_result($pending_count_for_badge);
-    $stmt_badge->fetch();
-    $stmt_badge->close();
-}
-
-
-
-$categories = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
-
-
-$item_details_query = "
-    SELECT 
-        i.item_id,
-        i.item_name,
-        i.description,
-        i.image_url,
-        c.category_name,
-        c.category_id,
-        COUNT(a.asset_id) AS total_units,
-        SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) AS available_units
-    FROM item i
-    JOIN categories c ON i.category_id = c.category_id
-    LEFT JOIN assets a ON i.item_id = a.item_id
-    GROUP BY i.item_id
-    ORDER BY i.item_name ASC
-";
-$item_details = [];
-$result = $conn->query($item_details_query);
-if ($result) {
-    $item_details = $result->fetch_all(MYSQLI_ASSOC);
-} 
-
-
-
-
+// --- 3. LOGIC: ADD CATEGORY ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_category'])) {
     $category_name = trim($_POST['category_name']);
-    
     if (!empty($category_name)) {
-        
         $stmt = $conn->prepare("INSERT INTO categories (category_name) VALUES (?)");
-        
-        if ($stmt === FALSE) {
-            $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Add Cat): ' . $conn->error];
-        } else {
-            $stmt->bind_param("s", $category_name);
-            
-            if ($stmt->execute()) {
-                $_SESSION['message'] = ['type' => 'success', 'text' => 'Category added successfully!'];
-            } else {
-                $_SESSION['message'] = ['type' => 'error', 'text' => 'Error adding category: ' . $stmt->error];
-            }
-            $stmt->close();
-        }
-    } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Category name cannot be empty.'];
-    }
-    header("Location: manageItem_tech.php");
-    exit();
-}
-
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_category'])) {
-    $category_id = (int)$_POST['edit_category_id'];
-    $category_name = trim($_POST['edit_category_name']);
-    
-    $update_fields = ["category_name = ?"];
-    $update_params = [$category_name];
-    $types = "s";
-    
-    
-    $update_params[] = $category_id;
-    $types .= "i";
-    
-    $update_query = "UPDATE categories SET " . implode(", ", $update_fields) . " WHERE category_id = ?";
-    $stmt = $conn->prepare($update_query);
-
-    if ($stmt === FALSE) {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'SQL Prepare Error (Edit Cat): ' . $conn->error];
-    } else {
-        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
-
-        if ($stmt->execute()) {
-            $_SESSION['message'] = ['type' => 'success', 'text' => 'Category updated successfully!'];
-        } else {
-            $_SESSION['message'] = ['type' => 'error', 'text' => 'Error updating category: ' . $stmt->error];
-        }
+        $stmt->bind_param("s", $category_name);
+        if ($stmt->execute()) $_SESSION['message'] = ['type' => 'success', 'title' => 'Success', 'text' => 'Category added!'];
+        else $_SESSION['message'] = ['type' => 'error', 'title' => 'Error', 'text' => $stmt->error];
         $stmt->close();
     }
-    
     header("Location: manageItem_tech.php"); exit();
 }
 
-
-if (isset($_GET['delete_category_id'])) {
-    $delete_id = (int)$_GET['delete_category_id'];
-    
-    
-    $stmt_info = $conn->prepare("SELECT category_name FROM categories WHERE category_id = ?"); 
-    $stmt_info->bind_param("i", $delete_id);
-    $stmt_info->execute();
-    $stmt_info->bind_result($category_name_to_delete);
-    $stmt_info->fetch();
-    $stmt_info->close();
-    
-    $check_item = $conn->prepare("SELECT COUNT(*) FROM item WHERE category_id = ?");
-    $check_item->bind_param("i", $delete_id);
-    $check_item->execute();
-    $check_item->bind_result($item_count);
-    $check_item->fetch();
-    $check_item->close();
-
-    if ($item_count > 0) {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot delete category: ' . $item_count . ' item type(s) are still linked to it.'];
-        header("Location: manageItem_tech.php"); exit();
-    }
-    
-    $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ?");
-    $stmt->bind_param("i", $delete_id);
-    if ($stmt->execute()) {
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Category deleted.'];
-    } else {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Could not delete category: ' . $stmt->error];
-    }
-    $stmt->close();
-    header("Location: manageItem_tech.php"); exit();
-}
-
-
+// --- 4. LOGIC: ADD ITEM & UNITS ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_units'])) {
     $item_name = ucwords(trim($_POST['item_name']));
     $category_id = (int)$_POST['category_id'];
-    $description = trim($_POST['description']);
     $quantity = (int)$_POST['quantity'];
-$batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
-$batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
-    // Ambil array kod manual kalau ada
-    $manual_codes = isset($_POST['manual_codes']) ? $_POST['manual_codes'] : [];
-    $is_manual = !empty($manual_codes);
+    $batch_brand = trim($_POST['batch_brand'] ?? '');
+    $batch_model = trim($_POST['batch_model'] ?? '');
+    $manual_codes = $_POST['manual_codes'] ?? [];
+    $is_manual = (isset($_POST['enable_manual_code']) && !empty($manual_codes));
 
     $conn->begin_transaction();
-
     try {
-        // 1. Upload Gambar
         $image_path = handleImageUpload('item_image', 'assets/item_images');
-
-        // 2. Insert Item Type
-        $stmt = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("siss", $item_name, $category_id, $description, $image_path);
+        $stmt = $conn->prepare("INSERT INTO item (item_name, category_id, image_url) VALUES (?, ?, ?)");
+        $stmt->bind_param("sis", $item_name, $category_id, $image_path);
         $stmt->execute();
         $new_item_id = $conn->insert_id;
+        $stmt->close();
 
-        // 3. Insert Assets (Units)
-        $asset_status = 'Available';
-        $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
+        $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
+        $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, 'Available')");
 
         if ($is_manual) {
-            // SITUASI MANUAL: Guna kod dari array manual_codes
             foreach ($manual_codes as $code) {
-                if (empty(trim($code))) continue; // Skip kalau kosong
-                $asset_insert_stmt->bind_param("issss", $new_item_id, $code, $batch_brand, $batch_model, $asset_status);
-                $asset_insert_stmt->execute();
+                $code = trim($code);
+                if (empty($code)) continue;
+                $check_stmt->bind_param("s", $code);
+                $check_stmt->execute();
+                if ($check_stmt->get_result()->num_rows > 0) throw new Exception("Code '$code' already exists!");
+                $insert_asset->bind_param("isss", $new_item_id, $code, $batch_brand, $batch_model);
+                $insert_asset->execute();
             }
-            $msg = "Item and units added with manual codes.";
         } else {
-            // SITUASI AUTO: Generate guna akronim
-            $akronim = generateItemAcronym($item_name);
+            $acr = generateItemAcronym($item_name);
             for ($i = 1; $i <= $quantity; $i++) {
-                $asset_code = $akronim . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-                $asset_insert_stmt->bind_param("issss", $new_item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
-                $asset_insert_stmt->execute();
+                $a_code = $acr . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
+                $insert_asset->bind_param("isss", $new_item_id, $a_code, $batch_brand, $batch_model);
+                $insert_asset->execute();
             }
-            $msg = "Item and $quantity units added with auto-generated codes.";
         }
-
         $conn->commit();
-        $_SESSION['message'] = ['type' => 'success', 'text' => $msg];
-
+        $_SESSION['message'] = ['type' => 'success', 'title' => 'Success', 'text' => 'Item added successfully!'];
     } catch (Exception $e) {
         $conn->rollback();
-        if (isset($image_path)) safe_unlink($image_path);
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: ' . $e->getMessage()];
-    }
-    header("Location: manageItem_tech.php");
-    exit();
-}
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
-    
-    $item_id = (int)$_POST['edit_item_id'];
-    $item_name = ucwords(trim($_POST['edit_item_name']));
-    $category_id = (int)$_POST['edit_category_id'];
-    $description = trim($_POST['edit_description']);
-    $quantity_to_add = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
-    $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
-    $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
-
-    if ($item_id <= 0 || $category_id <= 0) {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID.'];
-        header("Location: manageItem_tech.php"); 
-        exit();
-    }
-
-    $conn->begin_transaction();
-
-    try {
-        // 1. URUSAN GAMBAR
-        $new_image_path = handleImageUpload('edit_item_image', 'assets/item_images');
-        
-        $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
-        $update_params = [$item_name, $category_id, $description];
-        $types = "sis";
-
-        if ($new_image_path) {
-            // Ambil path gambar lama untuk delete
-            $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
-            $old_img_stmt->bind_param("i", $item_id);
-            $old_img_stmt->execute();
-            $old_img_stmt->bind_result($old_image_path);
-            $old_img_stmt->fetch();
-            $old_img_stmt->close();
-
-            $update_fields[] = "image_url = ?";
-            $update_params[] = $new_image_path;
-            $types .= "s";
-            
-            if ($old_image_path) safe_unlink($old_image_path); 
-        }
-
-        // 2. UPDATE TABLE ITEM
-        $update_params[] = $item_id;
-        $types .= "i";
-        $update_query = "UPDATE item SET " . implode(", ", $update_fields) . " WHERE item_id = ?";
-        
-        $stmt = $conn->prepare($update_query);
-        if (!$stmt) throw new Exception("Prepare Error: " . $conn->error);
-        
-        $stmt->bind_param($types, ...$update_params);
-        if (!$stmt->execute()) throw new Exception("Update Error: " . $stmt->error);
-        $stmt->close();
-
-        // 3. URUSAN TAMBAH UNIT (ASSETS)
-        $message_part_2 = "";
-        if ($quantity_to_add > 0) {
-            $asset_status = 'Available';
-            $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
-            
-            $first_new_code = "";
-
-            // A. MANUAL CODE
-            if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
-                foreach ($_POST['manual_codes'] as $index => $m_code) {
-                    $m_code = trim($m_code);
-                    if (!empty($m_code)) {
-                        $asset_insert_stmt->bind_param("issss", $item_id, $m_code, $batch_brand, $batch_model, $asset_status);
-                        $asset_insert_stmt->execute();
-                        if ($index === 0) $first_new_code = $m_code;
-                    }
-                }
-                $message_part_2 = " & " . count($_POST['manual_codes']) . " unit manual ditambah";
-            } 
-            // B. AUTO GENERATE (TAHUN + SIRI)
-            else {
-                $current_year = date('Y');
-                
-                // Cari total sedia ada untuk tentukan nombor siri seterusnya
-                $count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM assets WHERE item_id = ?");
-                $count_stmt->bind_param("i", $item_id);
-                $count_stmt->execute();
-                $res = $count_stmt->get_result();
-                $existing_count = $res->fetch_assoc()['total'];
-                $count_stmt->close();
-
-                for ($i = 1; $i <= $quantity_to_add; $i++) {
-                    $next_serial = $existing_count + $i;
-                    $auto_code = $current_year . str_pad($next_serial, 3, '0', STR_PAD_LEFT);
-                    
-                    $asset_insert_stmt->bind_param("issss", $item_id, $auto_code, $batch_brand, $batch_model, $asset_status);
-                    $asset_insert_stmt->execute();
-                    
-                    if ($i === 1) $first_new_code = $auto_code;
-                }
-                $message_part_2 = " & " . $quantity_to_add . " unit auto-generate ditambah (Mula: $first_new_code)";
-            }
-            $asset_insert_stmt->close();
-        }
-
-        $conn->commit();
-        $_SESSION['message'] = ['type' => 'success', 'text' => "Item '$item_name' berjaya dikemaskini$message_part_2."];
-
-    } catch (Exception $e) {
-        $conn->rollback();
-        if (isset($new_image_path)) safe_unlink($new_image_path);
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Gagal kemaskini: ' . $e->getMessage()];
-    }
-
-    header("Location: manageItem_tech.php");
-    exit();
-}
-
-if (isset($_GET['delete_item_id'])) {
-    
-    $delete_id = (int)$_GET['delete_item_id'];
-    
-    $stmt_info = $conn->prepare("SELECT item_name, image_url FROM item WHERE item_id = ?");
-    $stmt_info->bind_param("i", $delete_id);
-    $stmt_info->execute();
-    $stmt_info->bind_result($item_name_to_delete, $image_to_delete);
-    $stmt_info->fetch();
-    $stmt_info->close();
-    
-    $conn->begin_transaction();
-    
-    try {
-        $assets_to_delete_res = $conn->query("SELECT asset_id FROM assets WHERE item_id = $delete_id");
-        $asset_ids = [];
-        while ($row = $assets_to_delete_res->fetch_assoc()) { $asset_ids[] = $row['asset_id']; }
-        if (!empty($asset_ids)) {
-            $asset_id_list = implode(',', $asset_ids);
-            
-            $conn->query("DELETE FROM reservation_assets WHERE asset_id IN ($asset_id_list)");
-        }
-        
-        
-        $conn->query("DELETE FROM assets WHERE item_id = $delete_id");
-        
-        
-        $stmt = $conn->prepare("DELETE FROM item WHERE item_id = ?");
-        $stmt->bind_param("i", $delete_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        $conn->commit();
-        
-        safe_unlink($image_to_delete);
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'The item type and all its units have been deleted.'];
-        
-    } catch (Exception $e) {
-        $conn->rollback();
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Cannot deleted item.It may be part of booking record: ' . $e->getMessage()];
+        $_SESSION['message'] = ['type' => 'error', 'title' => 'Duplicate Alert', 'text' => $e->getMessage()];
     }
     header("Location: manageItem_tech.php"); exit();
 }
 
+// --- 5. LOGIC: EDIT ITEM & ADD UNITS ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
+    $item_id = (int)$_POST['edit_item_id'];
+    $item_name = ucwords(trim($_POST['edit_item_name']));
+    $category_id = (int)$_POST['edit_category_id'];
+    $qty_to_add = (int)($_POST['edit_item_quantity'] ?? 0);
+    $batch_brand = trim($_POST['batch_brand'] ?? '');
+    $batch_model = trim($_POST['batch_model'] ?? '');
 
+    $conn->begin_transaction();
+    try {
+        $new_img = handleImageUpload('edit_item_image', 'assets/item_images');
+        if ($new_img) {
+            $upd = $conn->prepare("UPDATE item SET item_name=?, category_id=?, image_url=? WHERE item_id=?");
+            $upd->bind_param("sisi", $item_name, $category_id, $new_img, $item_id);
+        } else {
+            $upd = $conn->prepare("UPDATE item SET item_name=?, category_id=? WHERE item_id=?");
+            $upd->bind_param("sii", $item_name, $category_id, $item_id);
+        }
+        $upd->execute();
+
+if ($qty_to_add > 0) {
+            $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
+            $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, status) VALUES (?, ?, 'Available')");
+
+            if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
+                foreach ($_POST['manual_codes'] as $m_code) {
+                    $m_code = trim($m_code);
+                    if (empty($m_code)) continue;
+
+                    // SEMAK JIKA KOD DAH ADA DALAM DB
+                    $check_stmt->bind_param("s", $m_code);
+                    $check_stmt->execute();
+                    $result = $check_stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        // Jika jumpa, batalkan semua proses (rollback) dan lempar error
+                        throw new Exception("Asset Code '$m_code' already exists in database!");
+                    }
+                    
+                    $insert_asset->bind_param("is", $item_id, $m_code);
+                    $insert_asset->execute();
+                }
+            
+            } else {
+                $curr_count = $conn->query("SELECT COUNT(*) FROM assets WHERE item_id=$item_id")->fetch_row()[0];
+                for ($i = 1; $i <= $qty_to_add; $i++) {
+                    $auto_code = date('Y') . str_pad($curr_count + $i, 3, '0', STR_PAD_LEFT);
+                    $insert_asset->bind_param("isss", $item_id, $auto_code, $batch_brand, $batch_model);
+                    $insert_asset->execute();
+                }
+            }
+        }
+        $conn->commit();
+        $_SESSION['message'] = ['type' => 'success', 'title' => 'Updated', 'text' => 'Inventory updated!'];
+    } catch (Exception $e) {
+        $conn->rollback(); // Batalkan semua kalau ada satu kod pun yang duplicate
+        $_SESSION['message'] = [
+            'type' => 'error', 
+            'title' => 'Duplicate Entry!', 
+            'text' => $e->getMessage() 
+        ];
+    }
+    header("Location: manageItem_tech.php"); exit();
+}
+
+// --- 6. LOGIC: DELETE ITEM ---
+if (isset($_GET['delete_item_id'])) {
+    $del_id = (int)$_GET['delete_item_id'];
+    try {
+        $conn->begin_transaction();
+        $check = $conn->query("SELECT COUNT(*) FROM reservation_assets WHERE asset_id IN (SELECT asset_id FROM assets WHERE item_id=$del_id)")->fetch_row()[0];
+        if ($check > 0) throw new Exception("Cannot delete. Item is in booking records.");
+        $conn->query("DELETE FROM assets WHERE item_id=$del_id");
+        $conn->query("DELETE FROM item WHERE item_id=$del_id");
+        $conn->commit();
+        $_SESSION['message'] = ['type' => 'success', 'title' => 'Deleted', 'text' => 'Item deleted.'];
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['message'] = ['type' => 'error', 'title' => 'Failed', 'text' => $e->getMessage()];
+    }
+    header("Location: manageItem_tech.php"); exit();
+}
+
+// --- 7. FINAL DATA FETCHING (DENGAN AVAILABLE UNITS) ---
+$categories = $conn->query("SELECT * FROM categories ORDER BY category_name ASC")->fetch_all(MYSQLI_ASSOC);
+
+$query = "
+    SELECT 
+        i.*, 
+        c.category_name, 
+        COUNT(a.asset_id) as total_units,
+        SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) as available_units
+    FROM item i 
+    JOIN categories c ON i.category_id = c.category_id 
+    LEFT JOIN assets a ON i.item_id = a.item_id 
+    GROUP BY i.item_id 
+    ORDER BY i.item_name ASC
+";
+$item_details = $conn->query($query)->fetch_all(MYSQLI_ASSOC);
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -894,10 +644,6 @@ endif;
                         </select>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea id="edit_description" name="edit_description" class="form-control" rows="2"></textarea>
-                    </div>
 
                     <hr>
                     <h6 class="mt-3">Add More Units (Optional)</h6>
@@ -905,7 +651,7 @@ endif;
                     
                     <div class="mb-3">
                         <label class="form-label">Number of New Units to Add</label>
-                        <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
+<input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control" min="0" value="0" required>
                     </div>
 
                     <div class="mb-3 form-check">
@@ -940,94 +686,176 @@ endif;
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- SIDEBAR LOGIC ---
-        const sidebar = document.getElementById('offcanvasSidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', function() {
-                sidebar.classList.toggle('active');
-            });
-        }
-
-        // --- DYNAMIC ASSET CODES (EDIT MODAL) ---
-        // SINI PUNCA DIA: Kita guna 'edit_item_quantity' supaya sama dengan HTML
-        const editQtyInput = document.getElementById('edit_item_quantity');
-        const editCheckbox = document.getElementById('edit_enable_manual_code');
-        const editContainer = document.getElementById('edit_manual_assets_container');
-        const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
-
-        function updateEditAssetInputs() {
-            if (!editDynamicInputs) return; 
-            editDynamicInputs.innerHTML = '';
-            if (editCheckbox && editCheckbox.checked) {
-                editContainer.style.display = 'block';
-                let qty = parseInt(editQtyInput.value) || 0;
-                for (let i = 1; i <= qty; i++) {
-                    editDynamicInputs.innerHTML += `
-                        <div class="input-group mb-2">
-                            <span class="input-group-text text-primary small">New Unit ${i}</span>
-                            <input type="text" name="manual_codes[]" class="form-control" placeholder="Manual code..." required>
-                        </div>`;
-                }
-            } else if (editContainer) {
-                editContainer.style.display = 'none';
-            }
-        }
-
-        if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
-        if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
-    });
-
-    // --- MODAL FUNCTIONS ---
-    function openEditItemModal(item) {
-        // Pastikan ID dalam getElementById adalah SAMA dengan id="" dalam HTML modal kau
-        const modalId = 'editItemModal';
-        const modalElement = document.getElementById(modalId);
-        
-        if (!modalElement) {
-            console.error("Modal dengan ID " + modalId + " tidak dijumpai dalam HTML!");
-            return;
-        }
-
-        document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('edit_item_name').value = item.item_name;
-        document.getElementById('edit_description').value = item.description || '';
-        document.getElementById('edit_category_id_select').value = item.category_id;
-        
-        // Gunakan ID edit_item_quantity (ikut HTML kau)
-        if(document.getElementById('edit_item_quantity')) {
-            document.getElementById('edit_item_quantity').value = 0;
-        }
-        
-        document.getElementById('edit_item_brand').value = '';
-        document.getElementById('edit_item_model').value = '';
-
-        // Tunjuk modal
-        var myModal = new bootstrap.Modal(modalElement);
-        myModal.show();
-    }
-
-    function openEditCategoryModal(category) {
-        document.getElementById('edit_category_id').value = category.category_id;
-        document.getElementById('edit_category_name').value = category.category_name;
-        var editCategoryModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
-        editCategoryModal.show();
-    }
-
-    function deleteItem(id, name) {
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- 1. SWEETALERT PHP NOTIFICATION ---
+    <?php if (isset($_SESSION['message'])): ?>
         Swal.fire({
-            title: 'Delete Item?',
-            text: "Asset '" + name + "' will be deleted!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Yes, Delete'
-        }).then((result) => {
-            if (result.isConfirmed) { window.location.href = 'manageItem_tech.php?delete_item_id=' + id; }
+            icon: '<?= $_SESSION['message']['type'] ?>',
+            title: '<?= addslashes($_SESSION['message']['title'] ?? "Notification") ?>',
+            text: '<?= addslashes($_SESSION['message']['text']) ?>',
+            confirmButtonColor: '#06b6d4',
+            timer: 4000,
+            timerProgressBar: true
+        });
+        <?php unset($_SESSION['message']); ?>
+    <?php endif; ?>
+
+    // --- 2. SIDEBAR TOGGLE (MOBILE) ---
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('offcanvasSidebar');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
         });
     }
+
+    // --- 3. DYNAMIC INPUTS FOR MANUAL ASSET CODES ---
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+    const editContainer = document.getElementById('edit_manual_assets_container');
+    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
+
+    function updateEditAssetInputs() {
+        if (!editDynamicInputs) return; 
+        const qty = parseInt(editQtyInput.value) || 0;
+
+        if (editCheckbox && editCheckbox.checked && qty > 0) {
+            editContainer.style.display = 'block';
+            let htmlContent = '';
+            const safeQty = Math.min(qty, 50); 
+
+            for (let i = 1; i <= safeQty; i++) {
+                htmlContent += `
+                    <div class="input-group mb-2">
+                        <span class="input-group-text text-primary small">Unit ${i}</span>
+                        <input type="text" name="manual_codes[]" class="form-control manual-code-input" 
+                               placeholder="Enter Asset Code..." required>
+                    </div>`;
+            }
+            editDynamicInputs.innerHTML = htmlContent;
+            attachDuplicateChecker(); // Panggil checker lepas generate input
+        } else {
+            if (editContainer) editContainer.style.display = 'none';
+            editDynamicInputs.innerHTML = '';
+        }
+    }
+
+    // --- 4. ULTIMATE DUPLICATE CHECKER (AJAX + CLIENT SIDE) ---
+    function attachDuplicateChecker() {
+        const inputs = document.querySelectorAll('.manual-code-input');
+        const saveBtn = document.querySelector('button[name="edit_item_type"]');
+
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                const currentInput = this;
+                const codeValue = currentInput.value.trim().toUpperCase();
+
+                if (codeValue === '') {
+                    currentInput.classList.remove('is-invalid', 'is-valid');
+                    return;
+                }
+
+                // A. Check duplicate dalam list modal (Client-side)
+                const allValues = Array.from(inputs).map(i => i.value.trim().toUpperCase());
+                const selfDuplicate = allValues.filter(v => v === codeValue).length > 1;
+
+                if (selfDuplicate) {
+                    showStatus(currentInput, 'Duplicate in list!', 'error');
+                    saveBtn.disabled = true;
+                    return;
+                }
+
+                // B. Check duplicate dengan Database (AJAX)
+                fetch('check_asset_code.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'asset_code=' + encodeURIComponent(codeValue)
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'exists') {
+                        showStatus(currentInput, 'Already exists!', 'error');
+                    } else {
+                        showStatus(currentInput, 'Valid code & can be used', 'success');
+                    }
+                    
+                    // Enable/Disable butang berdasarkan keadaan semua input
+                    const anyInvalid = Array.from(inputs).some(i => i.classList.contains('is-invalid'));
+                    saveBtn.disabled = anyInvalid;
+                });
+            });
+        });
+    }
+
+    function showStatus(el, msg, type) {
+        let feedback = el.nextElementSibling;
+        if (!feedback || !feedback.classList.contains('dynamic-feedback')) {
+            feedback = document.createElement('div');
+            feedback.className = 'dynamic-feedback small mt-1';
+            el.parentNode.appendChild(feedback);
+        }
+
+        if (type === 'error') {
+            el.classList.add('is-invalid');
+            el.classList.remove('is-valid');
+            feedback.className = 'dynamic-feedback invalid-feedback d-block';
+            feedback.innerText = msg;
+        } else {
+            el.classList.remove('is-invalid');
+            el.classList.add('is-valid');
+            feedback.className = 'dynamic-feedback valid-feedback d-block';
+            feedback.innerText = msg;
+        }
+    }
+
+    if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
+    if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
+});
+
+// --- 5. GLOBAL MODAL FUNCTIONS ---
+function openEditItemModal(item) {
+    const modalElement = document.getElementById('editItemModal');
+    if (!modalElement) return;
+
+    document.getElementById('edit_item_id').value = item.item_id;
+    document.getElementById('edit_item_name').value = item.item_name;
+    document.getElementById('edit_category_id_select').value = item.category_id;
+    
+    const qtyInput = document.getElementById('edit_item_quantity');
+    const manualCheck = document.getElementById('edit_enable_manual_code');
+    const saveBtn = document.querySelector('button[name="edit_item_type"]');
+    
+    if(qtyInput) qtyInput.value = 0;
+    if(manualCheck) manualCheck.checked = false;
+    if(saveBtn) saveBtn.disabled = false; // Reset butang
+    
+    const container = document.getElementById('edit_manual_assets_container');
+    if(container) container.style.display = 'none';
+
+    document.getElementById('edit_item_brand').value = '';
+    document.getElementById('edit_item_model').value = '';
+
+    const myModal = new bootstrap.Modal(modalElement);
+    myModal.show();
+}
+
+function deleteItem(id, name) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `Delete "${name}" and all its units?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = 'manageItem_tech.php?delete_item_id=' + id;
+        }
+    });
+}
 </script>
 </body>
 </html>

@@ -68,10 +68,10 @@ if (!empty($status_filter) && $status_filter != 'All') {
 }
 
 // Ambil maklumat item (Tajuk & Deskripsi)
-$stmt_item = $conn->prepare("SELECT item_name, description FROM item WHERE item_id = ?");
+$stmt_item = $conn->prepare("SELECT item_name FROM item WHERE item_id = ?");
 $stmt_item->bind_param("i", $item_id_filter);
 $stmt_item->execute();
-$stmt_item->bind_result($item_name_title, $description);
+$stmt_item->bind_result($item_name_title);
 if (!$stmt_item->fetch()) {
     header("Location: manageItem_tech.php"); exit(); 
 }
@@ -226,7 +226,6 @@ foreach ($all_assets as $asset) {
                 </ol>
             </nav>
             <h1 class="fw-bold h2 mb-0"><?= htmlspecialchars($item_name_title) ?></h1>
-            <p class="text-muted mt-1"><i class="fa-solid fa-info-circle me-1"></i> <?= htmlspecialchars($description) ?></p>
         </div>
         <a href="manageItem_tech.php" class="btn btn-white border shadow-sm px-4 py-2 rounded-4 bg-white">
             <i class="fa fa-chevron-left me-2"></i> Back
