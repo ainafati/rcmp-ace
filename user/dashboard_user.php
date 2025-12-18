@@ -1016,15 +1016,15 @@ $stmt_notif_list->close();
                     <hr class="mt-3 mb-3">
                     <div class="schedule-item">
                         <span class="text-muted"><i class="fa-solid fa-location-dot me-2"></i> Location:</span>
-                        <span class="fw-semibold text-end">IT Department, Level 1</span>
+                        <span class="fw-semibold text-end">No 3, Jalan Greentown, 30450 Ipoh Perak</span>
                     </div>
                     <div class="schedule-item">
                         <span class="text-muted"><i class="fa-solid fa-phone-volume me-2"></i> Contact No.:</span>
-                        <span class="fw-semibold text-end">+603-5543 XXXX (Ext: 1234)</span>
+                        <span class="fw-semibold text-end">1 300-22-7267</span>
                     </div>
                     <div class="schedule-item">
                         <span class="text-muted"><i class="fa-solid fa-envelope me-2"></i> Email:</span>
-                        <span class="fw-semibold text-end text-primary">it.rcmp@unikl.edu.my</span>
+                        <span class="fw-semibold text-end text-primary">+605-2432 636</span>
                     </div>
                     <p class="text-muted mt-3 mb-0 small">Please contact the number for any immediate issues or inquiries.</p>
                 </div>

@@ -330,102 +330,102 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
 
     if ($item_id <= 0 || $category_id <= 0) {
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID selected for update.'];
-        header("Location: manageItem_tech.php"); exit();
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Error: Invalid Item ID or Category ID.'];
+        header("Location: manageItem_tech.php"); 
+        exit();
     }
 
     $conn->begin_transaction();
 
     try {
+        // 1. URUSAN GAMBAR
+        $new_image_path = handleImageUpload('edit_item_image', 'assets/item_images');
+        
         $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
         $update_params = [$item_name, $category_id, $description];
         $types = "sis";
-        $old_image_path = NULL;
-        
-        
-        $new_image_path = handleImageUpload('edit_item_image', 'assets/item_images');
-
-        $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
-        $old_img_stmt->bind_param("i", $item_id);
-        $old_img_stmt->execute();
-        $old_img_stmt->bind_result($old_image_path);
-        $old_img_stmt->fetch();
-        $old_img_stmt->close();
 
         if ($new_image_path) {
+            // Ambil path gambar lama untuk delete
+            $old_img_stmt = $conn->prepare("SELECT image_url FROM item WHERE item_id = ?");
+            $old_img_stmt->bind_param("i", $item_id);
+            $old_img_stmt->execute();
+            $old_img_stmt->bind_result($old_image_path);
+            $old_img_stmt->fetch();
+            $old_img_stmt->close();
+
             $update_fields[] = "image_url = ?";
             $update_params[] = $new_image_path;
             $types .= "s";
-            safe_unlink($old_image_path); 
+            
+            if ($old_image_path) safe_unlink($old_image_path); 
         }
 
+        // 2. UPDATE TABLE ITEM
         $update_params[] = $item_id;
         $types .= "i";
-
         $update_query = "UPDATE item SET " . implode(", ", $update_fields) . " WHERE item_id = ?";
+        
         $stmt = $conn->prepare($update_query);
-        if ($stmt === FALSE) throw new Exception("SQL Prepare Error (Update Item): " . $conn->error);
+        if (!$stmt) throw new Exception("Prepare Error: " . $conn->error);
         
-        call_user_func_array([$stmt, 'bind_param'], refValues(array_merge([$types], $update_params)));
-
-        if (!$stmt->execute()) throw new Exception("Error updating item type: " . $stmt->error);
+        $stmt->bind_param($types, ...$update_params);
+        if (!$stmt->execute()) throw new Exception("Update Error: " . $stmt->error);
         $stmt->close();
-        
-        $message_part_2 = "";
-        $first_new_code = '';
 
-       if ($quantity_to_add > 0) {
+        // 3. URUSAN TAMBAH UNIT (ASSETS)
+        $message_part_2 = "";
+        if ($quantity_to_add > 0) {
             $asset_status = 'Available';
             $asset_insert_stmt = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, ?)");
-            if ($asset_insert_stmt === FALSE) throw new Exception("SQL Prepare Error (Edit Add Asset): " . $conn->error);
+            
+            $first_new_code = "";
 
-            // 1. SEMAK: Adakah user pilih Manual Code?
+            // A. MANUAL CODE
             if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
-                $manual_codes = $_POST['manual_codes'];
-                
-                foreach ($manual_codes as $index => $m_code) {
+                foreach ($_POST['manual_codes'] as $index => $m_code) {
                     $m_code = trim($m_code);
                     if (!empty($m_code)) {
                         $asset_insert_stmt->bind_param("issss", $item_id, $m_code, $batch_brand, $batch_model, $asset_status);
-                        if (!$asset_insert_stmt->execute()) throw new Exception("Error adding manual asset unit: " . $asset_insert_stmt->error);
-                        
+                        $asset_insert_stmt->execute();
                         if ($index === 0) $first_new_code = $m_code;
                     }
                 }
-                $message_part_2 = " and added " . count($manual_codes) . " units with manual codes.";
+                $message_part_2 = " & " . count($_POST['manual_codes']) . " unit manual ditambah";
             } 
-            // 2. JIKA TIDAK: Jalankan Auto-Generate macam biasa
+            // B. AUTO GENERATE (TAHUN + SIRI)
             else {
-                $akronim = generateItemAcronym($item_name); 
+                $current_year = date('Y');
                 
-                $asset_stmt = $conn->prepare("SELECT COUNT(*) AS max_num FROM assets WHERE item_id = ?");
-                $asset_stmt->bind_param("i", $item_id);
-                $asset_stmt->execute();
-                $asset_stmt->bind_result($max_num);
-                $asset_stmt->fetch();
-                $asset_stmt->close();
-                
-                $start_count = intval($max_num); 
+                // Cari total sedia ada untuk tentukan nombor siri seterusnya
+                $count_stmt = $conn->prepare("SELECT COUNT(*) as total FROM assets WHERE item_id = ?");
+                $count_stmt->bind_param("i", $item_id);
+                $count_stmt->execute();
+                $res = $count_stmt->get_result();
+                $existing_count = $res->fetch_assoc()['total'];
+                $count_stmt->close();
 
                 for ($i = 1; $i <= $quantity_to_add; $i++) {
-                    $asset_number = $start_count + $i;
-                    $asset_code = $akronim . "-" . str_pad($asset_number, 4, '0', STR_PAD_LEFT);
-                    if ($i == 1) $first_new_code = $asset_code;
-
-                    $asset_insert_stmt->bind_param("issss", $item_id, $asset_code, $batch_brand, $batch_model, $asset_status);
-                    if (!$asset_insert_stmt->execute()) throw new Exception("Error adding auto-generated asset unit: " . $asset_insert_stmt->error);
+                    $next_serial = $existing_count + $i;
+                    $auto_code = $current_year . str_pad($next_serial, 3, '0', STR_PAD_LEFT);
+                    
+                    $asset_insert_stmt->bind_param("issss", $item_id, $auto_code, $batch_brand, $batch_model, $asset_status);
+                    $asset_insert_stmt->execute();
+                    
+                    if ($i === 1) $first_new_code = $auto_code;
                 }
-                $message_part_2 = " and added " . $quantity_to_add . " units (Starts with: " . $first_new_code . ").";
+                $message_part_2 = " & " . $quantity_to_add . " unit auto-generate ditambah (Mula: $first_new_code)";
             }
             $asset_insert_stmt->close();
         }
+
         $conn->commit();
-        $_SESSION['message'] = ['type' => 'success', 'text' => 'Item berjaya dikemas kini' . $message_part_2 . '!'];
+        $_SESSION['message'] = ['type' => 'success', 'text' => "Item '$item_name' berjaya dikemaskini$message_part_2."];
 
     } catch (Exception $e) {
         $conn->rollback();
-        safe_unlink($new_image_path);
-        $_SESSION['message'] = ['type' => 'error', 'text' => 'Database error: ' . $e->getMessage()];
+        if (isset($new_image_path)) safe_unlink($new_image_path);
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'Gagal kemaskini: ' . $e->getMessage()];
     }
 
     header("Location: manageItem_tech.php");
@@ -722,20 +722,23 @@ endif;
 
 <div class="main-content">
     <div class="topbar">
-        <i class="fa fa-bars d-lg-none" id="sidebarToggle" style="cursor:pointer; font-size: 20px;"></i>
+        <i class="fa fa-bars menu-toggle" id="sidebarToggle"></i>
+        
         <h3>Inventory Management</h3>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-1"></i> Categories</button>
-            <div class="user-profile ms-3">
-                <span class="user-name small fw-bold"><?= $tech_name ?></span>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
+            <div class="user-profile">
+                <span class="user-name d-none d-sm-inline"><?= $tech_name ?></span> 
+                <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
+                    <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+                </a>
             </div>
         </div>
     </div>
-
+	
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h4 class="fw-bold mb-0">Item Inventory</h4>
                 <p class="text-muted small">Manage your equipment types and stock levels.</p>
             </div>
             <a href="addItem_tech.php" class="btn btn-primary px-4 shadow-sm">
@@ -787,6 +790,153 @@ endif;
     </div>
 </div>
 
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoryModalLabel">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-5">
+                        <h6>Add New Category</h6>
+                        <hr>
+                        <form method="post" action="manageItem_tech.php">
+                            <input type="hidden" name="add_category" value="1">
+                            <div class="mb-3">
+                                <label for="category_name" class="form-label">Category Name</label>
+                                <input type="text" class="form-control" id="category_name" name="category_name" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Add Category</button>
+                        </form>
+                    </div>
+                    <div class="col-md-7">
+                        <h6>Existing Categories</h6>
+                        <hr>
+                        <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+                            <?php if (empty($categories)): ?>
+                                <p class="text-center text-muted">No categories found.</p>
+                            <?php else: foreach($categories as $cat): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <span><?= htmlspecialchars($cat['category_name']) ?></span>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-warning" onclick='openEditCategoryModal(<?= htmlspecialchars(json_encode($cat), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(<?= $cat['category_id'] ?>, '<?= htmlspecialchars(addslashes($cat['category_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            <?php endforeach; endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="manageItem_tech.php">
+                <div class="modal-body">
+                    <input type="hidden" name="edit_category" value="1">
+                    <input type="hidden" id="edit_category_id" name="edit_category_id">
+                    <div class="mb-3">
+                        <label for="edit_category_name" class="form-label">Category Name</label>
+                        <input type="text" class="form-control" id="edit_category_name" name="edit_category_name" required>
+                    </div>
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="edit_item_type" value="1">
+                    <input type="hidden" id="edit_item_id" name="edit_item_id">
+
+                    <div class="mb-3">
+                        <label class="form-label">Item Name</label>
+                        <input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">New Item Image (Optional)</label>
+                        <input type="file" name="edit_item_image" class="form-control" accept="image/*">
+                        <small class="text-muted">Upload a new image to replace the old one.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select id="edit_category_id_select" name="edit_category_id" class="form-select" required>
+                            <?php foreach($categories as $cat): ?>
+                                <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="edit_description" name="edit_description" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <hr>
+                    <h6 class="mt-3">Add More Units (Optional)</h6>
+                    <p class="small text-muted">Kuantiti baru akan ditambah ke dalam sistem untuk item ini.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Number of New Units to Add</label>
+                        <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
+                        <label class="form-check-label" for="edit_enable_manual_code">I want to enter asset codes manually for these new units</label>
+                    </div>
+
+                    <div id="edit_manual_assets_container" style="display: none;">
+                        <label class="form-label text-primary fw-bold">Enter Manual Codes:</label>
+                        <div id="edit_dynamic_asset_inputs"></div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Brand for New Units</label>
+                            <input type="text" id="edit_item_brand" name="batch_brand" class="form-control" placeholder="e.g., Dell">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Model for New Units</label>
+                            <input type="text" id="edit_item_model" name="batch_model" class="form-control" placeholder="e.g., Latitude 5420">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -795,53 +945,23 @@ endif;
         // --- SIDEBAR LOGIC ---
         const sidebar = document.getElementById('offcanvasSidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
-
         if (sidebarToggle) {
             sidebarToggle.addEventListener('click', function() {
                 sidebar.classList.toggle('active');
             });
         }
-        
-        document.querySelector('.main-content').addEventListener('click', function(e) {
-            if (window.innerWidth <= 992 && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
-                sidebar.classList.remove('active');
-            }
-        });
-
-        // --- DYNAMIC ASSET CODES (ADD FORM) ---
-        const qtyInput = document.getElementById('input_quantity');
-        const checkbox = document.getElementById('enable_manual_code');
-        const container = document.getElementById('manual_assets_container');
-        const dynamicInputs = document.getElementById('dynamic_asset_inputs');
-
-        function updateAssetInputs() {
-            dynamicInputs.innerHTML = ''; 
-            if (checkbox.checked) {
-                container.style.display = 'block';
-                let qty = parseInt(qtyInput.value) || 0;
-                for (let i = 1; i <= qty; i++) {
-                    dynamicInputs.innerHTML += `
-                        <div class="input-group mb-2">
-                            <span class="input-group-text">Unit ${i}</span>
-                            <input type="text" name="manual_codes[]" class="form-control" placeholder="Enter code for unit ${i}" required>
-                        </div>`;
-                }
-            } else {
-                container.style.display = 'none';
-            }
-        }
-        qtyInput.addEventListener('input', updateAssetInputs);
-        checkbox.addEventListener('change', updateAssetInputs);
 
         // --- DYNAMIC ASSET CODES (EDIT MODAL) ---
-        const editQtyInput = document.getElementById('edit_input_quantity');
+        // SINI PUNCA DIA: Kita guna 'edit_item_quantity' supaya sama dengan HTML
+        const editQtyInput = document.getElementById('edit_item_quantity');
         const editCheckbox = document.getElementById('edit_enable_manual_code');
         const editContainer = document.getElementById('edit_manual_assets_container');
         const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
 
         function updateEditAssetInputs() {
+            if (!editDynamicInputs) return; 
             editDynamicInputs.innerHTML = '';
-            if (editCheckbox.checked) {
+            if (editCheckbox && editCheckbox.checked) {
                 editContainer.style.display = 'block';
                 let qty = parseInt(editQtyInput.value) || 0;
                 for (let i = 1; i <= qty; i++) {
@@ -851,15 +971,44 @@ endif;
                             <input type="text" name="manual_codes[]" class="form-control" placeholder="Manual code..." required>
                         </div>`;
                 }
-            } else {
+            } else if (editContainer) {
                 editContainer.style.display = 'none';
             }
         }
-        editQtyInput.addEventListener('input', updateEditAssetInputs);
-        editCheckbox.addEventListener('change', updateEditAssetInputs);
+
+        if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
+        if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
     });
 
-    // --- MODAL FUNCTIONS (OUTSIDE DOMCONTENTLOADED) ---
+    // --- MODAL FUNCTIONS ---
+    function openEditItemModal(item) {
+        // Pastikan ID dalam getElementById adalah SAMA dengan id="" dalam HTML modal kau
+        const modalId = 'editItemModal';
+        const modalElement = document.getElementById(modalId);
+        
+        if (!modalElement) {
+            console.error("Modal dengan ID " + modalId + " tidak dijumpai dalam HTML!");
+            return;
+        }
+
+        document.getElementById('edit_item_id').value = item.item_id;
+        document.getElementById('edit_item_name').value = item.item_name;
+        document.getElementById('edit_description').value = item.description || '';
+        document.getElementById('edit_category_id_select').value = item.category_id;
+        
+        // Gunakan ID edit_item_quantity (ikut HTML kau)
+        if(document.getElementById('edit_item_quantity')) {
+            document.getElementById('edit_item_quantity').value = 0;
+        }
+        
+        document.getElementById('edit_item_brand').value = '';
+        document.getElementById('edit_item_model').value = '';
+
+        // Tunjuk modal
+        var myModal = new bootstrap.Modal(modalElement);
+        myModal.show();
+    }
+
     function openEditCategoryModal(category) {
         document.getElementById('edit_category_id').value = category.category_id;
         document.getElementById('edit_category_name').value = category.category_name;
@@ -867,47 +1016,14 @@ endif;
         editCategoryModal.show();
     }
 
-    function openEditItemModal(item) {
-        document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('edit_item_name').value = item.item_name;
-        document.getElementById('edit_description').value = item.description || '';
-        document.getElementById('edit_category_id_select').value = item.category_id;
-        
-        // Reset inputs
-        document.getElementById('edit_input_quantity').value = 0; 
-        document.getElementById('edit_item_brand').value = '';
-        document.getElementById('edit_item_model').value = '';
-        
-        // Reset manual UI
-        document.getElementById('edit_enable_manual_code').checked = false;
-        document.getElementById('edit_manual_assets_container').style.display = 'none';
-        document.getElementById('edit_dynamic_asset_inputs').innerHTML = '';
-
-        var editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
-        editItemModal.show();
-    }
-
-    function deleteCategory(id, name) {
-        Swal.fire({
-            title: 'Hapus Kategori?',
-            text: "Kategori '" + name + "' akan dibuang.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Ya, Padam'
-        }).then((result) => {
-            if (result.isConfirmed) { window.location.href = 'manageItem_tech.php?delete_category_id=' + id; }
-        });
-    }
-
     function deleteItem(id, name) {
         Swal.fire({
-            title: 'Hapus Barang?',
-            text: "Semua unit (Asset) untuk '" + name + "' akan dihapuskan!",
+            title: 'Delete Item?',
+            text: "Asset '" + name + "' will be deleted!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            confirmButtonText: 'Ya, Padam Semua'
+            confirmButtonText: 'Yes, Delete'
         }).then((result) => {
             if (result.isConfirmed) { window.location.href = 'manageItem_tech.php?delete_item_id=' + id; }
         });
