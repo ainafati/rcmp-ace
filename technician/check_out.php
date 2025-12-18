@@ -82,10 +82,9 @@ $completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected
 
 
 $assetSql = "
-    SELECT asset_id, item_id, asset_code
-    FROM assets
-    WHERE
-        status = 'Available'
+    SELECT asset_id, item_id, asset_code, brand, model 
+    FROM assets 
+    WHERE status = 'Available'
 ";
 $assetResult = $conn->query($assetSql);
 if (!$assetResult) {
@@ -794,130 +793,131 @@ function checkOutItem(id) {
 window.checkOutItem = checkOutItem;
 
 
-    function openApproveModal(id) {
-        const row = document.getElementById('row-' + id);
-        if (!row) return;
+function openApproveModal(id) {
+    const row = document.getElementById('row-' + id);
+    if (!row) return;
 
-        
-        const originalQty = parseInt(row.dataset.qty);
-        const itemId = row.dataset.itemId;
-        const reservationReason = row.dataset.reason; 
-        
-        const assets = availableAssets[itemId] || [];
-        const availableCount = assets.length;
-
-        
-        const $approveBtn = $('#confirmApproveBtn');
-        const $assetContainer = $('#assetListContainer');
-        const $approveQtyInput = $('#approve_actual_qty');
-        const $partialRejectContainer = $('#partialRejectionReasonContainer');
-        const $partialRejectReason = $('#partial_reject_reason');
-        
-        
-        $('#userName').text(row.dataset.userName);
-        $('#itemName').text(row.dataset.itemname);
-        $('#userPhone').text(row.dataset.phone);
-        
-        $('#reservationReasonText').text(reservationReason || 'N/A'); 
-        $('#approve_reservation_item_id').val(id);
-        $('#requestedQtyText').text(originalQty);
-        $('#approve_original_qty').val(originalQty);
-        
-        
-        let qtyToApprove = (availableCount >= originalQty) ? originalQty : availableCount;
-        $approveQtyInput.val(qtyToApprove);
-        $approveQtyInput.attr('max', availableCount); 
-
-        
-        function updatePartialReasonDisplay(currentQty) {
-            
-            if (currentQty < originalQty) {
-                $partialRejectContainer.slideDown();
-                $partialRejectReason.attr('required', true); 
-            } else {
-                $partialRejectContainer.slideUp();
-                $partialRejectReason.attr('required', false).val(''); 
-            }
-        }
-
-        
-        function validateApproveButton() {
-            const currentQtyToApprove = parseInt($approveQtyInput.val());
-            const checkedCount = $('.asset-checkbox:checked').length;
-            
-            let isReasonValid = true;
-            
-            if (currentQtyToApprove < originalQty) {
-                  isReasonValid = $partialRejectReason.val().trim().length >= 5; 
-            }
-            
-            if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0 || !isReasonValid) {
-                  $approveBtn.prop('disabled', true);
-                  
-            
-            } else if (currentQtyToApprove > 0) {
-                $approveBtn.prop('disabled', checkedCount !== currentQtyToApprove);
-                
-            
-            } else if (currentQtyToApprove === 0) {
-                $approveBtn.prop('disabled', !isReasonValid);
-                
-            } else {
-                $approveBtn.prop('disabled', true);
-            }
-        }
-
-        
-        function buildAssetCheckboxes() {
-            const currentQtyToApprove = parseInt($approveQtyInput.val());
-
-            if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0) {
-                $assetContainer.html('<div class="alert alert-warning">Please enter a valid quantity (0 or more) to approve.</div>');
-                
-            } else if (currentQtyToApprove === 0) {
-                
-                 $assetContainer.html('<div class="alert alert-info mb-0">Quantity to Approve is 0. This request will be processed as a full rejection. Please provide a reason above.</div>');
-                
-            } else if (availableCount < currentQtyToApprove) {
-                $assetContainer.html(`<div class='alert alert-danger'>❌ Only ${availableCount} unit(s) available. You cannot approve ${currentQtyToApprove}.</div>`);
-                
-            } else if (availableCount === 0 && currentQtyToApprove > 0) {
-                 $assetContainer.html("<div class='alert alert-danger mb-0'>❌ No available assets found for this item. Please reject the request (or enter 0 above with a reason).</div>");
-                
-            } else {
-                
-                let html = `<h6>Select exactly ${currentQtyToApprove} asset(s) to assign:</h6>`;
-                html += assets.map(a =>
-                    `<div class='form-check'><input class='form-check-input asset-checkbox' value='${a.asset_id}' type='checkbox' id='asset-${a.asset_id}'><label class='form-check-label' for='asset-${a.asset_id}'>${a.asset_code}</label></div>`
-                ).join('');
-                $assetContainer.html(html);
-            }
-            
-            validateApproveButton();
-        }
-
-        
-        $approveQtyInput.off('change keyup');
-        $assetContainer.off('change.assetcheck');
-        $partialRejectReason.off('change keyup'); 
-
-        $approveQtyInput.on('change keyup', function() {
-            buildAssetCheckboxes();
-            updatePartialReasonDisplay(parseInt($(this).val()));
-        }); 
-
-        $partialRejectReason.on('change keyup', validateApproveButton); 
-        
-        $assetContainer.on('change.assetcheck', '.asset-checkbox', validateApproveButton); 
-
-        
-        buildAssetCheckboxes();
-        updatePartialReasonDisplay(qtyToApprove);
-
-        
-        new bootstrap.Modal('#approveDetailsModal').show();
-    }
+    const originalQty = parseInt(row.dataset.qty);
+    const itemId = row.dataset.itemId;
+    const reservationReason = row.dataset.reason; 
     
+    const assets = availableAssets[itemId] || [];
+    const availableCount = assets.length;
+
+    const $approveBtn = $('#confirmApproveBtn');
+    const $assetContainer = $('#assetListContainer');
+    const $approveQtyInput = $('#approve_actual_qty');
+    const $partialRejectContainer = $('#partialRejectionReasonContainer');
+    const $partialRejectReason = $('#partial_reject_reason');
+    
+    $('#userName').text(row.dataset.userName);
+    $('#itemName').text(row.dataset.itemname);
+    $('#userPhone').text(row.dataset.phone);
+    
+    $('#reservationReasonText').text(reservationReason || 'N/A'); 
+    $('#approve_reservation_item_id').val(id);
+    $('#requestedQtyText').text(originalQty);
+    $('#approve_original_qty').val(originalQty);
+    
+    let qtyToApprove = (availableCount >= originalQty) ? originalQty : availableCount;
+    $approveQtyInput.val(qtyToApprove);
+    $approveQtyInput.attr('max', availableCount); 
+
+    function updatePartialReasonDisplay(currentQty) {
+        if (currentQty < originalQty) {
+            $partialRejectContainer.slideDown();
+            $partialRejectReason.attr('required', true); 
+        } else {
+            $partialRejectContainer.slideUp();
+            $partialRejectReason.attr('required', false).val(''); 
+        }
+    }
+
+    function validateApproveButton() {
+        const currentQtyToApprove = parseInt($approveQtyInput.val());
+        const checkedCount = $('.asset-checkbox:checked').length;
+        
+        let isReasonValid = true;
+        if (currentQtyToApprove < originalQty) {
+             isReasonValid = $partialRejectReason.val().trim().length >= 5; 
+        }
+        
+        if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0 || !isReasonValid) {
+              $approveBtn.prop('disabled', true);
+        } else if (currentQtyToApprove > 0) {
+            $approveBtn.prop('disabled', checkedCount !== currentQtyToApprove);
+        } else if (currentQtyToApprove === 0) {
+            $approveBtn.prop('disabled', !isReasonValid);
+        } else {
+            $approveBtn.prop('disabled', true);
+        }
+    }
+
+function buildAssetCheckboxes() {
+    const currentQtyToApprove = parseInt($approveQtyInput.val());
+
+    if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0) {
+        $assetContainer.html('<div class="alert alert-warning">Please enter a valid quantity.</div>');
+    } else {
+        let html = `
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle border-top-0">
+                    <thead class="table-light sticky-top">
+                        <tr style="font-size: 0.75rem;" class="text-uppercase text-muted">
+                            <th class="text-center" style="width: 40px;">Sel</th>
+                            <th style="width: 120px;">Asset Code</th>
+                            <th>Brand / Model Information</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        assets.forEach(a => {
+            // Kita pecahkan brand dan model supaya lebih senang baca
+            const brandName = a.brand || 'No Brand';
+            const modelName = a.model || 'No Model';
+
+            html += `
+                <tr style="font-size: 0.85rem;">
+                    <td class="text-center">
+                        <input class="form-check-input asset-checkbox" type="checkbox" value="${a.asset_id}" id="asset-${a.asset_id}">
+                    </td>
+                    <td>
+                        <label for="asset-${a.asset_id}" class="fw-bold mb-0 text-primary" style="cursor: pointer;">
+                            ${a.asset_code}
+                        </label>
+                    </td>
+                    <td>
+                        <label for="asset-${a.asset_id}" class="mb-0 d-block" style="cursor: pointer;">
+                            <span class="fw-bold text-dark">${brandName}</span> 
+                            <span class="text-muted mx-1">|</span> 
+                            <span class="text-secondary">${modelName}</span>
+                        </label>
+                    </td>
+                </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        $assetContainer.html(html);
+    }
+    validateApproveButton();
+}
+    $approveQtyInput.off('change keyup');
+    $assetContainer.off('change.assetcheck');
+    $partialRejectReason.off('change keyup'); 
+
+    $approveQtyInput.on('change keyup', function() {
+        buildAssetCheckboxes();
+        updatePartialReasonDisplay(parseInt($(this).val()));
+    }); 
+
+    $partialRejectReason.on('change keyup', validateApproveButton); 
+    $assetContainer.on('change.assetcheck', '.asset-checkbox', validateApproveButton); 
+
+    buildAssetCheckboxes();
+    updatePartialReasonDisplay(qtyToApprove);
+
+    new bootstrap.Modal('#approveDetailsModal').show();
+}    
     window.openApproveModal = openApproveModal;
 
 
