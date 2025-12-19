@@ -103,10 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error_msg = "";
         if (strtolower($row['email']) === $lower_email) {
             $role_found = $row['role_name'] ? strtoupper($row['role_name']) : 'User';
-            $error_msg = "Email is already registered as **" . $role_found . "**.";
+            $error_msg = "Email is already registered as " . $role_found . ".";
         } elseif ($row['id'] === $personId) {
             $role_found = $row['role_name'] ? strtoupper($row['role_name']) : 'User';
-            $error_msg = "ID is already registered as **" . $role_found . "**.";
+            $error_msg = "ID is already registered as " . $role_found . ".";
         }
         
         $_SESSION['error'] = $error_msg;

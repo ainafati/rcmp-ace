@@ -92,9 +92,6 @@ try {
         }
         
         
-        // --- 2. KEMAS KINI KRITIKAL: INSERT KE reservation_items ---
-        // Buang reserve_date dan return_date kerana ia kini berada di jadual reservations
-        // Buang 'reason' kerana ia kini berada di jadual reservations
         $stmt_item = $conn->prepare(
             "INSERT INTO reservation_items (reserve_id, item_id, quantity, status) VALUES (?, ?, ?, 'Pending')"
         );
@@ -123,11 +120,6 @@ try {
     $stmt_user_name->close();
     
     
-    // Log Activity (Pilihan - Jika anda ada logActivity() dalam send_email.php)
-    // logActivity($conn, $user_id, 'RESERVATION_SUBMITTED', "New booking submitted (ID: {$reserve_id}) for {$user_name}", $reserve_id);
-
-
-    // Notifikasi Dalaman ke Technician
     $tech_role_id = 2; 
     $total_items_count = count($items_to_reserve);
     
