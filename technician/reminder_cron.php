@@ -29,6 +29,10 @@ if ($conn->connect_error) {
     exit("CRON JOB FAILED: Database connection error.\n");
 }
 
+// Cuma jalan kalau ada key atau jalan melalui server (CLI)
+if (php_sapi_name() !== 'cli' && (!isset($_GET['key']) || $_GET['key'] !== 'mysecret123')) {
+    die("Restricted Access!");
+}
 // ---------------------------------------------------------
 // 2. HELPER FUNCTIONS (Design & Mailer)
 // ---------------------------------------------------------
