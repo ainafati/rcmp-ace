@@ -11,13 +11,16 @@
 // 1. CONFIGURATION & PATHS
 define('ROOT_DIR', '../'); 
 
-require ROOT_DIR . 'config.php';
-require ROOT_DIR . 'config_email.php';
+// Tukar bahagian ni dlm reminder_cron.php
+// __DIR__ akan ambil path folder 'technician' secara tepat dlm server
 
-// Load PHPMailer classes
-require ROOT_DIR . 'PHPMailer-master/src/Exception.php';
-require ROOT_DIR . 'PHPMailer-master/src/PHPMailer.php';
-require ROOT_DIR . 'PHPMailer-master/src/SMTP.php';
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../config_email.php';
+
+// Path untuk PHPMailer pun sama
+require __DIR__ . '/../PHPMailer-master/src/Exception.php';
+require __DIR__ . '/../PHPMailer-master/src/PHPMailer.php';
+require __DIR__ . '/../PHPMailer-master/src/SMTP.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -239,7 +242,7 @@ foreach (get_overdue_items($conn) as $item) {
 // Process Tech Prep
 $to_prep = get_collection_items_to_prep($conn);
 if (!empty($to_prep)) {
-    send_technician_prep_reminder('aina.fatihah@t.unikl.edu.my', 'Main Technician', $to_prep);
+    send_technician_prep_reminder('it.rcmp@unikl.edu.my', 'Main Technician', $to_prep);
 }
 
 echo "Summary: Pickups: {$counts['pickup']}, Today: {$counts['today']}, Tomorrow: {$counts['tomorrow']}, Overdue: {$counts['overdue']}.\n";

@@ -43,7 +43,7 @@ if (!defined('LOCAL_MAIL_TEST_CHECK')) {
 // --- PEMBETULAN DI SINI ---
 // Kita guna "if (!defined(...))" supaya tak ralat kalau fail ni dipanggil 2 kali
 if (!defined('TECHNICIAN_GROUP_EMAIL')) {
-    define('TECHNICIAN_GROUP_EMAIL', 'aina.fatihah@t.unikl.edu.my'); 
+    define('TECHNICIAN_GROUP_EMAIL', 'it.rcmp@unikl.edu.my'); 
 }
 
 if (!defined('BASE_URL')) {
