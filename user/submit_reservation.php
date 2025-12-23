@@ -1,31 +1,45 @@
 <?php
 session_start();
 
-// PASTIKAN SEMUA PATH ADALAH BETUL
+// 1. PATH CONFIGURATION
 include '../config.php';
 include '../technician/config_email.php'; 
 require '../technician/send_email.php';
 
 header('Content-Type: application/json');
 
+// --- 2. FUNGSI LOGGER (DIUBAH MENGIKUT STRUKTUR DB KAU) ---
+function log_activity($conn, $user_type, $person_id, $action, $details) {
+    // Dapatkan IP Address user
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    
+    // Ikut susunan column DB kau: user_type, person_id, action, details, ip_address
+    $stmt = $conn->prepare("INSERT INTO activity_logs (user_type, person_id, action, details, ip_address) VALUES (?, ?, ?, ?, ?)");
+    
+    // Bind: s = string, i = integer
+    $stmt->bind_param("sisss", $user_type, $person_id, $action, $details, $ip_address);
+    $stmt->execute();
+    $stmt->close();
+}
+
 function send_error($message) {
-    // Pastikan ini adalah satu-satunya output selain JSON
     echo json_encode(['status' => 'error', 'message' => $message]);
     exit();
 }
 
 if (!$conn) {
-    send_error('Database connection failed. Check config.php path and settings.');
+    send_error('Database connection failed.');
 }
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-// Pastikan tiada output sebelum header dan session_start()
+// 3. CHECK SESSION
 if (!isset($_SESSION['person_id'])) { 
     send_error('Sesi tamat. Sila log masuk semula.'); 
 }
 $user_id = (int)$_SESSION['person_id'];
 
+// 4. READ JSON INPUT
 $json_input = file_get_contents('php://input');
 $submission_data = json_decode($json_input, true);
 
@@ -40,179 +54,78 @@ $reserve_date_context = $submission_data['reserve_date'] ?? null;
 $return_date_context = $submission_data['return_date'] ?? null;
 
 if (empty($items_to_reserve)) { 
-    send_error('The order item list is empty. Please add items in Step 2.'); 
+    send_error('The order item list is empty. Please add items.'); 
 }
 
-if (empty($request_reason) || empty($reserve_date_context) || empty($return_date_context)) {
-    send_error('Booking context data is incomplete (Borrow/Return Date or Purpose of Loan is required).');
-}
-
-
+// 5. DATABASE TRANSACTION
 $conn->begin_transaction();
-
 $reserve_id = 0; 
 
 try {
-    
-    // --- 1. KEMAS KINI KRITIKAL: INSERT KE JADUAL reservations ---
-    // Tambah reserve_date, return_date, dan reason ke dalam kuerti reservations
+    // --- INSERT KE reservations ---
     $stmt_res = $conn->prepare("INSERT INTO reservations (person_id, reserve_date, return_date, reason, created_at, priority) VALUES (?, ?, ?, ?, NOW(), ?)");
-    if (!$stmt_res) {
-        throw new Exception("Error preparing reservation statement: " . $conn->error);
-    }
-    
-    // Pastikan jenis pemboleh ubah sepadan: i, s, s, s, i
-    $stmt_res->bind_param("isssi", 
-        $user_id, 
-        $reserve_date_context, // Tarikh Mula Pinjaman
-        $return_date_context,  // Tarikh Pulangan Dijangka
-        $request_reason,       // Tujuan Pinjaman (Reason)
-        $priority
-    );
+    $stmt_res->bind_param("isssi", $user_id, $reserve_date_context, $return_date_context, $request_reason, $priority);
     $stmt_res->execute();
     $reserve_id = $conn->insert_id;
     $stmt_res->close();
 
-    
-    // 2. INSERT KE reservation_items
+    // --- INSERT KE reservation_items ---
     foreach ($items_to_reserve as $item_data) {
-        
         $item_id = (int)($item_data['item_id'] ?? 0); 
-        $item_name = $item_data['item_name'] ?? 'Unknown Item';
         $quantity = (int)($item_data['quantity'] ?? 0);
         
-        
-        if ($quantity <= 0) { 
-            throw new Exception("Quantity for '" . htmlspecialchars($item_name) . "' must be greater than zero."); 
-        }
-
-        
-        if ($item_id <= 0) {
-            throw new Exception("Invalid item ID for the item: " . htmlspecialchars($item_name));
-        }
-        
-        
-        $stmt_item = $conn->prepare(
-            "INSERT INTO reservation_items (reserve_id, item_id, quantity, status) VALUES (?, ?, ?, 'Pending')"
-        );
-        if (!$stmt_item) {
-            throw new Exception("Error preparing reservation item statement: " . $conn->error);
-        }
-        
-        
-        $stmt_item->bind_param("iii", 
-            $reserve_id, 
-            $item_id, 
-            $quantity
-        );
+        $stmt_item = $conn->prepare("INSERT INTO reservation_items (reserve_id, item_id, quantity, status) VALUES (?, ?, ?, 'Pending')");
+        $stmt_item->bind_param("iii", $reserve_id, $item_id, $quantity);
         $stmt_item->execute();
         $stmt_item->close();
     }
 
-    // 3. LOGIK NOTIFIKASI
     $conn->commit();
+
+    // --- 6. LOGGING (MENGGUNAKAN NAMA USER) ---
+    $stmt_user = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
+    $stmt_user->bind_param("i", $user_id);
+    $stmt_user->execute();
+    $user_data = $stmt_user->get_result()->fetch_assoc();
+    $user_name = $user_data['name'] ?? 'Unknown User';
+    $stmt_user->close();
+
+    $item_count = count($items_to_reserve);
+    $log_details = "User $user_name submitted reservation #$reserve_id containing $item_count items.";
     
-    $stmt_user_name = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
-    $stmt_user_name->bind_param("i", $user_id);
-    $stmt_user_name->execute();
-    $user_data = $stmt_user_name->get_result()->fetch_assoc();
-    $user_name = $user_data['name'] ?? 'User Unknown';
-    $stmt_user_name->close();
-    
-    
+    // Panggil fungsi logger dengan user_type 'user' sesuai Enum DB kau
+    log_activity($conn, 'user', $user_id, "Submit Reservation", $log_details);
+
+    // --- 7. NOTIFICATIONS & EMAIL (SEPERTI ASAL) ---
     $tech_role_id = 2; 
-    $total_items_count = count($items_to_reserve);
+    $notification_message = "New Reservation (#{$reserve_id}) from {$user_name} requires approval.";
     
-    $notification_message = "New Reservation (#{$reserve_id}) from {$user_name} requires approval ({$total_items_count} item).";
-    $notification_type = "New_Reservation"; 
-    
-    try {
-        $sql_get_techs = "SELECT person_id FROM person_roles WHERE role_id = ?";
-        $stmt_techs = $conn->prepare($sql_get_techs);
-        $stmt_techs->bind_param("i", $tech_role_id);
-        $stmt_techs->execute();
-        $result_techs = $stmt_techs->get_result();
-        $tech_ids = $result_techs->fetch_all(MYSQLI_ASSOC);
-        $stmt_techs->close();
-        
-        $sql_insert_notif = "INSERT INTO notifications (person_id, recipient_role_id, message, is_read, type, related_id) VALUES (?, ?, ?, 0, ?, ?)";
-        $stmt_insert = $conn->prepare($sql_insert_notif);
+    $sql_get_techs = "SELECT person_id FROM person_roles WHERE role_id = ?";
+    $stmt_techs = $conn->prepare($sql_get_techs);
+    $stmt_techs->bind_param("i", $tech_role_id);
+    $stmt_techs->execute();
+    $tech_ids = $stmt_techs->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt_techs->close();
 
-        if ($stmt_insert) {
-            foreach ($tech_ids as $tech) {
-                $target_tech_id = $tech['person_id'];
-                
-                $stmt_insert->bind_param("iissi", 
-                    $target_tech_id,
-                    $tech_role_id,
-                    $notification_message,
-                    $notification_type,
-                    $reserve_id 
-                );
-                $stmt_insert->execute();
-            }
-            $stmt_insert->close();
-        } else {
-            error_log("Failed to prepare notification statement: " . $conn->error);
-        }
-        
-    } catch (Exception $e) {
-        error_log("Failed to create in-system notifications: " . $e->getMessage());
+    $sql_insert_notif = "INSERT INTO notifications (person_id, recipient_role_id, message, is_read, type, related_id) VALUES (?, ?, ?, 0, 'New_Reservation', ?)";
+    $stmt_notif = $conn->prepare($sql_insert_notif);
+    foreach ($tech_ids as $tech) {
+        $stmt_notif->bind_param("iisi", $tech['person_id'], $tech_role_id, $notification_message, $reserve_id);
+        $stmt_notif->execute();
     }
-    
-    
-    // E-mel Notifikasi ke Technician
-    $technician_email = TECHNICIAN_GROUP_EMAIL; 
-    $count = count($items_to_reserve);
-    $item_summary = '';
+    $stmt_notif->close();
 
-    if ($count === 1) {
-        $item_summary = $items_to_reserve[0]['item_name'] ?? 'Single Item';
-    } elseif ($count >= 2) {
-        $first_item = htmlspecialchars($items_to_reserve[0]['item_name']);
-        $second_item = $items_to_reserve[1]['item_name'] ?? null;
-        
-        if ($second_item) {
-            $second_item = htmlspecialchars($second_item);
-        }
-        
-        if ($count === 2) {
-            $item_summary = "2 Items ($first_item, $second_item)";
-        } else {
-            $other_count = $count - 2;
-            $item_summary = "$count Items ($first_item, $second_item, +$other_count more)";
-        }
-    } else {
-        $item_summary = 'No Items';
-    }
-
-    
-    $reserve_date_str = $reserve_date_context;
-    $link_to_approval = BASE_URL . 'index.php?page=approvals&reserve_id=' . $reserve_id; 
-    
+    // Email Notifikasi
     $email_sent = false;
-    
-    if (defined('TECHNICIAN_GROUP_EMAIL') && defined('BASE_URL')) {
-        // Fungsi ini harus ada dalam send_email.php
-        $email_sent = sendNewReservationNotification(
-            $technician_email, 
-            $reserve_id, 
-            $user_name, 
-            $item_summary, 
-            $reserve_date_str, 
-            $link_to_approval
-        );
+    if (defined('TECHNICIAN_GROUP_EMAIL')) {
+        $email_sent = sendNewReservationNotification(TECHNICIAN_GROUP_EMAIL, $reserve_id, $user_name, "$item_count items", $reserve_date_context, BASE_URL . "approvals.php");
     }
     
-    $email_message = $email_sent ? ' Technician notification sent.' : ' Warning: Failed to send technician email notification. Please check the error log.';
-    
-    
-    echo json_encode(['status' => 'success', 'message' => 'Booking successfully sent! ' . $email_message]);
+    $email_msg = $email_sent ? ' Email notification sent.' : ' Email failed.';
+    echo json_encode(['status' => 'success', 'message' => 'Booking successfully sent! ID: #' . $reserve_id . $email_msg]);
 
 } catch (Exception $e) {
-    
     $conn->rollback();
-    
     send_error("Submission failed: " . $e->getMessage()); 
 }
 

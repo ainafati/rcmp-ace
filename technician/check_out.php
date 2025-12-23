@@ -7,15 +7,40 @@ if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
-$person_id = (int)$_SESSION['person_id'];
+$person_id = (int) $_SESSION['person_id']; 
 
+// 2. Tarik Data Technician (Satu query sahaja)
+$stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $tech = $stmt->get_result()->fetch_assoc(); // Simpan dalam $tech
+    $stmt->close();
+}
 
-$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
-$stmt_tech->bind_param("i", $person_id);
-$stmt_tech->execute();
-$result_tech = $stmt_tech->get_result(); 
-$tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
-$stmt_tech->close();
+if (!$tech) {
+    session_unset();
+    session_destroy();
+    header("Location: ../login.php");
+    exit();
+}
+
+// 3. Logik Nama Pendek (Gunakan $tech, bukan $user)
+$fullName = $tech['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 
 $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_GET['filter_date'] : null;
@@ -503,7 +528,9 @@ function create_request_table($requests) {
             <h3>Manage Requests</h3>
         </div>
         <div class="d-flex align-items-center gap-3">
-            <span class="fw-bold d-none d-md-block"><?= htmlspecialchars($tech['name']) ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
             <a href="profile_tech.php" title="My Profile" aria-label="View My Profile">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
             </a>

@@ -17,13 +17,38 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technicia
 
 $person_id = (int) $_SESSION['person_id']; 
 
-// 2. GET TECH DATA
-$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
-$stmt_tech->bind_param("i", $person_id);
-$stmt_tech->execute();
-$tech_data = $stmt_tech->get_result()->fetch_assoc();
-$stmt_tech->close();
-$tech_name = $tech_data ? htmlspecialchars($tech_data['name']) : 'Technician Unknown'; 
+// 2. Tarik Data Technician (Satu query sahaja)
+$stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $tech = $stmt->get_result()->fetch_assoc(); // Simpan dalam $tech
+    $stmt->close();
+}
+
+if (!$tech) {
+    session_unset();
+    session_destroy();
+    header("Location: ../login.php");
+    exit();
+}
+
+// 3. Logik Nama Pendek (Gunakan $tech, bukan $user)
+$fullName = $tech['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 // --- HELPER FUNCTIONS ---
 function safe_unlink($db_filepath) {
@@ -478,7 +503,9 @@ endif;
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
             <div class="user-profile">
-                <span class="user-name d-none d-sm-inline"><?= $tech_name ?></span> 
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
                 <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                     <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>

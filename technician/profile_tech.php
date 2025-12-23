@@ -2,7 +2,6 @@
 session_start();
 
 // --- PHP INITIATION & DATABASE CONNECTION ---
-// Include file konfigurasi database
 include '../config.php';
 
 // Pastikan pengguna log masuk
@@ -12,14 +11,13 @@ if (!isset($_SESSION['person_id'])) {
 }
 
 $person_id = (int)$_SESSION['person_id'];
-$tech_id = $person_id; // Menggunakan person_id sebagai tech_id
 
 // Semak sambungan database
 if (!isset($conn) || $conn->connect_error) {
     die("Database Connection Error.");
 }
 
-// Dapatkan butiran Juruteknik (Selamat: Menggunakan prepared statements)
+// 1. Dapatkan butiran Juruteknik (Satu query yang lengkap)
 $stmt = $conn->prepare("SELECT id AS staff_id, name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
@@ -32,17 +30,31 @@ $tech = $result->fetch_assoc();
 $stmt->close();
 
 if (!$tech) {
-    // Jika data pengguna tidak dijumpai, hancurkan sesi dan redirect ke login
     session_destroy();
     header("Location: ../login.php");
     exit();
 }
 
-// Pengurusan Mod Edit (Untuk kekal dalam mod edit jika update gagal)
+// 2. LOGIK NAMA PENDEK (PENTING: Masukkan semula logik ini)
+$fullName = $tech['name'] ?? 'Technician';
+$lowerName = strtolower($fullName);
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+$displayName = trim($shortName);
+
+// Pengurusan Mod Edit
 $keep_edit_mode = false;
 if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) {
     $keep_edit_mode = true;
-    unset($_SESSION['keep_edit_mode']); // Bersihkan sesi selepas digunakan
+    unset($_SESSION['keep_edit_mode']); 
 }
 ?>
 <!DOCTYPE html>
@@ -232,7 +244,9 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
         </button>
         <h3>My Profile</h3>
         <div class="user-profile">
-            <span class="user-name d-none d-md-inline fw-bold"><?= htmlspecialchars($tech['name'] ?? '') ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
             <a href="#" title="My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>

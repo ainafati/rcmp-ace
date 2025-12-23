@@ -1,32 +1,50 @@
 <?php
 session_start();
-
 include '../config.php'; 
 
-// --- Sekatan Akses & Pengesahan Sesi (Tiada perubahan) ---
+// 1. Sekatan Akses & Pengesahan Sesi
 if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== 'Technician') {
     session_unset();
     session_destroy();
-    $_SESSION['error'] = "Access denied or session expired. Please log in as a Technician.";
+    $_SESSION['error'] = "Access denied. Please log in as a Technician.";
     header("Location: ../login.php");
     exit();
 }
 
 $person_id = (int) $_SESSION['person_id']; 
 
+// 2. Tarik Data Technician (Satu query sahaja)
 $stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
-$stmt->bind_param("i", $person_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$tech = $result->fetch_assoc();
-$stmt->close();
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $tech = $stmt->get_result()->fetch_assoc(); // Simpan dalam $tech
+    $stmt->close();
+}
 
 if (!$tech) {
     session_unset();
     session_destroy();
-    header("Location: ../logout.php");
+    header("Location: ../login.php");
     exit();
 }
+
+// 3. Logik Nama Pendek (Gunakan $tech, bukan $user)
+$fullName = $tech['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 // --- Fungsi Bantuan (Tiada perubahan) ---
 function get_reservation_item_count($conn, $status) {
@@ -576,7 +594,9 @@ $conn->close();
         </div>
 
         <div class="technician-profile d-flex align-items-center">
-            <span class="technician-name me-2 d-none d-sm-block"><?= htmlspecialchars($tech['name']) ?></span> 
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
 			
 			<div class="dropdown me-3" style="position: relative;">
                 <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">

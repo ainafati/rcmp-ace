@@ -6,14 +6,13 @@ include_once '../logger.php';
 $allowed_role = 'Admin'; 
 
 if (!isset($_SESSION['person_id']) || !isset($_SESSION['logged_in_role']) || $_SESSION['logged_in_role'] !== $allowed_role) {
-    
     header("Location: ../login.php");
     exit();
 }
 
-
 $person_id_session = (int)$_SESSION['person_id']; 
 $admin_data = ['name' => 'Admin']; 
+
 $stmt_admin = $conn->prepare("
     SELECT name 
     FROM person 
@@ -21,7 +20,6 @@ $stmt_admin = $conn->prepare("
 ");
 
 if (!$stmt_admin) {
-    
     die("Database Error in Admin fetch: " . $conn->error);
 }
 
@@ -34,6 +32,22 @@ if ($data = $result_admin->fetch_assoc()) {
 }
 $stmt_admin->close();
 
+// === LOGIK DISINI UNTUK SET DISPLAY NAME ===
+$fullName = $admin_data['name'] ?? 'Admin';
+$lowerName = strtolower($fullName);
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+// Variable ini yang dipanggil pada baris 741
+$displayName = trim($shortName); 
 
 $admin_id_for_log = $person_id_session;
 $admin_name_for_log = $admin_data['name']; 
@@ -152,7 +166,6 @@ $item_details_query = "
     SELECT 
         i.item_id,
         i.item_name,
-        i.description,
         i.image_url,
         c.category_name,
         c.category_id,
@@ -272,7 +285,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     
     $item_name = ucwords (trim($_POST['item_name']));
     $category_id = (int)$_POST['category_id'];
-    $description = trim($_POST['description']);
     $quantity = (int)$_POST['quantity'];
     $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
@@ -283,12 +295,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     $conn->begin_transaction();
     try {
         
-        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, description, image_url) VALUES (?, ?, ?, ?)");
+        $stmt_item = $conn->prepare("INSERT INTO item (item_name, category_id, image_url) VALUES (?, ?, ?, ?)");
         if ($stmt_item === FALSE) throw new Exception("SQL Prepare Error (Add Item): " . $conn->error);
         
         
         $image_path_to_bind = isset($image_path) ? $image_path : '';          
-        $stmt_item->bind_param("siss", $item_name, $category_id, $description, $image_path_to_bind);
+        $stmt_item->bind_param("siss", $item_name, $category_id, $image_path_to_bind);
         if (!$stmt_item->execute()) throw new Exception("Error adding item type: " . $stmt_item->error);
         $new_item_id = $conn->insert_id;
         $stmt_item->close();
@@ -342,7 +354,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     $item_id = (int)$_POST['edit_item_id'];
     $item_name = ucwords(trim($_POST['edit_item_name']));
     $category_id = (int)$_POST['edit_category_id'];
-    $description = trim($_POST['edit_description']);
     $quantity_to_add = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
     $batch_brand = isset($_POST['batch_brand']) ? trim($_POST['batch_brand']) : '';
     $batch_model = isset($_POST['batch_model']) ? trim($_POST['batch_model']) : '';
@@ -355,8 +366,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     $conn->begin_transaction();
 
     try {
-        $update_fields = ["item_name = ?", "category_id = ?", "description = ?"];
-        $update_params = [$item_name, $category_id, $description];
+        $update_fields = ["item_name = ?", "category_id = ?"];
+        $update_params = [$item_name, $category_id];
         $types = "sis";
         $old_image_path = NULL;
         
@@ -555,6 +566,19 @@ if (isset($_GET['delete_item_id'])) {
             font-weight: 600; 
             margin-top: auto; 
         } 
+		
+		/* Dalam Bahagian 2, di dalam tag <style> */
+
+/* LOGOUT LINK */
+.sidebar a.logout-link { 
+    color: var(--danger-color); 
+    font-weight: 600; 
+    margin-top: 10px; /* Tukar 10px ini jika ada */
+}
+/* Tambah atau pastikan baris ini ada: */
+.sidebar > a.logout-link { /* Guna selector yang lebih spesifik jika perlu */
+    margin-top: auto; /* KUNCI UNTUK MENDAPATKANNYA DI BAWAH */
+}
         .sidebar a.logout-link:hover { 
             color: #fff; 
             background: var(--danger-color); 
@@ -713,8 +737,8 @@ endif;
             <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
             <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
         </div>
-        <a href="manageItem_admin.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="manageItem_admin.php" class="active" ><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
         <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
@@ -728,102 +752,65 @@ endif;
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
             <div class="user-profile">
-<span class="user-name d-none d-sm-inline"><?= $admin_name_for_log ?></span>                <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
+                <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                     <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
                 </a>
             </div>
         </div>
     </div>
-
+	
     <div class="container-fluid">
-        <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="card shadow-sm p-4 mb-4">
-                    <h5 class="mb-3"><i class="fa fa-cubes"></i> 1. Add New Item Type & Units</h5>
-                    <p class="text-muted small">Create a new item type and add initial stock in one step. <strong>Asset Codes are generated automatically from the Item Name acronym (e.g., PS-0001).</strong></p>
-                    <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
-                        <input type="hidden" name="add_item_type_and_units" value="1">
-                        <h6 class="mt-3">A. Item Type Information</h6>
-                        <hr class="mt-1">
-                        <div class="mb-3">
-                            <label class="form-label">Item Type Name</label>
-                            <input type="text" name="item_name" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Item Image (Optional)</label>
-                            <input type="file" name="item_image" class="form-control" accept="image/*">
-                            <small class="text-muted">Upload an image representing this item type.</small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Category</label>
-                            <select name="category_id" class="form-select" required>
-                                <option value="">Select Category</option>
-                                <?php foreach($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea name="description" class="form-control" rows="2"></textarea>
-                        </div>
-                        <h6 class="mt-4">B. Item Details (Optional)</h6>
-                        <hr class="mt-1">
-                        <div class="mb-3">
-                            <label class="form-label">Brand</label>
-                            <input type="text" name="batch_brand" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Model</label>
-                            <input type="text" name="batch_model" class="form-control">
-                        </div>
-                        <h6 class="mt-4">C. Initial Stock (Units)</h6>
-                        <hr class="mt-1">
-                        <div class="mb-3">
-                            <label class="form-label">Number of Units to Add</label>
-                            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
-                            <small class="text-muted">Each unit will get a unique asset code based on Item Name acronym (e.g., PS-0001).</small>
-                        </div>
-                        <button type="submit" class="btn btn-success w-100 mt-3">Create Item & Add Units</button>
-                    </form>
-                </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <p class="text-muted small">Manage your equipment types and stock levels.</p>
             </div>
-            <div class="col-lg-8">
-                <div class="card h-100">
-                    <h5><i class="fa fa-list-check me-2 text-primary"></i> Item Type Summary</h5>
-                    <p class="text-muted small">Overview of all item types. Click <i class="fa fa-eye"></i> to view individual units.</p>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead><tr><th>Item Type</th><th>Category</th><th class="text-center">Total</th><th class="text-center">Available</th><th>Actions</th></tr></thead>
-                            <tbody>
-                            <?php if (empty($item_details)): ?>
-                                <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-box-open fa-2x mb-2"></i><br>No items found. Add one using the form.</td></tr>
-                            <?php else: foreach($item_details as $item): ?>
-                                <tr>
-                                    <td>
+            <a href="add_item.php" class="btn btn-primary px-4 shadow-sm">
+                <i class="fa fa-plus-circle me-2"></i> Add New Item
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Item Type</th>
+                            <th>Category</th>
+                            <th class="text-center">Total Units</th>
+                            <th class="text-center">Available</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($item_details)): ?>
+                            <tr><td colspan="5" class="text-center py-5 text-muted">No items found.</td></tr>
+                        <?php else: foreach($item_details as $item): ?>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
                                         <?php if (!empty($item['image_url'])): ?>
-                                            <img src="<?= htmlspecialchars('../' . $item['image_url']) ?>" class="item-img-sm" alt="Item Image">
+                                            <img src="../<?= htmlspecialchars($item['image_url']) ?>" class="item-img-sm">
                                         <?php endif; ?>
-                                        <strong><?= ucwords (htmlspecialchars($item['item_name'])) ?></strong>
-                                    </td>
-                                    <td><?= htmlspecialchars($item['category_name']) ?></td>
-                                    <td class="text-center"><span class="badge rounded-pill text-bg-secondary"><?= $item['total_units'] ?></span></td>
-                                    <td class="text-center"><span class="badge rounded-pill text-bg-success"><?= $item['available_units'] ?></span></td>
-                                    
-                                    <td class="d-flex gap-2">
-                                        <a href="view_assets.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info" title="View Units"><i class="fa fa-eye"></i></a>
-                                        <button class="btn btn-sm btn-outline-warning" title="Edit Item Type" onclick='openEditItemModal(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger" title="Delete Item Type" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= htmlspecialchars(addslashes($item['item_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
-                                    </td>
-                                    </tr>
-                            <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                        <strong><?= ucwords(htmlspecialchars($item['item_name'])) ?></strong>
+                                    </div>
+                                </td>
+                                <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($item['category_name']) ?></span></td>
+                                <td class="text-center"><span class="fw-bold"><?= $item['total_units'] ?></span></td>
+                                <td class="text-center"><span class="badge rounded-pill bg-success"><?= $item['available_units'] ?></span></td>
+                                <td class="text-end">
+                                    <div class="btn-group">
+                                        <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info"><i class="fa fa-eye"></i></a>
+                                        <button class="btn btn-sm btn-outline-warning" onclick='openEditItemModal(<?= json_encode($item) ?>)'><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= addslashes($item['item_name']) ?>')"><i class="fa fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -841,7 +828,7 @@ endif;
                     <div class="col-md-5">
                         <h6>Add New Category</h6>
                         <hr>
-                        <form method="post" action="manageItem_admin.php">
+                        <form method="post" action="manageItem_tech.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
                                 <label for="category_name" class="form-label">Category Name</label>
@@ -882,7 +869,7 @@ endif;
                 <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="post" action="manageItem_admin.php">
+            <form method="post" action="manageItem_tech.php">
                 <div class="modal-body">
                     <input type="hidden" name="edit_category" value="1">
                     <input type="hidden" id="edit_category_id" name="edit_category_id">
@@ -904,14 +891,19 @@ endif;
 <div class="modal fade" id="editItemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Edit Item Type</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
 
-                    <h6>Item Details</h6>
-                    <div class="mb-3"><label class="form-label">Item Name</label><input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required></div>
+                    <div class="mb-3">
+                        <label class="form-label">Item Name</label>
+                        <input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required>
+                    </div>
                     
                     <div class="mb-3">
                         <label class="form-label">New Item Image (Optional)</label>
@@ -919,30 +911,50 @@ endif;
                         <small class="text-muted">Upload a new image to replace the old one.</small>
                     </div>
 
-                    <div class="mb-3"><label class="form-label">Category</label>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
                         <select id="edit_category_id_select" name="edit_category_id" class="form-select" required>
-                            <?php foreach($categories as $cat): ?><option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option><?php endforeach; ?>
+                            <?php foreach($categories as $cat): ?>
+                                <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="mb-3"><label class="form-label">Description</label><textarea id="edit_description" name="edit_description" class="form-control" rows="2"></textarea></div>
+
 
                     <hr>
                     <h6 class="mt-3">Add More Units (Optional)</h6>
-                    <p class="small text-muted">New unit Asset Codes will be generated based on the updated Item Name acronym.</p>
+                    <p class="small text-muted">Kuantiti baru akan ditambah ke dalam sistem untuk item ini.</p>
+                    
                     <div class="mb-3">
                         <label class="form-label">Number of New Units to Add</label>
-                        <input type="number" id="edit_item_quantity" name="quantity" class="form-control" min="0" value="0" required>
+<input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control" min="0" value="0" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Brand for New Units</label>
-                        <input type="text" id="edit_item_brand" name="batch_brand" class="form-control" placeholder="e.g., Dell">
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
+                        <label class="form-check-label" for="edit_enable_manual_code">I want to enter asset codes manually for these new units</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Model for New Units</label>
-                        <input type="text" id="edit_item_model" name="batch_model" class="form-control" placeholder="e.g., Latitude 5420">
+
+                    <div id="edit_manual_assets_container" style="display: none;">
+                        <label class="form-label text-primary fw-bold">Enter Manual Codes:</label>
+                        <div id="edit_dynamic_asset_inputs"></div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Brand for New Units</label>
+                            <input type="text" id="edit_item_brand" name="batch_brand" class="form-control" placeholder="e.g., Dell">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Model for New Units</label>
+                            <input type="text" id="edit_item_model" name="batch_model" class="form-control" placeholder="e.g., Latitude 5420">
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
@@ -950,91 +962,176 @@ endif;
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        const sidebar = document.getElementById('admin-sidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', function() {
-                sidebar.classList.toggle('active');
-            });
-        }
-        
-        
-        document.querySelector('.main-content').addEventListener('click', function(e) {
-            if (window.innerWidth <= 992 && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
-                sidebar.classList.remove('active');
-            }
-        });
-
-    });
-
-    /**
-     * Function to open the Edit Category modal and populate data.
-     * @param {object} category - Category data object.
-     */
-    function openEditCategoryModal(category) {
-        document.getElementById('edit_category_id').value = category.category_id;
-        document.getElementById('edit_category_name').value = category.category_name;
-        
-        
-        var editCategoryModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
-        editCategoryModal.show();
-    }
+document.addEventListener('DOMContentLoaded', function() {
     
-    /**
-     * Function to open the Edit Item Type modal and populate data.
-     * @param {object} item - Item data object.
-     */
-    function openEditItemModal(item) {
-        document.getElementById('edit_item_id').value = item.item_id;
-        document.getElementById('edit_item_name').value = item.item_name;
-        document.getElementById('edit_description').value = item.description;
-        
-        
-        document.getElementById('edit_category_id_select').value = item.category_id;
-
-        
-        document.getElementById('edit_item_quantity').value = 0;
-        document.getElementById('edit_item_brand').value = '';
-        document.getElementById('edit_item_model').value = '';
-        
-        var editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
-        editItemModal.show();
-    }
-    function deleteCategory(id, name) {
+    // --- 1. SWEETALERT PHP NOTIFICATION ---
+    <?php if (isset($_SESSION['message'])): ?>
         Swal.fire({
-            title: 'Are you sure?',
-            text: "You are about to delete the category: " + name + ". This action cannot be undone and can only be performed if no item types are linked to it.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, delete it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                window.location.href = 'manageItem_admin.php?delete_category_id=' + id;
-            }
+            icon: '<?= $_SESSION['message']['type'] ?>',
+            title: '<?= addslashes($_SESSION['message']['title'] ?? "Notification") ?>',
+            text: '<?= addslashes($_SESSION['message']['text']) ?>',
+            confirmButtonColor: '#06b6d4',
+            timer: 4000,
+            timerProgressBar: true
+        });
+        <?php unset($_SESSION['message']); ?>
+    <?php endif; ?>
+
+    // --- 2. SIDEBAR TOGGLE (MOBILE) ---
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('offcanvasSidebar');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
         });
     }
 
-    function deleteItem(id, name) {
-        Swal.fire({
-            title: 'Are you sure?',
-            text: "You are about to delete the item type: " + name + ". This will delete ALL associated units (Assets) and records. This action cannot be undone.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, delete everything!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                window.location.href = 'manageItem_admin.php?delete_item_id=' + id;
+    // --- 3. DYNAMIC INPUTS FOR MANUAL ASSET CODES ---
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+    const editContainer = document.getElementById('edit_manual_assets_container');
+    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
+
+    function updateEditAssetInputs() {
+        if (!editDynamicInputs) return; 
+        const qty = parseInt(editQtyInput.value) || 0;
+
+        if (editCheckbox && editCheckbox.checked && qty > 0) {
+            editContainer.style.display = 'block';
+            let htmlContent = '';
+            const safeQty = Math.min(qty, 50); 
+
+            for (let i = 1; i <= safeQty; i++) {
+                htmlContent += `
+                    <div class="input-group mb-2">
+                        <span class="input-group-text text-primary small">Unit ${i}</span>
+                        <input type="text" name="manual_codes[]" class="form-control manual-code-input" 
+                               placeholder="Enter Asset Code..." required>
+                    </div>`;
             }
+            editDynamicInputs.innerHTML = htmlContent;
+            attachDuplicateChecker(); // Panggil checker lepas generate input
+        } else {
+            if (editContainer) editContainer.style.display = 'none';
+            editDynamicInputs.innerHTML = '';
+        }
+    }
+
+    // --- 4. ULTIMATE DUPLICATE CHECKER (AJAX + CLIENT SIDE) ---
+    function attachDuplicateChecker() {
+        const inputs = document.querySelectorAll('.manual-code-input');
+        const saveBtn = document.querySelector('button[name="edit_item_type"]');
+
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                const currentInput = this;
+                const codeValue = currentInput.value.trim().toUpperCase();
+
+                if (codeValue === '') {
+                    currentInput.classList.remove('is-invalid', 'is-valid');
+                    return;
+                }
+
+                // A. Check duplicate dalam list modal (Client-side)
+                const allValues = Array.from(inputs).map(i => i.value.trim().toUpperCase());
+                const selfDuplicate = allValues.filter(v => v === codeValue).length > 1;
+
+                if (selfDuplicate) {
+                    showStatus(currentInput, 'Duplicate in list!', 'error');
+                    saveBtn.disabled = true;
+                    return;
+                }
+
+                // B. Check duplicate dengan Database (AJAX)
+                fetch('check_asset_code.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'asset_code=' + encodeURIComponent(codeValue)
+                })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'exists') {
+                        showStatus(currentInput, 'Already exists!', 'error');
+                    } else {
+                        showStatus(currentInput, 'Valid code & can be used', 'success');
+                    }
+                    
+                    // Enable/Disable butang berdasarkan keadaan semua input
+                    const anyInvalid = Array.from(inputs).some(i => i.classList.contains('is-invalid'));
+                    saveBtn.disabled = anyInvalid;
+                });
+            });
         });
     }
+
+    function showStatus(el, msg, type) {
+        let feedback = el.nextElementSibling;
+        if (!feedback || !feedback.classList.contains('dynamic-feedback')) {
+            feedback = document.createElement('div');
+            feedback.className = 'dynamic-feedback small mt-1';
+            el.parentNode.appendChild(feedback);
+        }
+
+        if (type === 'error') {
+            el.classList.add('is-invalid');
+            el.classList.remove('is-valid');
+            feedback.className = 'dynamic-feedback invalid-feedback d-block';
+            feedback.innerText = msg;
+        } else {
+            el.classList.remove('is-invalid');
+            el.classList.add('is-valid');
+            feedback.className = 'dynamic-feedback valid-feedback d-block';
+            feedback.innerText = msg;
+        }
+    }
+
+    if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
+    if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
+});
+
+// --- 5. GLOBAL MODAL FUNCTIONS ---
+function openEditItemModal(item) {
+    const modalElement = document.getElementById('editItemModal');
+    if (!modalElement) return;
+
+    document.getElementById('edit_item_id').value = item.item_id;
+    document.getElementById('edit_item_name').value = item.item_name;
+    document.getElementById('edit_category_id_select').value = item.category_id;
+    
+    const qtyInput = document.getElementById('edit_item_quantity');
+    const manualCheck = document.getElementById('edit_enable_manual_code');
+    const saveBtn = document.querySelector('button[name="edit_item_type"]');
+    
+    if(qtyInput) qtyInput.value = 0;
+    if(manualCheck) manualCheck.checked = false;
+    if(saveBtn) saveBtn.disabled = false; // Reset butang
+    
+    const container = document.getElementById('edit_manual_assets_container');
+    if(container) container.style.display = 'none';
+
+    document.getElementById('edit_item_brand').value = '';
+    document.getElementById('edit_item_model').value = '';
+
+    const myModal = new bootstrap.Modal(modalElement);
+    myModal.show();
+}
+
+function deleteItem(id, name) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `Delete "${name}" and all its units?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = 'manageItem_tech.php?delete_item_id=' + id;
+        }
+    });
+}
 </script>
 </body>
 </html>

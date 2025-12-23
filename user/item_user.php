@@ -2,38 +2,52 @@
 session_start();
 include '../config.php';
 
-
 if (!$conn) {
     error_log("Database connection failed: " . mysqli_connect_error());
     die("Server connection error."); 
 }
-
 
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
+// Guna satu nama sahaja (person_id)
 $person_id = (int) $_SESSION['person_id'];
 
-
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
-if ($stmt === false) {
-    error_log("Error preparing statement: " . $conn->error);
-    die("Server error.");
-}
-$stmt->bind_param("i", $person_id);
+if ($stmt === false) { die("Database Error (User Info): " . $conn->error); }
+
+// BETULKAN DI SINI: Tukar $user_id kepada $person_id
+$stmt->bind_param("i", $person_id); 
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
 
 if (!$user) {
+    session_unset();
     session_destroy();
     header("Location: ../login.php");
     exit();
 }
 
+// LOGIK NAMA PENDEK (Dah betul)
+$fullName = $user['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 $categories = [];
 $res_cat = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name");
@@ -474,7 +488,9 @@ $conn->close();
         </button>
         <h3>Item Availability</h3>
         <div class="user-profile">
-            <span class="user-name"><?= htmlspecialchars($user['name']) ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>
             <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>

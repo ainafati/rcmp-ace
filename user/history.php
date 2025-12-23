@@ -1,39 +1,45 @@
 <?php
 session_start();
-
-
 include '../config.php';
 
-
 if (!isset($_SESSION['person_id'])) {
-header("Location: ../login.php");
-exit();
+    header("Location: ../login.php");
+    exit();
 }
 
 $person_id = (int) $_SESSION['person_id'];
 
-
-$user = null;
-$stmt_user = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
-
-if ($stmt_user) {
-$stmt_user->bind_param("i", $person_id);
-$stmt_user->execute();
-$result_user = $stmt_user->get_result();
-$user = $result_user->fetch_assoc();
-$stmt_user->close();
-} else {
-
-error_log("Failed to prepare user statement: " . $conn->error);
+// 1. Tarik data user (Satu query saja cukup)
+$stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 }
 
 if (!$user) {
-session_destroy();
-header("Location: ../login.php");
-exit();
+    session_destroy();
+    header("Location: ../login.php");
+    exit();
 }
 
-// Tambah ID ke array $user (Untuk dipaparkan di Topbar)
+// 2. LOGIK NAMA PENDEK (Aina Fatihah sahaja)
+$fullName = $user['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+$displayName = trim($shortName);
+
+// Tambah ID ke array user untuk kegunaan lain
 $user['person_id'] = $person_id;
 
 
@@ -359,7 +365,9 @@ body {
 
  <h3>Borrowing History</h3>
  <div class="user-profile">
-<span class="user-name d-none d-md-inline"><?= htmlspecialchars(isset($user['name']) ? $user['name'] : 'User') ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
 <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
  <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
 </a>

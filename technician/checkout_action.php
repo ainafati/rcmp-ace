@@ -9,6 +9,7 @@ session_start();
 include __DIR__ . '/../config.php';
 include 'config_email.php';
 require 'send_email.php';
+include_once '../logger.php'; // --- TAMBAHAN: Hubungkan logger ---
 
 if (!isset($_SESSION['person_id'])) {
  header('Content-Type: application/json');
@@ -18,6 +19,9 @@ if (!isset($_SESSION['person_id'])) {
 }
 
 $person_id = (int)$_SESSION['person_id'];
+// Set role untuk logger (mengikut enum db kau)
+$user_role = strtolower($_SESSION['logged_in_role'] ?? 'tech');
+if($user_role == 'technician') $user_role = 'tech'; 
 
 $action = '';
 
@@ -137,6 +141,8 @@ $stmt_notify->bind_param("isi", $person_id_applicant, $message_notify, $reservat
 $stmt_notify->execute();
 $stmt_notify->close();
 
+// --- TAMBAHAN LOGGER ---
+log_activity($conn, $user_role, $person_id, "Reject Item", "Rejected Item: $item_name (Booking #$reserve_id). Reason: $reason");
 
 $conn->commit();
 $response_message = 'The request was completely rejected because the Approved Quantity is 0.';
@@ -249,7 +255,7 @@ WHERE id = ?");
 
 
  $stmt_asset_update = $conn->prepare("UPDATE assets SET `status` = 'Reserved' WHERE asset_id = ?");
- if (!$stmt_asset_update) throw new Exception("Prepare failed (update asset): " . $conn->error);
+ if (!$stmt_asset_update) throw new Exception("Prepare failed (update asset status): " . $conn->error);
 
  foreach ($selectedAssets as $asset_id) {
 $asset_id_int = (int)$asset_id;
@@ -262,6 +268,9 @@ $stmt_asset_update->execute();
  }
  $stmt_asset_insert->close();
  $stmt_asset_update->close();
+
+ // --- TAMBAHAN LOGGER ---
+ log_activity($conn, $user_role, $person_id, "Approve Item", "Approved $new_quantity units for Item ID: $reservation_item_id (Booking #$reserve_id)");
 
  $conn->commit();
 
@@ -421,6 +430,9 @@ SMTP_PASS
 }
  }
 
+ // --- TAMBAHAN LOGGER ---
+ log_activity($conn, $user_role, $person_id, "Reject Item", "Rejected Item: $item_name (ID: $reservation_item_id). Reason: $reason");
+
  $conn->commit();
  $message = 'The request was successfully declined and the user has been informed.';
  $message .= $email_sent ? ' Email notification has been sent.' : ' Warning: Email notification failed to send.';
@@ -550,6 +562,9 @@ $stmt_asset_update->execute();
  $total_approved_items += 1;
 }
  }
+
+ // --- TAMBAHAN LOGGER (Bulk) ---
+ log_activity($conn, $user_role, $person_id, "Approve All", "Approved $total_approved_items items for Booking #$reserve_id");
 
  $conn->commit();
  $message = "Successfully processed {$total_approved_items} item approved for Booking ID {$reserve_id}.";
@@ -685,6 +700,8 @@ $total_assets_updated++;
 $stmt_item_update->close();
 $stmt_asset_update->close();
 
+// --- TAMBAHAN LOGGER ---
+log_activity($conn, $user_role, $person_id, "Bulk Checkout", "Issued $total_assets_updated assets for Booking #$reserve_id");
 
 $conn->commit();
 echo json_encode([
@@ -800,6 +817,9 @@ $stmt_asset_update->close();
 // 4. Log/Message
 $asset_ids_str = implode(',', $asset_ids);
 $log_desc = "Checked Out Item: {$item_name}. Assigned Assets: {$asset_ids_str}."; // Logik log sedia ada
+
+// --- TAMBAHAN LOGGER ---
+log_activity($conn, $user_role, $person_id, "Checkout", "Issued Assets ($asset_ids_str) for Item ID: $reservation_item_id");
 
 $conn->commit();
 echo json_encode(['message' => "Item successfully issued. " . count($asset_ids) . " the asset's status has been updated."]);
@@ -1026,7 +1046,9 @@ case 'checkin_multi':
 
             // 7. Log dan Commit
             $log_desc = "Checked In Item: {$item_name}. Returned: " . implode(', ', $available_asset_codes) . ". Maintenance: " . implode(', ', $damaged_asset_codes) . ". Item Status: {$final_item_status}.";
-            // Anda boleh masukkan fungsi logging di sini, contoh: log_activity($log_desc, $technician_id);
+            
+            // --- TAMBAHAN LOGGER ---
+            log_activity($conn, $user_role, $person_id, "Check-in", $log_desc);
 
             $conn->commit();
             echo json_encode([

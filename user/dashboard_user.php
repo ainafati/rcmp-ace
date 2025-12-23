@@ -196,7 +196,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
 
 
 
-
 $stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
 if ($stmt === false) { die("Database Error (User Info): " . $conn->error); }
 $stmt->bind_param("i", $user_id);
@@ -212,6 +211,22 @@ if (!$user) {
     exit();
 }
 
+// 2. BARU PROSES NAMA PENDEK (Gunakan logik yang kita bincang)
+$fullName = $user['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 
 $total = 0; $approved = 0; $pending = 0; $rejected_completed = 0;
@@ -779,8 +794,9 @@ $stmt_notif_list->close();
         </button>
         <h3>Dashboard</h3>
         <div class="user-profile">
-            <span class="user-name"><?= htmlspecialchars($user['name'] ?? 'Guest User') ?></span>
-            
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
             <div class="dropdown me-3" style="position: relative;">
                 <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fa-solid fa-bell fa-xl"></i>

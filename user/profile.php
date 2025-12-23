@@ -1,6 +1,5 @@
 <?php
 session_start();
-
 include '../config.php';
 
 if (!$conn) {
@@ -18,29 +17,41 @@ $person_id = (int) $_SESSION['person_id'];
 
 $user = null;
 
-$stmt_user = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
-
-if ($stmt_user) {
-    $stmt_user->bind_param("i", $person_id);
-    $stmt_user->execute();
-    $result_user = $stmt_user->get_result();
-    $user = $result_user->fetch_assoc();
-    $stmt_user->close();
-} else {
-    error_log("Failed to prepare user statement: " . $conn->error);
+// 1. PASTIKAN QUERY ADA COLUMN 'id'
+$stmt = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 }
 
 if (!$user) {
-    error_log("SECURITY ALERT: User with person_id " . $person_id . " was not found.");
     session_destroy();
-    $_SESSION['error'] = "User data not found or session invalid.";
     header("Location: ../login.php");
     exit();
 }
 
+// 2. LOGIK NAMA PENDEK
+$fullName = $user['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+$displayName = trim($shortName);
+
+// Tambah person_id (Primary Key) ke array user untuk hidden input
 $user['person_id'] = $person_id;
 
-$conn->close();
+// JANGAN TUTUP $conn di sini jika anda ada query lain di bawah (seperti history atau categories)
+// $conn->close(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -259,7 +270,9 @@ $conn->close();
 
         <h3>My Profile</h3>
         <div class="user-profile">
-            <span class="user-name d-none d-md-inline"><?= htmlspecialchars($user['name']) ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
             <a href="profile.php" title="My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
             </a>

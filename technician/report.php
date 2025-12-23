@@ -15,12 +15,40 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-$stmt_tech = $conn->prepare("SELECT name FROM person WHERE person_id = ?");
-$stmt_tech->bind_param("i", $person_id);
-$stmt_tech->execute();
-$result_tech = $stmt_tech->get_result();
-$tech = ($tech_data = $result_tech->fetch_assoc()) ? $tech_data : ['name' => 'Technician'];
-$stmt_tech->close();
+$person_id = (int) $_SESSION['person_id']; 
+
+// 2. Tarik Data Technician (Satu query sahaja)
+$stmt = $conn->prepare("SELECT name, email FROM person WHERE person_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $person_id);
+    $stmt->execute();
+    $tech = $stmt->get_result()->fetch_assoc(); // Simpan dalam $tech
+    $stmt->close();
+}
+
+if (!$tech) {
+    session_unset();
+    session_destroy();
+    header("Location: ../login.php");
+    exit();
+}
+
+// 3. Logik Nama Pendek (Gunakan $tech, bukan $user)
+$fullName = $tech['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
 
 function get_reservation_item_count($conn, $status) {
     $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
@@ -324,7 +352,9 @@ $pagination_params = http_build_query([
 
         <h3>Returned Items Report</h3>
         <div class="technician-profile">
-            <span class="tech-name d-none d-md-inline"><?= htmlspecialchars($tech['name']) ?></span>
+<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+    <?= htmlspecialchars($displayName) ?>
+</span>            
             <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
             </a>
