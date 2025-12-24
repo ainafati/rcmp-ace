@@ -24,7 +24,41 @@ $user_role = strtolower($_SESSION['logged_in_role'] ?? 'tech');
 if($user_role == 'technician') $user_role = 'tech'; 
 
 $action = '';
+// --- AUTO-CANCEL LOGIC (VERSI KEMAS) ---
+$hari_ini = date('Y-m-d');
 
+// Cari item yang Approved tapi reserve_date dah LEPAS
+$sql_expired = "SELECT ri.id, ra.asset_id 
+                FROM reservation_items ri
+                JOIN reservations r ON ri.reserve_id = r.reserve_id
+                LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
+                WHERE ri.status = 'Approved' 
+                AND r.reserve_date < '$hari_ini'";
+
+$result_expired = $conn->query($sql_expired);
+
+if ($result_expired && $result_expired->num_rows > 0) {
+    while ($row = $result_expired->fetch_assoc()) {
+        $ri_id = $row['id'];
+        $asset_id = $row['asset_id'];
+
+        // 1. Kemaskini Database: Tukar status & simpan alasan
+        $update_item = "UPDATE reservation_items 
+                        SET status = 'Rejected', 
+                            rejection_reason = 'Auto-Cancelled: Failed to collect the item on the specified date' 
+                        WHERE id = $ri_id";
+        $conn->query($update_item);
+
+        // 2. Lepaskan aset supaya orang lain boleh pinjam
+        if ($asset_id) {
+            $conn->query("UPDATE assets SET status = 'Available' WHERE asset_id = $asset_id");
+        }
+        
+        // 3. Rekod dalam Log (Supaya tahu ini kerja sistem)
+        log_activity($conn, 'system', 0, 'AUTO_CANCEL', "Item ID $ri_id terbatal automatik.");
+    }
+}
+// --- TAMAT AUTO-CANCEL ---
 if (isset($_POST['action'])) {
  $action = $_POST['action'];
 } elseif (isset($_GET['action'])) {
@@ -858,209 +892,58 @@ http_response_code(500); echo json_encode(['message' => 'Prepare failed (get ass
  break;
 
 case 'checkin_multi':
-        // Dapatkan data dari permintaan POST
-        $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
-        $asset_conditions_json = isset($_POST['asset_conditions']) ? $_POST['asset_conditions'] : '[]';
-        $technician_id = isset($_SESSION['person_id']) ? (int)$_SESSION['person_id'] : 0;
+    $reservation_item_id = isset($_POST['reservation_item_id']) ? (int)$_POST['reservation_item_id'] : 0;
+    $asset_conditions_json = isset($_POST['asset_conditions']) ? $_POST['asset_conditions'] : '[]';
+    $technician_id = isset($_SESSION['person_id']) ? (int)$_SESSION['person_id'] : 0;
 
-        $asset_conditions = json_decode($asset_conditions_json, true);
+    $asset_conditions = json_decode($asset_conditions_json, true);
 
-        // --- VALIDASI AWAL ---
-        if (empty($reservation_item_id) || empty($asset_conditions) || !is_array($asset_conditions)) {
-            http_response_code(400);
-            echo json_encode(['message' => 'Missing required information (ID or Asset Conditions).']);
-            exit();
-        }
-        if ($technician_id === 0) {
-            http_response_code(401);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized: Technician ID not found in session.']);
-            exit();
-        }
+    if (empty($reservation_item_id) || empty($asset_conditions)) {
+        http_response_code(400);
+        echo json_encode(['message' => 'Data tidak lengkap.']);
+        exit();
+    }
 
-        // --- TRANSAKSI PANGKALAN DATA ---
-        $conn->begin_transaction();
-        try {
-            $damaged_count = 0;
-            $checked_in_count = 0;
-            $available_asset_codes = [];
-            $damaged_asset_codes = [];
+    $conn->begin_transaction();
+    try {
+        $all_remarks = []; // Untuk simpan gabungan nota ke reservation_items
 
-            // 1. Dapatkan Nama Item (untuk log)
-            $stmt_item_info = $conn->prepare("SELECT i.item_name 
-                                             FROM reservation_items ri 
-                                             JOIN item i ON ri.item_id = i.item_id 
-                                             WHERE ri.id = ?");
-            if (!$stmt_item_info) throw new Exception("Prepare failed (item info): " . $conn->error);
-            $stmt_item_info->bind_param("i", $reservation_item_id);
-            $stmt_item_info->execute();
-            $item_info = $stmt_item_info->get_result()->fetch_assoc();
-            $stmt_item_info->close();
-            $item_name = $item_info ? htmlspecialchars($item_info['item_name']) : 'N/A';
+        foreach ($asset_conditions as $asset) {
+            $asset_id = (int)$asset['asset_id'];
+            $condition = $asset['condition']; 
+            $remarks = isset($asset['remarks']) ? trim($asset['remarks']) : '';
 
-            // 2. Sediakan Pernyataan untuk Kemas Kini Aset & Dapatkan Kod Aset
-            $stmt_asset_update = $conn->prepare("UPDATE assets 
-                                                 SET `status` = ?, last_return_date = CURDATE() 
-                                                 WHERE asset_id = ?");
-            $stmt_get_asset_code = $conn->prepare("SELECT asset_code FROM assets WHERE asset_id = ?");
-
-            if (!$stmt_asset_update) throw new Exception("Prepare failed (asset update): " . $conn->error);
-            if (!$stmt_get_asset_code) throw new Exception("Prepare failed (get asset code): " . $conn->error);
-
-
-            // 3. Proses Setiap Keadaan Aset (Mengemas kini status aset individu)
-            foreach ($asset_conditions as $asset) {
-                if (!isset($asset['asset_id']) || !isset($asset['condition'])) continue; 
-
-                $asset_id = (int)$asset['asset_id'];
-                $condition = $asset['condition']; 
-
-                $new_asset_status = 'Checked Out'; 
-
-                if ($condition === 'Good' || $condition === 'Available') { 
-                    $new_asset_status = 'Available';
-                } elseif ($condition === 'Damaged') {
-                    $new_asset_status = 'Maintenance';
-                    $damaged_count++;
-                } elseif ($condition === 'Not_Returned_Yet') {
-                    // Abaikan aset ini; ia masih dalam status 'Checked Out' dalam jadual `assets`
-                    continue;
-                }
-
-                if ($new_asset_status !== 'Checked Out') {
-                    
-                    // A. Kemas Kini Jadual `assets`
-                    $stmt_asset_update->bind_param("si", $new_asset_status, $asset_id);
-                    if (!$stmt_asset_update->execute()) {
-                        throw new Exception("Asset update failed for asset_id {$asset_id}: " . $stmt_asset_update->error);
-                    }
-
-                    // B. Dapatkan Kod Aset untuk Tujuan Log
-                    $stmt_get_asset_code->bind_param("i", $asset_id);
-                    $stmt_get_asset_code->execute();
-                    $code_row = $stmt_get_asset_code->get_result()->fetch_assoc();
-
-                    if ($code_row) {
-                        if ($new_asset_status === 'Maintenance') {
-                            $damaged_asset_codes[] = $code_row['asset_code'];
-                        } else {
-                            $available_asset_codes[] = $code_row['asset_code'];
-                        }
-                    }
-
-                    $checked_in_count++;
-                }
+            // Tentukan status baru asset
+            $new_status = 'Available';
+            if ($condition === 'Damaged' || $condition === 'Maintenance') {
+                $new_status = 'Maintenance';
+                if(!empty($remarks)) $all_remarks[] = "Asset ID $asset_id: $remarks";
             }
 
-            $stmt_asset_update->close();
-            $stmt_get_asset_code->close();
-
-
-            // 4. Semak Baki Aset 'Checked Out' 
-            $stmt_check_remaining = $conn->prepare("
-                SELECT COUNT(a.asset_id) AS remaining_count
-                FROM reservation_assets ra
-                JOIN assets a ON ra.asset_id = a.asset_id
-                WHERE ra.reservation_item_id = ? AND a.status = 'Checked Out'
-            ");
-            if (!$stmt_check_remaining) throw new Exception("Prepare failed (check remaining): " . $conn->error);
-
-            $stmt_check_remaining->bind_param("i", $reservation_item_id);
-            $stmt_check_remaining->execute();
-            $remaining_row = $stmt_check_remaining->get_result()->fetch_assoc();
-            $remaining_count = (int)$remaining_row['remaining_count'];
-            $stmt_check_remaining->close();
-
-
-            // 5. Kemas Kini Status `reservation_items` (Butiran Item Tempahan)
-            $final_item_status = ($remaining_count > 0) ? 'Checked Out' : 'Returned';
-            $final_condition = ($damaged_count > 0) ? "{$damaged_count} Under Maintenance" : "Good";
-            $final_remarks = "Checked in {$checked_in_count} asset(s). Final item status: {$final_item_status}.";
-
-            if ($final_item_status === 'Returned') {
-                // KEMAS KINI PENUH: Tetapkan status, checked_in_on, dll. (return_date TIDAK di sini)
-                $stmt_item = $conn->prepare("UPDATE reservation_items
-                    SET status = ?,
-                        return_condition = ?,
-                        return_remarks = ?,
-                        checked_in_by = ?, 
-                        checked_in_on = NOW()
-                    WHERE id = ?");
-                
-                if (!$stmt_item) throw new Exception("Prepare failed (update item returned): " . $conn->error);
-                $stmt_item->bind_param("sssii", $final_item_status, $final_condition, $final_remarks, $technician_id, $reservation_item_id);
-
-            } else {
-                // KEMAS KINI SEPARA: Hanya kemas kini status/kondisi/catatan
-                $stmt_item = $conn->prepare("UPDATE reservation_items
-                    SET status = ?,
-                        return_condition = ?,
-                        return_remarks = ?
-                    WHERE id = ?");
-
-                if (!$stmt_item) throw new Exception("Prepare failed (update item checked out): " . $conn->error);
-                $stmt_item->bind_param("sssi", $final_item_status, $final_condition, $final_remarks, $reservation_item_id);
-            }
-
-            if (!$stmt_item->execute()) throw new Exception("Execute failed (update item): " . $stmt_item->error);
-            $stmt_item->close();
-
-
-            // 6. Kemas Kini Jadual `reservations` (Induk) - Logik return_date
-            if ($final_item_status === 'Returned') {
-                
-                // A. Dapatkan reserve_id daripada reservation_items
-                $stmt_get_reserve_id = $conn->prepare("SELECT reserve_id FROM reservation_items WHERE id = ?");
-                if (!$stmt_get_reserve_id) throw new Exception("Prepare failed (get reserve id): " . $conn->error);
-                $stmt_get_reserve_id->bind_param("i", $reservation_item_id);
-                $stmt_get_reserve_id->execute();
-                $reserve_row = $stmt_get_reserve_id->get_result()->fetch_assoc();
-                $reserve_id = $reserve_row ? (int)$reserve_row['reserve_id'] : 0;
-                $stmt_get_reserve_id->close();
-                
-                // B. Semak sama ada SEMUA item tempahan di bawah reserve_id ini telah 'Returned'
-                $stmt_check_all_items = $conn->prepare("
-                    SELECT COUNT(id) AS unreturned_count
-                    FROM reservation_items
-                    WHERE reserve_id = ? AND status != 'Returned'
-                ");
-                if (!$stmt_check_all_items) throw new Exception("Prepare failed (check all items): " . $conn->error);
-                $stmt_check_all_items->bind_param("i", $reserve_id);
-                $stmt_check_all_items->execute();
-                $unreturned_row = $stmt_check_all_items->get_result()->fetch_assoc();
-                $unreturned_count = (int)$unreturned_row['unreturned_count'];
-                $stmt_check_all_items->close();
-
-                // C. Jika TIADA item lain yang belum dipulangkan, kemas kini reservations.return_date
-                if ($reserve_id > 0 && $unreturned_count === 0) {
-                    $stmt_reserve_update = $conn->prepare("UPDATE reservations
-                        SET return_date = CURDATE()
-                        WHERE reserve_id = ?");
-                    
-                    if (!$stmt_reserve_update) throw new Exception("Prepare failed (update reservation): " . $conn->error);
-                    $stmt_reserve_update->bind_param("i", $reserve_id);
-                    if (!$stmt_reserve_update->execute()) throw new Exception("Execute failed (update reservation): " . $stmt_reserve_update->error);
-                    $stmt_reserve_update->close();
-                }
-            }
-
-
-            // 7. Log dan Commit
-            $log_desc = "Checked In Item: {$item_name}. Returned: " . implode(', ', $available_asset_codes) . ". Maintenance: " . implode(', ', $damaged_asset_codes) . ". Item Status: {$final_item_status}.";
-            
-            // --- TAMBAHAN LOGGER ---
-            log_activity($conn, $user_role, $person_id, "Check-in", $log_desc);
-
-            $conn->commit();
-            echo json_encode([
-                'success' => true,
-                'message' => "Check-in success. {$checked_in_count} processed assets. Booking status updated to '{$final_item_status}'"
-            ]);
-
-        } catch (Exception $e) {
-            $conn->rollback();
-            http_response_code(500);
-            error_log("Multi Check-in Error for reservation_item_id {$reservation_item_id}: " . $e->getMessage());
-            echo json_encode(['message' => 'Check-in gagal: ' . $e->getMessage()]);
+            // 1. UPDATE table ASSETS (Simpan nota kerosakan pada asset tu sendiri)
+            $stmt_as = $conn->prepare("UPDATE assets SET status = ?, last_remarks = ?, last_return_date = CURDATE() WHERE asset_id = ?");
+            $stmt_as->bind_param("ssi", $new_status, $remarks, $asset_id);
+            $stmt_as->execute();
         }
-        break;
+
+        // 2. UPDATE table RESERVATION_ITEMS (Guna column return_remarks yang kau dah ada)
+        $final_remarks_str = implode(" | ", $all_remarks);
+        $stmt_ri = $conn->prepare("UPDATE reservation_items 
+                                   SET status = 'Returned', 
+                                       return_remarks = ?, 
+                                       checked_in_by = ?, 
+                                       checked_in_on = NOW() 
+                                   WHERE id = ?");
+        $stmt_ri->bind_param("sii", $final_remarks_str, $technician_id, $reservation_item_id);
+        $stmt_ri->execute();
+
+        $conn->commit();
+        echo json_encode(['success' => true, 'message' => 'Check-in berjaya disimpan!']);
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        http_response_code(500);
+        echo json_encode(['message' => 'Ralat: ' . $e->getMessage()]);
+    }
+    break;
 }

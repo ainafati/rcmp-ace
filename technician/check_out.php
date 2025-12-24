@@ -46,23 +46,29 @@ $displayName = trim($shortName);
 $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_GET['filter_date'] : null;
 
 
+
 function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $status_placeholders = implode(',', array_fill(0, count($statuses), '?'));
 
-    $sql = "SELECT
-                ri.id AS reservation_item_id, ri.status, ri.quantity, r.reserve_date, r.return_date,
-                r.created_at AS apply_date, 
-                r.priority, r.reserve_id, /* <<< KOMA DITAMBAH DI SINI */
-                r.reason AS reservation_reason,
-                u.name AS user_name, u.phoneNum AS user_phone,
-                u.person_id AS user_person_id,
-                i.item_name, i.item_id
-            FROM reservation_items ri
-            JOIN reservations r ON ri.reserve_id = r.reserve_id
-            JOIN person u ON r.person_id = u.person_id 
-            JOIN item i ON ri.item_id = i.item_id 
-            WHERE ri.status IN ($status_placeholders)";
-
+// Cari dalam function fetch_reservations_by_status
+$sql = "SELECT
+            ri.id AS reservation_item_id, ri.status, ri.rejection_reason, ri.quantity, 
+            r.reserve_date, r.return_date, r.created_at AS apply_date, 
+            r.priority, r.reserve_id, r.reason AS reservation_reason,
+            u.name AS user_name, u.phoneNum AS user_phone,
+            u.person_id AS user_person_id,
+            i.item_name, i.item_id
+        FROM reservation_items ri
+        JOIN reservations r ON ri.reserve_id = r.reserve_id
+        JOIN person u ON r.person_id = u.person_id 
+        JOIN item i ON ri.item_id = i.item_id 
+        WHERE ri.status IN ($status_placeholders)
+        AND (
+            ri.status != 'Approved' 
+            OR (ri.status = 'Approved' AND r.reserve_date >= CURDATE())
+        )"; // Logik ini memastikan Rejected/Returned sentiasa keluar walaupun tarikh dah lepas
+		
+		
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
 
@@ -120,224 +126,152 @@ while ($row = $assetResult->fetch_assoc()) { $availableAssets[$row['item_id']][]
 $availableAssets_json = json_encode($availableAssets);
 
 
+
 function create_request_table($requests) {
     if (empty($requests)) {
         echo '<div class="text-center text-muted py-5"><i class="fa-solid fa-inbox fa-2x mb-2"></i><br>No reservations found matching the criteria.</div>';
         return;
     }
 
-    
+    // 1. Grouping Data
     $grouped_by_user = [];
     foreach ($requests as $row) {
-        $user_name = $row['user_name'];
-        $grouped_by_user[$user_name][] = $row;
+        $grouped_by_user[$row['user_name']][] = $row;
     }
 
     $main_accordion_id = 'accordion_main_' . uniqid();
-    
-    
-    $current_status = isset($requests[0]) ? strtolower(trim($requests[0]['status'])) : '';
-    $is_pending_tab = ($current_status === 'pending');
-    $is_approved_tab = ($current_status === 'approved');
-    $is_checked_out_tab = ($current_status === 'checked out');
-
     echo '<div class="accordion" id="' . $main_accordion_id . '">';
 
     $user_index = 0;
-
-    
     foreach ($grouped_by_user as $user_name => $user_items) {
-        
-        
         $grouped_by_reserve = [];
         foreach ($user_items as $item) {
             $grouped_by_reserve[$item['reserve_id']][] = $item;
         }
 
-        $total_reserve_count = count($grouped_by_reserve);
-        $user_phone = $user_items[0]['user_phone']; 
-        
-        
         $user_collapse_id = 'collapse_user_' . $user_index;
         $user_header_id = 'header_user_' . $user_index;
-        $inner_accordion_id = 'inner_accordion_' . $user_index; 
+        $inner_accordion_id = 'inner_accordion_' . $user_index;
 
-        echo '<div class="accordion-item shadow-sm mb-3">';
-
-        
-        echo '<h2 class="accordion-header" id="' . $user_header_id . '">';
-        echo '  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '" aria-expanded="false" aria-controls="' . $user_collapse_id . '">';
-        
-        echo '    <div class="d-flex justify-content-between w-100 pe-3">'; 
-        echo '      <div>';
-        echo '        <strong class="fs-6">' . htmlspecialchars($user_name) . '</strong>';
-        echo '        <span class="text-muted ms-2" style="font-size: 0.9em;">(' . htmlspecialchars($user_phone) . ')</span>';
+        // --- LEVEL 1: USER ACCORDION ---
+        echo '<div class="accordion-item shadow-sm mb-3 border-0 rounded-3 overflow-hidden">';
+        echo '  <h2 class="accordion-header" id="' . $user_header_id . '">';
+        echo '    <button class="accordion-button collapsed bg-light text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '">';
+        echo '      <div class="d-flex justify-content-between w-100 pe-3 align-items-center">';
+        echo '        <div><strong class="fs-6">' . htmlspecialchars($user_name) . '</strong> <small class="text-muted ms-1">(' . htmlspecialchars($user_items[0]['user_phone']) . ')</small></div>';
+        echo '        <span class="badge bg-primary rounded-pill">' . count($grouped_by_reserve) . ' Booking(s)</span>';
         echo '      </div>';
-        echo '      <div class="mt-1">';
-        echo '        <span class="badge bg-primary rounded-pill">' . $total_reserve_count . ' Reservation(s)</span>';
-        echo '      </div>';
-        echo '    </div>';
+        echo '    </button>';
+        echo '  </h2>';
 
-        echo '  </button>';
-        echo '</h2>';
-        
-        
-        echo '<div id="' . $user_collapse_id . '" class="accordion-collapse collapse" aria-labelledby="' . $user_header_id . '" data-bs-parent="#' . $main_accordion_id . '">';
-        echo '  <div class="accordion-body p-3">'; 
+        echo '  <div id="' . $user_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $main_accordion_id . '">';
+        echo '    <div class="accordion-body p-3 bg-white">';
+        echo '      <div class="accordion" id="' . $inner_accordion_id . '">';
 
-        
-        echo '<div class="accordion" id="' . $inner_accordion_id . '">';
         $reserve_index = 0;
-
         foreach ($grouped_by_reserve as $reserve_id => $reservation_items) {
-            $total_items_in_booking = count($reservation_items);
-
+            $priority = $reservation_items[0]['priority'];
+            $priorityClass = ($priority == 1) ? 'priority-high' : (($priority == 2) ? 'priority-mid' : '');
             $reserve_collapse_id = 'collapse_reserve_' . $user_index . '_' . $reserve_index;
-            $reserve_header_id = 'header_reserve_' . $user_index . '_' . $reserve_index;
-            
-            
-            $has_relevant_items = false;
-            foreach ($reservation_items as $item) {
-                $status = strtolower(trim($item['status']));
-                if (($is_pending_tab && $status === 'pending') ||
-                    ($is_approved_tab && $status === 'approved') ||
-                    ($is_checked_out_tab && $status === 'checked out')) {
-                    $has_relevant_items = true;
-                    break;
-                }
-            }
+            $status_check = strtolower(trim($reservation_items[0]['status']));
 
-            echo '<div class="accordion-item mb-2 border rounded">';
-
+            // --- LEVEL 2: RESERVATION ID CARD ---
+            echo '<div class="accordion-item booking-card ' . $priorityClass . ' shadow-sm mb-3 border">';
+            echo '  <div class="d-flex align-items-center bg-white py-3 px-3 w-100 justify-content-between rounded-3">';
             
-            echo '<h2 class="accordion-header p-0" id="' . $reserve_header_id . '">';
-            
-            
-            echo '  <div class="d-flex align-items-center bg-light rounded-top">';
-            
-            
-            echo '    <button class="accordion-button collapsed p-3 bg-light w-auto flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#' . $reserve_collapse_id . '" aria-expanded="false" aria-controls="' . $reserve_collapse_id . '">';
-            echo '      <div class="d-flex justify-content-between w-100 pe-3">'; 
-            echo '        <div class="d-flex align-items-center">';
-            echo '          <strong><i class="fa-solid fa-bookmark me-2 text-primary"></i> Booking ID: ' . htmlspecialchars($reserve_id) . '</strong>';
-            echo '          <span class="ms-3 badge bg-info text-dark rounded-pill">' . $total_items_in_booking . ' Item(s)</span>';
-            echo '        </div>';
+            // Klik sini untuk buka item list
+            echo '    <div class="d-flex align-items-center flex-grow-1" data-bs-toggle="collapse" data-bs-target="#' . $reserve_collapse_id . '" style="cursor: pointer;">';
+            echo '      <div class="id-badge me-3">';
+            echo '        <span class="text-muted small fw-bold" style="font-size: 0.7rem;">ID</span>';
+            echo '        <span class="text-primary fw-bold ms-1">#' . htmlspecialchars($reserve_id) . '</span>';
             echo '      </div>';
-            echo '    </button>';
+            echo '      <div class="d-none d-md-block text-start">';
+            echo '        <div class="text-muted small" style="font-size: 0.7rem;">Applied on</div>';
+            echo '        <div class="fw-bold small">' . date('d M Y', strtotime($reservation_items[0]['apply_date'])) . '</div>';
+            echo '      </div>';
+            echo '      <i class="fa-solid fa-chevron-down ms-3 text-muted small"></i>';
+            echo '    </div>';
 
-            
-            if ($has_relevant_items) {
-                
-                if ($is_approved_tab) {
-                    
-                    echo '  <button 
-                                class="btn btn-primary btn-sm checkout-all-btn me-3" 
-                                data-reserve-id="' . htmlspecialchars($reserve_id) . '"
-                                title="Check out all approved items in this booking."
-                                style="flex-shrink: 0;">
-                                <i class="fa-solid fa-box-open"></i> Check Out All
-                            </button>';
-                } 
+            // Check Out All Button (Jika status Approved)
+            echo '    <div class="d-flex align-items-center" style="position: relative; z-index: 100;">';
+            if ($status_check === 'approved') {
+                echo '<button type="button" class="btn btn-primary btn-sm me-3 rounded-pill px-3 checkout-all-btn" data-reserve-id="' . $reserve_id . '"><i class="fa-solid fa-box-open me-1"></i> Check Out All</button>';
             }
-            
+            echo '      <span class="badge bg-light text-dark border rounded-pill fw-normal px-3 py-2"><i class="fa-solid fa-boxes-stacked me-1 text-secondary"></i> ' . count($reservation_items) . ' Item(s)</span>';
+            echo '    </div>';
+            echo '  </div>';
 
-            echo '  </div>'; 
-            echo '</h2>';
-
-            
-            echo '<div id="' . $reserve_collapse_id . '" class="accordion-collapse collapse" aria-labelledby="' . $reserve_header_id . '" data-bs-parent="#' . $inner_accordion_id . '">';
-            echo '  <div class="accordion-body p-0">'; 
-
-            
-            echo '<div class="table-responsive"><table class="table mb-0 align-middle table-sm">';
-            echo '<thead><tr>';
-            echo '  <th class="ps-3">Item / Priority</th>';
-            echo '  <th class="text-center">Qty</th>';
-            echo '  <th>Duration / Applied</th>';
-            echo '  <th>Status</th>';
-            echo '  <th class="text-center pe-3">Actions</th>';
-            echo '</tr></thead><tbody>';
+            echo '  <div id="' . $reserve_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $inner_accordion_id . '">';
+            echo '    <div class="accordion-body p-0">';
+            echo '      <div class="table-responsive"><table class="table mb-0 align-middle table-sm">';
+            echo '        <thead><tr class="table-light">';
+            echo '          <th class="ps-3 py-2">Item / Priority</th><th class="text-center">Qty</th><th>Duration</th>';
+            echo '          <th class="text-center" style="width: 100px;">STATUS</th><th class="text-center pe-3">Actions</th>';
+            echo '        </tr></thead><tbody>';
 
             foreach ($reservation_items as $row) {
-                
                 $status = strtolower(trim($row['status']));
+                $id = $row['reservation_item_id'];
+                $p_class = ($row['priority'] == 1) ? 'bg-danger' : (($row['priority'] == 2) ? 'bg-warning text-dark' : 'bg-info text-dark');
+                $p_text = ($row['priority'] == 1) ? 'High' : (($row['priority'] == 2) ? 'Moderate' : 'Low');
 
-                
-                $priority_class = 'bg-secondary';
-                $priority_text = 'Normal Priority';
-                if ($row['priority'] == 1) {
-                    $priority_class = 'bg-danger';
-                    $priority_text = 'High Priority';
-                } elseif ($row['priority'] == 2) {
-                    $priority_class = 'bg-warning text-dark';
-                    $priority_text = 'Moderate Priority';
-                } else {
-                    $priority_class = 'bg-info text-dark';
-                    $priority_text = 'Low Priority';
-                }
+                // Status Icon Logic
+                $icon = 'fa-clock'; $color = '#ffc107'; $title = 'Pending';
+                if($status == 'approved'){ $icon = 'fa-check-circle'; $color = '#198754'; $title = 'Approved'; }
+                elseif($status == 'checked out'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
+                elseif($status == 'returned'){ $icon = 'fa-hand-holding-heart'; $color = '#0dcaf0'; $title = 'Returned'; }
+                elseif($status == 'rejected'){ $icon = 'fa-times-circle'; $color = '#dc3545'; $title = 'Rejected'; }
 
+                // --- PENTING: ID & DATA UNTUK JAVASCRIPT ---
+                echo "<tr id='row-{$id}' 
+                        data-qty='{$row['quantity']}' 
+                        data-item-id='{$row['item_id']}' 
+                        data-user-name='" . htmlspecialchars($user_name) . "' 
+                        data-itemname='" . htmlspecialchars($row['item_name']) . "' 
+                        data-phone='" . htmlspecialchars($row['user_phone']) . "' 
+                        data-reason='" . htmlspecialchars($row['reservation_reason'] ?? '') . "'>";
                 
-                $badgeClass = 'bg-secondary';
-                if ($status === 'pending') $badgeClass = 'bg-warning text-dark';
-                if ($status === 'approved') $badgeClass = 'bg-success';
-                if ($status === 'checked out') $badgeClass = 'bg-primary';
-                if ($status === 'rejected') $badgeClass = 'bg-danger';
+                echo "  <td class='ps-3'><strong>" . htmlspecialchars($row['item_name']) . "</strong><br><span class='badge $p_class' style='font-size:0.65rem;'>$p_text Priority</span></td>";
+                echo "  <td class='text-center'><strong>{$row['quantity']}</strong></td>";
+                echo "  <td><small>" . date('d M', strtotime($row['reserve_date'])) . " - " . date('d M Y', strtotime($row['return_date'])) . "</small></td>";
                 
-                
-                echo "<tr id='row-{$row['reservation_item_id']}'  
-                     data-phone='" . htmlspecialchars($row['user_phone']) . "' 
-                     data-itemname='" . htmlspecialchars($row['item_name']) . "' 
-                     data-user-name='" . htmlspecialchars($row['user_name']) . "' 
-                     data-user-id='{$row['user_person_id']}'  
-                     data-item-id='{$row['item_id']}' 
-                     data-reason='" . htmlspecialchars($row['reservation_reason']) . "' 
-                     data-qty='{$row['quantity']}'
-                     >"; 
-        
-                echo "<td class='ps-3'><strong>" . htmlspecialchars($row['item_name']) . "</strong>";
-                echo "<div><span class='badge rounded-pill $priority_class' style='font-size: 0.7em;'>$priority_text</span></div>";
-                echo "</td>";
-        
-                echo "<td class='text-center'><strong>{$row['quantity']}</strong></td>";
-                echo "<td>" . date('d M Y', strtotime($row['reserve_date'])) . " to " . date('d M Y', strtotime($row['return_date'])) . "<div class='info-secondary'>Applied: " . date('d M Y', strtotime($row['apply_date'])) . "</div></td>";
-                echo "<td><span class='badge rounded-pill $badgeClass'>" . ucfirst(str_replace('_', ' ', $status)) . "</span></td>";
-                echo "<td class='text-center pe-3'>";
-                
-                
+                // Status Icon
+                echo "  <td class='text-center'><div style='display:flex; justify-content:center;'><div title='$title' style='position:relative; width:30px; height:30px; background:$color; color:#fff; border-radius:50%; flex-shrink:0;'>";
+                echo "    <i class='fa-solid $icon' style='position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.8rem;'></i>";
+                echo "  </div></div></td>";
+
+                // Action Buttons
+                echo "  <td class='text-center pe-3'>";
                 if ($status === 'pending') {
-                      echo "<button class='btn btn-success btn-sm' title='Approve' aria-label='Approve Request' onclick='openApproveModal({$row['reservation_item_id']})'><i class='fa-solid fa-check'></i></button> ";
-                      echo "<button class='btn btn-danger btn-sm' title='Reject' aria-label='Reject Request' onclick='openRejectModal({$row['reservation_item_id']})'><i class='fa-solid fa-xmark'></i></button>";
+                    echo "<div class='action-group'>";
+                    echo "  <button type='button' class='btn btn-success btn-sm border-0 px-3' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
+                    echo "  <button type='button' class='btn btn-danger btn-sm border-0 px-3' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
+                    echo "</div>";
                 } elseif ($status === 'approved') {
-                      echo "<button class='btn btn-primary btn-sm' title='Check Out' aria-label='Check Out Item' onclick='checkOutItem({$row['reservation_item_id']})'><i class='fa-solid fa-box-open'></i></button>";
-                } elseif ($status === 'checked out') {
-                      echo "<button class='btn btn-warning btn-sm' title='Check In' aria-label='Check In Item' onclick='checkInItem({$row['reservation_item_id']})'><i class='fa-solid fa-inbox'></i></button>";
+                    echo "<button type='button' class='btn btn-primary btn-sm rounded-pill px-3' onclick='event.stopPropagation(); checkOutItem($id)'><i class='fa-solid fa-box-open'></i></button>";
+                } elseif ($status === 'on loan' || $status === 'checked out'){
+                    echo "<button type='button' class='btn btn-warning btn-sm rounded-pill px-3 text-dark' onclick='event.stopPropagation(); checkInItem($id)'><i class='fa-solid fa-inbox'></i></button>";
                 } else {
-                      echo "<span class='text-muted'>—</span>";
+                    echo "<span class='text-muted small'>—</span>";
                 }
-                echo "</td></tr>";
-            } 
-
-            echo '</tbody></table></div>'; 
-            
-            echo '  </div>'; 
-            echo '</div>'; 
-            echo '</div>'; 
-
+                echo "  </td>";
+                echo "</tr>";
+            }
+            echo '</tbody></table></div>';
+            echo '    </div>'; 
+            echo '  </div>';
+            echo '</div>';
             $reserve_index++;
-        } 
-
-        echo '</div>'; 
-        
-        echo '  </div>'; 
-        echo '</div>'; 
-        echo '</div>'; 
-
+        }
+        echo '      </div>';
+        echo '    </div>';
+        echo '  </div>';
+        echo '</div>';
         $user_index++;
-    } 
+    }
+    echo '</div>';
+}?>
 
-    echo '</div>'; 
-}
-?>
 
 <!DOCTYPE html>
 
@@ -500,6 +434,79 @@ function create_request_table($requests) {
     .btn.d-lg-none {
         border: none;
     }
+	/* 1. Warna Side Border ikut Priority */
+.booking-card {
+    border-left: 5px solid #dee2e6 !important; /* Default kelabu */
+    border-radius: 10px !important;
+    overflow: hidden;
+    background: #fff;
+    transition: all 0.2s ease-in-out;
+}
+
+.booking-card.priority-high { border-left-color: #dc3545 !important; } /* Merah */
+.booking-card.priority-mid { border-left-color: #ffc107 !important; }  /* Kuning */
+
+.booking-card:hover {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* 2. Gaya ID Badge yang nampak 'Pro' */
+.id-badge {
+    background: #f1f5f9;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 3. Button Group untuk Action (Optional - kalau nak butang rapat) */
+.action-group {
+    display: inline-flex;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+/* --- SEARCH BOX STYLING --- */
+.search-box .input-group {
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
+}
+
+.search-box .input-group:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15); /* Soft Cyan Glow */
+}
+
+#userSearchInput {
+    border: none;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+}
+
+#userSearchInput:focus {
+    box-shadow: none; /* Buang default blue glow bootstrap */
+}
+
+.search-box .input-group-text {
+    background-color: #fff;
+    color: var(--text-muted);
+    padding-left: 15px;
+}
+
+/* Responsive: Search bar penuh bila kat mobile */
+@media (max-width: 768px) {
+    .main-actions-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 15px;
+    }
+    .search-box {
+        width: 100% !important;
+    }
+}
 </style>
 </head>
 <body>
@@ -528,9 +535,9 @@ function create_request_table($requests) {
             <h3>Manage Requests</h3>
         </div>
         <div class="d-flex align-items-center gap-3">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
+            <span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
+                <?= htmlspecialchars($displayName) ?>
+            </span>            
             <a href="profile_tech.php" title="My Profile" aria-label="View My Profile">
                 <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
             </a>
@@ -541,43 +548,65 @@ function create_request_table($requests) {
         <div class="row g-4">
             <div class="col-lg-12">
 
-                <div class="card">
-                    <h5 class="mb-3"><i class="fa-solid fa-filter me-2 text-primary"></i> Filter by Apply Date</h5>
-                    <form method="GET" action="check_out.php" class="row g-3 align-items-end">
-                        <div class="col-md-5">
-                            <label for="filter_date" class="form-label fw-bold">Select Apply Date</label>
-                            <input type="date" class="form-control" id="filter_date" name="filter_date" value="<?= htmlspecialchars(isset($filter_date) ? $filter_date : '') ?>">
-                        </div>
-                        <div class="col-md-auto">
-                            <button type="submit" class="btn btn-primary">Filter</button>
-                        </div>
-                         <div class="col-md-auto">
-                            <a href="check_out.php" class="btn btn-outline-secondary">Reset</a>
-                        </div>
-                    </form>
+<div class="card shadow-sm border-0 mb-3" style="padding: 15px 25px;">
+    <div class="card-body p-0">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <h6 class="mb-0 text-dark fw-bold">
+                    <i class="fa-solid fa-filter me-2 text-primary"></i>Filter by Apply Date
+                </h6>
+            </div>
+            
+            <div class="col-md-8">
+                <form class="d-flex justify-content-md-end align-items-center gap-2">
+                    <label for="applyDate" class="small text-muted mb-0 d-none d-lg-block">Select Date:</label>
+                    <input type="date" id="applyDate" class="form-control form-control-sm" style="width: 180px; border-radius: 8px;">
+                    <button type="submit" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">Filter</button>
+                    <button type="reset" class="btn btn-outline-secondary btn-sm px-3" style="border-radius: 8px;">Reset</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+               <div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="main-actions-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fa-solid fa-list-check me-2 text-primary"></i> 
+                Reservation Actions
+            </h5>
+            
+            <div class="search-box" style="width: 320px;">
+                <div class="input-group">
+                    <span class="input-group-text border-end-0">
+                        <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    </span>
+                    <input type="text" id="userSearchInput" class="form-control" placeholder="Search for name or phone number...">
                 </div>
+            </div>
+        </div>
 
-                <div class="card">
-                    <h5><i class="fa-solid fa-list-check me-2 text-primary"></i> Reservation Actions</h5>
-                    <ul class="nav nav-tabs nav-fill mt-3" id="myTab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tab-pane" type="button" role="tab">New Requests <span class="badge rounded-pill text-bg-warning ms-1"><?= count($pending_requests) ?></span></button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved-tab-pane" type="button" role="tab">To Be Collected <span class="badge rounded-pill text-bg-primary ms-1"><?= count($approved_requests) ?></span></button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="onloan-tab" data-bs-toggle="tab" data-bs-target="#onloan-tab-pane" type="button" role="tab">On Loan <span class="badge rounded-pill text-bg-danger ms-1"><?= count($on_loan_requests) ?></span></button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button" role="tab">Completed Archive</button>
-                        </li>
-                    </ul>
-                    <div class="tab-content pt-3" id="myTabContent">
-                        <div class="tab-pane fade show active" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
-                        <div class="tab-pane fade" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
-                        <div class="tab-pane fade" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
-                        <div class="tab-pane fade" id="completed-tab-pane" role="tabpanel"><?php create_request_table($completed_requests); ?></div>
+        <ul class="nav nav-tabs nav-fill mt-4" id="myTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tab-pane" type="button" role="tab">New Requests <span class="badge rounded-pill text-bg-warning ms-1"><?= count($pending_requests) ?></span></button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved-tab-pane" type="button" role="tab">To Be Collected <span class="badge rounded-pill text-bg-primary ms-1"><?= count($approved_requests) ?></span></button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="onloan-tab" data-bs-toggle="tab" data-bs-target="#onloan-tab-pane" type="button" role="tab">On Loan <span class="badge rounded-pill text-bg-danger ms-1"><?= count($on_loan_requests) ?></span></button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button" role="tab">Completed Archive</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content pt-3" id="myTabContent">
+                            <div class="tab-pane fade show active tab-container" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
+                            <div class="tab-pane fade tab-container" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
+                            <div class="tab-pane fade tab-container" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
+                            <div class="tab-pane fade tab-container" id="completed-tab-pane" role="tabpanel"><?php create_request_table($completed_requests); ?></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -595,31 +624,20 @@ function create_request_table($requests) {
             <div class="modal-body">
                 <p><strong>User:</strong> <span id="userName"></span> (<span id="userPhone"></span>)</p>
                 <p><strong>Item:</strong> <span id="itemName"></span></p>
-<p>
-    <strong>Quantity Requested:</strong> 
-    <span id="requestedQtyText"></span> 
-</p>
-<p>
-    <strong>Reason:</strong> 
-    <span id="reservationReasonText" ></span>
-</p>
-				<hr>
-
+                <p><strong>Quantity Requested:</strong> <span id="requestedQtyText"></span></p>
+                <p><strong>Reason:</strong> <span id="reservationReasonText"></span></p>
+                <hr>
                 <div class="mb-3">
                     <label for="approve_actual_qty" class="form-label fw-bold">Quantity to Approve:</label>
                     <input type="number" class="form-control" id="approve_actual_qty" min="1">
                 </div>
-
                 <div class="mb-3" id="partialRejectionReasonContainer" style="display:none;">
                     <label for="partial_reject_reason" class="form-label fw-bold text-danger">Reason for Quantity Reduction:</label>
                     <textarea class="form-control" id="partial_reject_reason" placeholder="e.g., Only 2 units are available now."></textarea>
-                    <small class="form-text text-muted">Please explain why the approved quantity is less than requested.</small>
                 </div>
                 <div id="assetListContainer"></div>
-
                 <input type="hidden" id="approve_reservation_item_id">
                 <input type="hidden" id="approve_original_qty"> 
-
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -628,39 +646,25 @@ function create_request_table($requests) {
         </div>
     </div>
 </div>
-<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel" aria-hidden="true">
+
+<div class="modal fade" id="checkInModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="rejectModalLabel">Reject Reservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-            <div class="modal-body">
-                <p>Please provide a reason for rejection:</p>
-                <textarea id="reject_reason" class="form-control" placeholder="e.g., Item unavailable, insufficient details..."></textarea>
-                <input type="hidden" id="reject_reservation_item_id">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Return Item (Check-In)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-danger" id="confirmRejectBtn">Confirm Rejection</button></div>
+            <div class="modal-body" id="checkInModalBody">
+                <p class="text-center">Loading assets...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmCheckInBtn">Confirm Return</button>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="checkInModal" tabindex="-1" role="dialog" aria-labelledby="checkInModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="checkInModalLabel">Check In Item(s)</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="checkInModalBody">
-                <div class="text-center p-4">
-                    <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
-                    <br>Loading assets...
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirmCheckInBtn" disabled>Confirm Check-In</button>
-            </div>
-        </div>
-    </div>
-</div>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -668,11 +672,52 @@ function create_request_table($requests) {
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
 
+document.addEventListener('DOMContentLoaded', function () {
+    // Aktifkan semua tooltip dlm page
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+});
 
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
 $(document).ready(function() {
+
+// --- LOGIK KEKALKAN TAB SELEPAS RELOAD ---
+    // Simpan tab aktif ke dalam localStorage bila user klik tab
+    $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        localStorage.setItem('activeTab', $(e.target).attr('data-bs-target'));
+    });
+
+    // Baca balik tab yang disimpan bila page reload
+    var activeTab = localStorage.getItem('activeTab');
+    if (activeTab) {
+        var tabTrigger = new bootstrap.Tab($('button[data-bs-target="' + activeTab + '"]')[0]);
+        tabTrigger.show();
+    }
     
+    $('#userSearchInput').on('keyup', function() {
+        var value = $(this).val().toLowerCase();
+        
+        // Kita tapis accordion-item dalam tab yang sedang aktif sahaja
+        // supaya tak kacau tab lain (lebih ringan)
+        $('.tab-pane.active .accordion-item').filter(function() {
+            // Dia akan cari nama user (header) dan juga content dalam baris tu
+            var textToSearch = $(this).find('.accordion-header').text().toLowerCase();
+            
+            // Toggle: Kalau jumpa tunjuk, kalau tak jumpa sorok
+            $(this).toggle(textToSearch.indexOf(value) > -1);
+        });
+    });
+
+    // Reset kotak search bila user tukar tab (New Request -> On Loan etc)
+    $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        $('#userSearchInput').val(''); // Kosongkan input
+        $('.accordion-item').show();   // Tunjukkan balik semua item
+    });
+    // ==========================================
+
     function handleBulkAction(action, reserveId, title, text, confirmText, confirmColor) {
         
         Swal.fire({
@@ -729,6 +774,8 @@ $(document).ready(function() {
             '#3b82f6' 
         );
     });
+
+
 
 
 function checkOutItem(id) {

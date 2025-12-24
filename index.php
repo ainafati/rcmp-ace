@@ -3,456 +3,281 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexCheck (RCMP Inventory Reservation Check System) - IT Asset Management</title>
+    <title>NexCheck | Intelligence Asset Management</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         :root {
-            /* NEW RCMP-Inspired Colors (Clean & Tech/Medical) */
-            --primary-blue: #002147;      /* Keep a dark blue base for text/structure */
-            --accent-cyan: #00A3C9;       /* Light Blue/Cyan for highlights */
-            --accent-green: #A7D737;      /* Lime Green for secondary highlights */
-            --background-light: #ffffff; 
-            --off-white: #f8f9fc;
-            --text-dark: #222;
-            --text-muted: #666;
-            --border-color: #e0e0e0;
+            --primary: #002147;      /* Navy RCMP */
+            --accent: #00A3C9;       /* Cyan RCMP */
+            --bg-body: #f8fafc;      /* Background bersih */
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --glass: rgba(255, 255, 255, 0.9);
+            --shadow-premium: 0 20px 40px -10px rgba(0, 33, 71, 0.1);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            margin: 0;
             font-family: 'Poppins', sans-serif;
-            background: var(--background-light); 
-            color: var(--text-dark);
-            scroll-behavior: smooth;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            overflow-x: hidden;
+            line-height: 1.6;
         }
 
-        /* Container for Content */
+        /* Container - Kunci utama untuk elak "rapat border" */
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 40px; /* Ruang bernafas kiri & kanan */
+            width: 100%;
         }
 
-        /* Navbar - Clean and Professional */
+        /* Navbar Pill */
         .navbar {
-            background: var(--background-light);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 15px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 3px solid var(--accent-cyan); /* Using New Accent Cyan */
-        }
-        .navbar-layout { 
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-        }
-        .navbar-left {
-            display: flex;
-            align-items: center;
-            gap: 10px; 
-        }
-        .navbar-left img {
-            height: 38px; 
-        }
-        .navbar-title {
-            color: var(--primary-blue);
-            font-size: 18px; 
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        .navbar-right a {
-            color: white;
-            text-decoration: none;
-            background: var(--accent-cyan); /* Using New Accent Cyan */
-            padding: 8px 20px; 
-            border-radius: 6px;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 10px rgba(0, 163, 201, 0.2);
-        }
-        .navbar-right a:hover {
-            background: var(--primary-blue);
-            box-shadow: 0 6px 15px rgba(0, 33, 71, 0.2);
-        }
-
-        /* Hero Section - Split Layout */
-        .hero {
-            height: 70vh;
-            min-height: 550px;
-            display: flex;
-            align-items: center;
-            background: var(--background-light);
-            position: relative;
-            padding-top: 50px;
-        }
-        .hero-layout {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 50px;
-            width: 100%;
-        }
-        .hero-text {
-            flex: 1;
-            padding-right: 20px;
-            animation: slideInLeft 1s ease-out forwards;
-        }
-        .hero-graphic {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            animation: fadeIn 1s ease-out forwards;
-        }
-        .hero-graphic img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Hero Text Styling */
-        .hero h1 {
-            font-size: 48px;
-            margin: 10px 0 20px 0;
-            font-weight: 800;
-            color: var(--primary-blue);
-            line-height: 1.2;
-        }
-        .hero h1 strong {
-            color: var(--accent-cyan); /* Using New Accent Cyan */
-        }
-        .hero p {
-            font-size: 18px;
-            line-height: 1.6;
-            color: var(--text-muted);
-            margin-bottom: 30px;
-            max-width: 500px;
-        }
-        .cta-button {
-            display: inline-block;
-            background: var(--primary-blue);
-            color: white;
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            margin: 20px auto;
+            width: 90%;
+            max-width: 1100px;
+            border-radius: 100px;
             padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-            transition: background 0.3s ease, transform 0.3s ease;
-        }
-        .cta-button:hover {
-            background: var(--accent-cyan);
-            transform: translateY(-2px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 20px;
+            z-index: 1000;
+            box-shadow: var(--shadow-premium);
         }
 
-        /* Features Section */
-        .content-wrapper {
-            padding: 80px 0;
-            background: var(--off-white);
-        }
-        .section-title {
-            text-align: center;
-            color: var(--primary-blue);
-            font-size: 36px;
-            margin-bottom: 60px;
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-weight: 800;
+            color: var(--primary);
+            font-size: 1.2rem;
         }
 
-        /* Features Grid */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 40px;
-        }
-        .card {
-            background: var(--background-light);
-            border-radius: 12px;
-            padding: 30px;
-            text-align: left;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-            border-left: 5px solid var(--accent-green); /* Using New Accent Green */
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
-        }
-        .card .icon {
-            font-size: 40px;
-            color: var(--accent-cyan); /* Using New Accent Cyan */
-            margin-bottom: 15px;
-        }
-        .card h3 {
-            color: var(--primary-blue);
-            font-size: 20px;
-            margin-top: 0;
-            font-weight: 700;
-        }
-        .card p {
-            font-size: 15px;
-            line-height: 1.6;
-            color: var(--text-muted);
-        }
+        .navbar-brand img { height: 35px; border-radius: 5px; }
 
-        /* About Section */
-        .about {
-            background: var(--primary-blue); /* Keep dark primary blue for contrast */
+        .btn-login {
+            background: var(--primary);
             color: white;
-            padding: 60px 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin: 80px auto;
-        }
-        .about h2 {
-            color: var(--accent-green); /* Using New Accent Green */
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 20px;
-        }
-        .about p {
-            font-size: 16px;
-            margin: 15px auto 0;
-            line-height: 1.8;
-            max-width: 800px;
-            opacity: 0.9;
-        }
-
-        /* Footer */
-        footer {
-            background: var(--primary-blue);
-            color: white;
-            text-align: center;
-            padding: 25px;
-            font-size: 14px;
-        }
-        footer strong {
-            color: var(--accent-green); /* Using New Accent Green */
+            padding: 10px 25px;
+            border-radius: 100px;
+            text-decoration: none;
             font-weight: 600;
+            font-size: 0.9rem;
+            transition: 0.3s;
         }
 
-        /* Scroll Animation (no change) */
-        .animate-on-scroll {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-        }
-        .animate-on-scroll.is-visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        @keyframes slideInLeft {
-            from { opacity: 0; transform: translateX(-50px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        .btn-login:hover { background: var(--accent); transform: translateY(-2px); }
+
+        /* Hero Section */
+        .hero { padding: 80px 0; text-align: center; }
+
+        .badge-ui {
+            background: rgba(0, 163, 201, 0.1);
+            color: var(--accent);
+            padding: 6px 16px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 25px;
+            letter-spacing: 1px;
         }
 
-        /* Modal (updated colors) */
+        .hero h1 {
+            font-size: clamp(2.2rem, 6vw, 4rem);
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.1;
+            margin-bottom: 25px;
+            letter-spacing: -1px;
+        }
+
+        .hero h1 span { color: var(--accent); }
+
+        .hero p {
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 50px;
+            font-size: 1.1rem;
+        }
+
+        /* Mockup Display */
+        .mockup-img {
+            width: 100%;
+            max-width: 950px;
+            border-radius: 25px;
+            box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.2);
+            border: 8px solid white;
+            transition: 0.5s;
+        }
+
+        /* Features Section - Improved Grid */
+        .features-wrapper { background: white; padding: 100px 0; margin-top: 50px; }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px; /* Jarak antara kad */
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 50px 40px;
+            border-radius: 30px;
+            border: 1px solid #f1f5f9;
+            box-shadow: var(--shadow-premium);
+            transition: 0.4s ease;
+            text-align: left;
+        }
+
+        .card:hover {
+            transform: translateY(-12px);
+            border-color: var(--accent);
+            box-shadow: 0 30px 60px -10px rgba(0, 163, 201, 0.15);
+        }
+
+        .card i {
+            font-size: 2.8rem;
+            color: var(--accent);
+            margin-bottom: 25px;
+            display: block;
+        }
+
+        .card h3 { margin-bottom: 15px; font-size: 1.4rem; color: var(--primary); }
+
+        /* Modal Premium */
         .modal {
             display: none;
             position: fixed;
-            z-index: 1001;
-            left: 0; top: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
+            inset: 0;
+            background: rgba(0, 33, 71, 0.2);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
             align-items: center;
             justify-content: center;
         }
+
         .modal-content {
-            background: var(--background-light);
-            color: var(--text-dark);
-            padding: 40px;
-            border-radius: 12px;
-            max-width: 450px;
+            background: white;
+            padding: 60px 40px;
+            border-radius: 40px;
+            max-width: 500px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 50px 100px rgba(0,0,0,0.1);
+            transform: scale(0.9);
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .modal-content .icon {
-            font-size: 3rem;
-            color: var(--accent-cyan); /* Using New Accent Cyan */
-        }
-        .modal-content h3 {
-            margin: 15px 0;
-            color: var(--primary-blue);
-        }
-        .modal-content button {
-            margin-top: 20px;
-            padding: 12px 25px;
-            background: var(--accent-green); /* Using New Accent Green */
+
+        .modal.active { display: flex; }
+        .modal.active .modal-content { transform: scale(1); }
+
+        .btn-modal {
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
+            padding: 16px 40px;
+            border-radius: 50px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .modal-content button:hover {
-            background: #90c226; /* Slightly darker green for hover */
-            transform: translateY(-2px);
+            width: 100%;
+            margin-top: 30px;
+            transition: 0.3s;
         }
 
+        .btn-modal:hover { background: var(--accent); }
 
-        /* Responsive Design (no change) */
-        @media (max-width: 992px) {
-            .hero-layout {
-                flex-direction: column;
-                text-align: center;
-                gap: 40px;
-            }
-            .hero-text {
-                padding-right: 0;
-            }
-            .hero-graphic {
-                display: none; 
-            }
-            .hero {
-                height: auto;
-                min-height: 400px;
-                padding-bottom: 50px;
-            }
-            .features {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
-        }
         @media (max-width: 768px) {
-            .navbar { padding: 15px 20px; }
-            .hero h1 { font-size: 36px; }
-            .features { grid-template-columns: 1fr; }
-            .navbar-title { display: none; }
+            .container { padding: 0 25px; }
+            .hero h1 { font-size: 2.5rem; }
+            .navbar { width: 95%; padding: 10px 20px; }
         }
     </style>
 </head>
 <body>
 
-    <div class="navbar">
-        <div class="container navbar-layout">
-            <div class="navbar-left">
-                <img src="img/Logo-UniKL-PCM.jpg" alt="UniKL RCMP Logo">
-                <div class="navbar-title">RCMP Inventory Reservation Check System</div>
-            </div>
-            <div class="navbar-right">
-                <a href="login.php">Log In</a>
-            </div>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
+            <span>NexCheck | RCMP Inventory Reservation Check System</span>
         </div>
-    </div>
+        <a href="login.php" class="btn-login">Login</a>
+    </nav>
 
-    <div class="hero">
+    <section class="hero">
         <div class="container">
-            <div class="hero-layout">
-                <div class="hero-text">
-                    <p style="font-size: 16px; font-weight: 500; color: var(--accent-cyan); margin-bottom: 5px; text-transform: uppercase;">NexCheck: Royal College of Medicine Perak</p>
-                    <h1>Precision Inventory Tracking for <strong>UniKL RCMP.</strong></h1>
-                    <p>The definitive <strong>IT Asset Management System</strong> designed for accuracy and accountability. Manage loans, track inventory lifecycle, and generate precise audit reports for all campus equipment.</p>
-                    <a href="#features-section" class="cta-button">Explore Core Features <i class="fas fa-arrow-right"></i></a>
-                </div>
-                <div class="hero-graphic">
-                    <img src="img/view.png" alt="IT Asset Management System Dashboard Mockup">
-                </div>
+            <div class="badge-ui"><i class="fas fa-shield-alt"></i> UniKL RCMP OFFICIAL</div>
+            <h1>Precision Inventory Tracking <br>for <span>UniKL RCMP.</span></h1>
+            <p>Seamlessly manage, audit, and track UniKL RCMP's IT assets with a high-precision ecosystem designed for accountability.</p>
+            
+            <div class="mockup-wrapper">
+                <img src="img/view.png" class="mockup-img" alt="System View">
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="content-wrapper">
+    <section class="features-wrapper">
         <div class="container">
-            <h2 class="section-title animate-on-scroll" id="features-section">System Highlights</h2>
-            <div class="features">
-                <div class="card animate-on-scroll">
-                    <div class="icon"><i class="fas fa-barcode"></i></div>
-                    <h3>Inventory Tracking (Barcode/Tag)</h3>
-                    <p>Register, categorize, and permanently track all equipment using serial numbers and unique <strong>UniKL asset tags</strong> for robust accountability.</p>
+            <div class="features-grid">
+                <div class="card">
+                    <i class="fas fa-microchip"></i>
+                    <h3>Digital Inventory</h3>
+                    <p>Every equipment is cataloged with precision using UniKL asset tags and digital serial tracking.</p>
                 </div>
-                <div class="card animate-on-scroll" style="transition-delay: 0.1s;">
-                    <div class="icon"><i class="fas fa-exchange-alt"></i></div>
-                    <h3>Controlled Loan Lifecycle</h3>
-                    <p>The core <strong>Check-In/Check-Out</strong> function ensures every asset movement is logged, providing full visibility over who holds which equipment and for how long.</p>
+                <div class="card">
+                    <i class="fas fa-sync-alt"></i>
+                    <h3>Live Workflow</h3>
+                    <p>Monitor real-time loan statuses, check-ins, and return schedules across the entire campus.</p>
                 </div>
-                <div class="card animate-on-scroll" style="transition-delay: 0.2s;">
-                    <div class="icon"><i class="fas fa-cogs"></i></div>
-                    <h3>Maintenance & Audit Logs</h3>
-                    <p>Maintain a complete history of equipment condition, repair status, and generate detailed utilization reports necessary for annual IT audits.</p>
+                <div class="card">
+                    <i class="fas fa-file-contract"></i>
+                    <h3>Automated Audit</h3>
+                    <p>Generate high-fidelity reports for annual department audits and maintenance history instantly.</p>
                 </div>
             </div>
-
-            <div class="about animate-on-scroll">
-                <h2>Designed for IT Department, Serving the Campus.</h2>
-                <p>NexCheck is an essential tool for the <strong>UniKL IT Department</strong> at the Royal College of Medicine Perak. Its purpose is to streamline asset issuance (laptops, projectors, testing gear) to faculty and students, minimizing loss and ensuring operational readiness across all medical and administrative facilities.</p>
-            </div>
         </div>
-    </div>
-
-    <footer>
-        <div class="container">
-            <p>&copy; <?php echo date("Y"); ?> Universiti Kuala Lumpur <strong>Royal College of Medicine Perak (RCMP)</strong> IT Department. All rights reserved.</p>
-        </div>
-    </footer>
+    </section>
 
     <div class="modal" id="disclaimerModal">
         <div class="modal-content">
-            <div class="icon"><i class="fas fa-bullhorn"></i></div>
-            <h3>Important Notice for Borrowers</h3>
-            <p><strong>All borrowed items must be collected and returned personally at the UniKL RCMP IT Department office.</strong></p>
-            <button onclick="closeModal()">I Understand</button>
+            <i class="fas fa-id-card-alt" style="font-size: 4rem; color: var(--accent); margin-bottom: 25px;"></i>
+            <h2>Security Protocol</h2>
+            <p style="color: var(--text-muted);">Attention: All borrowers must physically present their ID and the asset at the IT Department for verification during collection and return.</p>
+            <button onclick="closeModal()" class="btn-modal">I UNDERSTAND</button>
         </div>
     </div>
 
-<script>
-    
-    const modal = document.getElementById("disclaimerModal");
-    
-    window.closeModal = function() {
-        modal.style.display = "none";
-        sessionStorage.setItem('noticeShown', 'true');    
-    }
-    
-    window.onload = () => {
-        if (!sessionStorage.getItem('noticeShown')) {
+    <script>
+        const modal = document.getElementById('disclaimerModal');
+
+        window.onload = () => {
+            if (!sessionStorage.getItem('noticeShown')) {
+                setTimeout(() => {
+                    modal.classList.add('active');
+                }, 1000);
+            }
+        };
+
+        function closeModal() {
+            modal.classList.remove('active');
             setTimeout(() => {
-                modal.style.display = "flex";
-            }, 1000);
+                modal.style.display = 'none';
+                sessionStorage.setItem('noticeShown', 'true');
+            }, 300);
         }
-
-        setupScrollAnimation();
-    };
-
-    
-    function setupScrollAnimation() {
-        const scrollElements = document.querySelectorAll(".animate-on-scroll");
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("is-visible");
-                    observer.unobserve(entry.target); 
-                }
-            });
-        }, { threshold: 0.1 });
-
-        scrollElements.forEach(el => {
-            observer.observe(el);
-        });
-    }
-</script>
-
+    </script>
 </body>
 </html>

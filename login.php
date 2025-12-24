@@ -2,503 +2,340 @@
 session_start();
 include 'config.php';
 
-
+// Logic switch role - Jika sudah login, terus ke dashboard
 if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     $role = $_SESSION['logged_in_role'];
-    
     switch ($role) {
-        case 'Admin':
-            header("Location: admin/manageItem_admin.php");
-            exit();
-        case 'Technician':
-            header("Location: technician/dashboard_tech.php");
-            exit();
-        case 'User':
-            header("Location: user/dashboard_user.php");
-            exit();
+        case 'Admin': header("Location: admin/manageItem_admin.php"); exit();
+        case 'Technician': header("Location: technician/dashboard_tech.php"); exit();
+        case 'User': header("Location: user/dashboard_user.php"); exit();
     }
 }
 
-
-
-$login_attempt_role = isset($_SESSION['login_attempt_role']) ? $_SESSION['login_attempt_role'] : '';
-$login_attempt_email = isset($_SESSION['login_attempt_email']) ? $_SESSION['login_attempt_email'] : '';
-
+$login_attempt_role = $_SESSION['login_attempt_role'] ?? '';
+$login_attempt_email = $_SESSION['login_attempt_email'] ?? '';
 unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
 
-$errorMessage = isset($_SESSION['error']) ? $_SESSION['error'] : '';
-$successMessage = isset($_SESSION['success']) ? $_SESSION['success'] : '';
+$errorMessage = $_SESSION['error'] ?? '';
+$successMessage = $_SESSION['success'] ?? '';
 unset($_SESSION['error'], $_SESSION['success']);
 
-
-
-$remembered_email = isset($_COOKIE['remember_email']) ? $_COOKIE['remember_email'] : '';
-
-
+$remembered_email = $_COOKIE['remember_email'] ?? '';
 if (empty($login_attempt_email) && !empty($remembered_email)) {
     $login_attempt_email = $remembered_email;
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login - NexCheck</title>
-    
+    <title>Login | NexCheck RCMP</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
-    /* -------------------------------------------------------------------------- */
-    /* GLOBAL & STRUCTURE (Centered Design) */
-    /* -------------------------------------------------------------------------- */
     :root {
-        --primary-color: #002147;
-        --accent-cyan: #00A3C9;
-        --accent-green: #A7D737;
-        --light-bg: #f5f8ff;
-        --border-color: #e2e8f0;
-        --shadow-strong: 0 10px 30px rgba(0, 0, 0, 0.15);
+        --primary: #002147;      /* Navy RCMP */
+        --accent: #00A3C9;       /* Cyan RCMP */
+        --bg-body: #f8fafc;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --white: #ffffff;
     }
 
-    body, html { 
-        margin: 0; 
-        padding: 0; 
-        font-family: 'Inter', sans-serif; 
-        height: 100%; 
-        background-color: var(--light-bg); 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 100vh;
-    }
-    .form-wrapper { 
-        max-width: 450px;
-        width: 90%; 
-        background: #fff; 
-        padding: 40px; 
-        border-radius: 12px; 
-        box-shadow: var(--shadow-strong);
-        transition: transform 0.3s ease-in-out;
-    }
-    
-    /* Header Branding */
-    .header-branding {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .header-branding img {
-        width: 120px; 
-        margin-bottom: 10px;
-    }
-    .header-branding h1 {
-        font-size: 26px;
-        font-weight: 800;
-        color: var(--primary-color);
-        margin: 0;
-        letter-spacing: 0.5px;
-    }
-    .header-branding p {
-        font-size: 14px;
-        color: #64748b;
-        margin-top: 5px;
-    }
-
-    /* Form Title */
-    h2 { 
-        font-size: 24px; 
-        font-weight: 700; 
-        color: var(--primary-color); 
-        margin-bottom: 25px; 
-        text-align: center; 
-    }
-    
-    /* -------------------------------------------------------------------------- */
-    /* ROLE SELECTION */
-    /* -------------------------------------------------------------------------- */
-    #role-selection-step p.instruction {
-        font-weight: 500; 
-        color: #475569; 
-        margin-bottom: 25px; 
-        text-align: center;
-    }
-    .roles { 
-        display: grid; 
-        grid-template-columns: repeat(3, 1fr); 
-        gap: 15px; 
-    }
-    .role-card input { display: none; }
-    .role-content { 
-        border: 2px solid var(--border-color); 
-        border-radius: 10px; 
-        padding: 15px 10px; 
-        text-align: center; 
-        cursor: pointer; 
-        transition: all 0.3s ease-in-out;
-        background-color: #ffffff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .role-content i { 
-        font-size: 24px; 
-        margin-bottom: 8px; 
-        color: var(--accent-cyan);
-    }
-    .role-content span { 
-        display: block; 
-        font-weight: 600; 
-        font-size: 13px;
-        color: #1e293b; 
-    }
-    .role-card:hover .role-content { 
-        border-color: var(--accent-cyan); 
-        transform: translateY(-2px);
-    }
-    .role-card input:checked + .role-content { 
-        border-color: var(--primary-color); 
-        background-color: #f0f4f9; 
-        transform: translateY(-1px); 
-    }
-    
-    /* -------------------------------------------------------------------------- */
-    /* LOGIN FORM ELEMENTS */
-    /* -------------------------------------------------------------------------- */
-    #login-details-step { 
-        opacity: 0; 
-        height: 0;
+        background-color: var(--bg-body);
         overflow: hidden;
-        transition: opacity 0.4s ease-in-out, height 0.4s ease-in-out, margin-top 0.4s ease-in-out; 
-        margin-top: 0px;
+        position: relative;
     }
-    #login-details-step.visible { 
-        opacity: 1; 
-        height: auto;
-        margin-top: 25px;
-    }
-    .input-group { 
-        margin-bottom: 18px; 
-        text-align: left; 
-        position: relative; 
-        z-index: 10; 
-    }
-    .input-group label { 
-        font-weight: 600; 
-        font-size: 14px; 
-        display: block; 
-        margin-bottom: 6px; 
-        color: #1e293b; 
-    }
-    .input-group input { 
-        width: 100%; 
-        padding: 12px; 
-        border: 1px solid var(--border-color); 
-        border-radius: 8px; 
-        box-sizing: border-box; 
-        font-size: 16px;
-        transition: border-color 0.3s, box-shadow 0.3s;
-        padding-right: 50px; 
-    }
-    
-    /* Sembunyikan ikon Reveal Password lalai dari pelayar */
-    input[type=password]::-ms-reveal,
-    input[type=password]::-ms-clear {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-    }
-    input[type=password]::-webkit-contacts-auto-fill-button,
-    input[type=password]::-webkit-credentials-auto-fill-button {
-        visibility: hidden;
-        pointer-events: none;
+
+    /* Background Image dengan Blur (Sebahagian dari Branding) */
+    body::before {
+        content: "";
         position: absolute;
-        right: 0;
-    }
-    
-    .input-group input:focus {
-        border-color: var(--accent-green);
-        box-shadow: 0 0 0 2px rgba(167, 215, 55, 0.3); 
-        outline: none;
-    }
-    .toggle-password { 
-        position: absolute; 
-        right: 8px; 
-        top: 50%;
-        transform: translateY(-50%);
-        margin-top: 14px;
-        cursor: pointer; 
-        color: #94a3b8; 
-        font-size: 16px; 
-        z-index: 100; 
-    }
-    .input-group input:placeholder-shown + .toggle-password {
-        top: 50%;
-        margin-top: 0;
-    }
-    .toggle-password:hover { color: var(--accent-cyan); }
-    
-    .login-btn { 
-        background: var(--primary-color); 
-        color: white; border: none; width: 100%; padding: 13px; 
-        border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px;
-        transition: background-color 0.3s, transform 0.1s;
-        margin-top: 5px;
-    }
-    .login-btn:hover { background-color: var(--accent-cyan); transform: translateY(-1px); }
-    .login-btn:active { transform: translateY(0); background-color: #0087a3; }
-    
-    /* Footer & Alerts */
-    .form-footer { margin-top: 20px; font-size: 14px; text-align: center; }
-    .form-footer a { color: var(--accent-cyan); text-decoration: none; font-weight: 600; }
-    .form-footer a:hover { text-decoration: underline; color: var(--primary-color); }
-    
-    /* -------------------------------------------------------------------------- */
-    /* ALERT MESSAGES (IMPROVEMENT) */
-    /* -------------------------------------------------------------------------- */
-    .alert-message {
-        border-radius: 8px;
-        padding: 12px 15px;
-        margin-bottom: 20px;
-        font-size: 14px;
-        font-weight: 500;
-        border: 1px solid transparent;
-        opacity: 1;
-        transition: opacity 0.5s ease-out;
-    }
-
-    .error-message {
-        color: #721c24; 
-        background-color: #f8d7da; 
-        border-color: #f5c6cb; 
-    }
-
-    .success-message {
-        color: #155724; 
-        background-color: #d4edda; 
-        border-color: #c3e6cb; 
-    }
-    
-    .instruction #role-title { color: var(--accent-cyan) !important; }
-
-    /* -------------------------------------------------------------------------- */
-    /* REMEMBER ME CHECKBOX (KOD BARU) */
-    /* -------------------------------------------------------------------------- */
-    .remember-me-group {
-        margin-bottom: 25px; 
-        text-align: left;
-    }
-    .remember-me-label {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        color: #475569;
-    }
-    .remember-me-label input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        margin-right: 8px;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
-        appearance: none;
-        background-color: #fff;
-        transition: all 0.2s;
-    }
-    .remember-me-label input[type="checkbox"]:checked {
-        background-color: var(--accent-cyan);
-        border-color: var(--accent-cyan);
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3l6-6'/%3e%3c/svg%3e");
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
+        inset: 0;
+        background-image: url('img/view.png'); /* Pastikan path fail betul */
+        background-size: cover;
         background-position: center;
+        filter: blur(10px) brightness(0.4);
+        transform: scale(1.1);
+        z-index: -1;
     }
-    .remember-me-label input[type="checkbox"]:focus {
-        outline: 2px solid var(--accent-green);
-        outline-offset: 2px;
-    }
-    /* -------------------------------------------------------------------------- */
 
-    /* -------------------------------------------------------------------------- */
-    /* RESPONSIVE DESIGN (MOBILE) */
-    /* -------------------------------------------------------------------------- */
-    @media (max-width: 550px) {
-        .form-wrapper {
-            width: 100%;
-            max-width: none;
-            padding: 30px 20px;
-            box-shadow: none; 
-            border-radius: 0;
-            min-height: 100vh;
-        }
-        .roles {
-            grid-template-columns: 1fr; 
-            gap: 10px;
-        }
-        .header-branding {
-            margin-top: 15px;
-        }
-        .toggle-password {
-            margin-top: 13px;
-        }
+    .main-container {
+        display: flex;
+        width: 900px;
+        max-width: 95%;
+        height: 550px;
+        background: var(--white);
+        border-radius: 40px; /* Rounding besar macam card landing page */
+        overflow: hidden;
+        box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.3);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    /* KIRI: Visual Branding */
+    .side-visual {
+        flex: 1;
+        background: var(--primary);
+        padding: 50px;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Efek hiasan sikit kat tepi */
+    .side-visual::after {
+        content: "";
+        position: absolute;
+        bottom: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: var(--accent);
+        border-radius: 50%;
+        opacity: 0.2;
+        filter: blur(40px);
+    }
+
+    .side-visual img { height: 45px; width: auto; border-radius: 8px; margin-bottom: 20px;}
+    .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; letter-spacing: -1px; }
+    .side-visual h1 span { color: var(--accent); }
+    .side-visual p { font-size: 0.9rem; opacity: 0.8; margin-top: 20px; font-weight: 300; }
+
+    /* KANAN: Form Section */
+    .side-form {
+        flex: 1.2;
+        padding: 50px;
+        background: var(--white);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; letter-spacing: -1px; margin-bottom: 10px; }
+    .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
+
+    /* Role Cards */
+    .roles-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .role-card { cursor: pointer; text-align: center; }
+    .role-box {
+        padding: 20px 10px;
+        border-radius: 20px;
+        border: 2px solid #f1f5f9;
+        transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .role-box i { font-size: 1.8rem; color: var(--accent); margin-bottom: 10px; display: block; }
+    .role-box span { font-size: 0.75rem; font-weight: 700; color: var(--text-main); }
+
+    .role-box:hover { 
+        transform: translateY(-5px);
+        border-color: var(--accent);
+        background: rgba(0, 163, 201, 0.05);
+    }
+
+    /* Login Form (Step 2) */
+    #login-section { display: none; animation: fadeIn 0.5s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .input-group { margin-bottom: 20px; position: relative; }
+    .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .input-group input {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        font-family: inherit;
+        font-size: 0.9rem;
+        transition: 0.3s;
+        background: #f8fafc;
+    }
+    .input-group input:focus { 
+        outline: none; 
+        border-color: var(--accent); 
+        background: white;
+        box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
+    }
+
+    .toggle-password { position: absolute; right: 16px; bottom: 14px; color: var(--text-muted); cursor: pointer; }
+
+    .btn-login {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 16px;
+        border-radius: 50px;
+        width: 100%;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: 0.3s;
+        margin-top: 10px;
+        box-shadow: 0 10px 20px -5px rgba(0, 33, 71, 0.3);
+    }
+    .btn-login:hover { background: var(--accent); transform: translateY(-3px); box-shadow: 0 15px 25px -5px rgba(0, 163, 201, 0.4); }
+
+    .back-btn {
+        background: none; border: none; color: var(--accent); font-weight: 700; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 20px;
+    }
+
+    /* Alerts */
+    .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-bottom: 20px; font-weight: 500; }
+    .alert-error { background: #fee2e2; color: #991b1b; }
+
+    @media (max-width: 768px) {
+        .side-visual { display: none; }
+        .main-container { width: 100%; height: auto; border-radius: 30px; }
+        .side-form { padding: 40px 30px; }
     }
 </style>
 </head>
 <body>
 
-<div class="form-wrapper">
-    <div class="header-branding">
-        <img src="assets/unikl-logo.png" alt="UniKL Logo">
-        <h1>RCMP NexCheck</h1>
-        <p>IT Department Inventory Management Portal.</p>
+<div class="main-container">
+    <div class="side-visual">
+        <div>
+            <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
+            <h1>NexCheck <span>Portal.</span></h1>
+            <p>High-precision IT asset reservation and inventory management ecosystem for UniKL RCMP.</p>
+        </div>
+        
+        <div style="font-size: 0.75rem; opacity: 0.6;">
+            <i class="fas fa-shield-alt"></i> Secure Protocol Active
+        </div>
     </div>
 
-    <div class="form-container">
-        <h2>System Login</h2>
+    <div class="side-form">
         
-        <div id="role-selection-step">
-            <p class="instruction">Please select your role to proceed:</p>
-            <div class="roles">
-                <label class="role-card"><input type="radio" name="role" value="admin" data-title="Admin"><div class="role-content"><i class="fa-solid fa-user-shield"></i><span>Admin</span></div></label>
-                <label class="role-card"><input type="radio" name="role" value="tech" data-title="Technician"><div class="role-content"><i class="fa-solid fa-screwdriver-wrench"></i><span>Technician</span></div></label>
-                <label class="role-card"><input type="radio" name="role" value="user" data-title="User/Staff"><div class="role-content"><i class="fa-solid fa-user"></i><span>User/Staff</span></div></label>
+        <div id="role-section">
+            <h2>Welcome Back</h2>
+            <p class="sub-text">Identify your access level to continue to the dashboard.</p>
+            
+            <div class="roles-grid">
+                <div class="role-card" onclick="showLogin('Admin', 'Administrator')">
+                    <div class="role-box">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Admin</span>
+                    </div>
+                </div>
+                <div class="role-card" onclick="showLogin('tech', 'Technician')">
+                    <div class="role-box">
+                        <i class="fas fa-screwdriver-wrench"></i>
+                        <span>Technician</span>
+                    </div>
+                </div>
+                <div class="role-card" onclick="showLogin('user', 'Staff / Student')">
+                    <div class="role-box">
+                        <i class="fas fa-user"></i>
+                        <span>Staff/Student</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="index.php" style="color: var(--text-muted); text-decoration: none; font-size: 0.75rem; font-weight: 600;">
+                    <i class="fas fa-arrow-left"></i> Back to Homepage
+                </a>
             </div>
         </div>
 
-        <div id="login-details-step">
-            <p class="instruction" style="font-weight: 700;">Log In as <span id="role-title"></span></p>
-            
-            <?php if (!empty($errorMessage)): ?>
-                <div class="alert-message error-message"><?= htmlspecialchars($errorMessage); ?></div>
-            <?php endif; ?>
-            
-            <?php if (!empty($successMessage)): ?>
-                <div class="alert-message success-message"><?= htmlspecialchars($successMessage); ?></div>
+        <div id="login-section">
+            <button class="back-btn" onclick="goBack()"><i class="fas fa-chevron-left"></i> Change Role</button>
+            <h2>Login as <span id="role-display" style="color: var(--accent);"></span></h2>
+            <p class="sub-text">Enter your UniKL credentials below.</p>
+
+            <?php if ($errorMessage): ?>
+                <div class="alert alert-error"><i class="fas fa-circle-exclamation"></i> <?= htmlspecialchars($errorMessage) ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="login_process.php">
-                <input type="hidden" name="role" id="hidden-role-input">
-                
+            <form action="login_process.php" method="POST">
+                <input type="hidden" name="role" id="role-input">
+
                 <div class="input-group">
-                    <label for="email">Email</label>
-                    <input type="email" name="email" id="email" value="<?= htmlspecialchars($login_attempt_email) ?>" required>
+                    <label>UniKL Email</label>
+                    <input type="email" name="email" id="email" value="<?= htmlspecialchars($login_attempt_email) ?>" placeholder="e.g. name@unikl.edu.my" required>
                 </div>
-                
+
                 <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" name="password" id="password" required>
-                    <i class="fa-solid toggle-password" id="togglePassword"></i>
+                    <label>Password</label>
+                    <input type="password" name="password" id="password" placeholder="••••••••" required>
+                    <i class="fas fa-eye-slash toggle-password" id="togglePassword"></i>
                 </div>
-                
-                <div class="remember-me-group">
-                    <label class="remember-me-label">
-                        <input type="checkbox" name="remember_me" value="1" <?= !empty($login_attempt_email) && !empty($remembered_email) ? 'checked' : '' ?>>
-                        Remember Me
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; font-size: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
+                        <input type="checkbox" name="remember_me" value="1" <?= (!empty($remembered_email)) ? 'checked' : '' ?>> Remember Me
                     </label>
+                    <a href="forgot_password.php" style="color: var(--accent); text-decoration: none; font-weight: 700;">Forgot Password?</a>
                 </div>
-                <button type="submit" class="login-btn">Log In</button>
-            </form>
 
-            <div class="form-footer">
-                <p>Forgot your password? <a href="forgot_password.php">Reset it here</a></p>
-                <p id="signUpLink" style="display: none;">Don't have an account? <a href="signUp.php">Sign Up</a></p>
-            </div>
+                <button type="submit" class="btn-login">SIGN IN</button>
+
+                <div id="signUpLink" style="text-align: center; margin-top: 20px; font-size: 0.8rem; display: none;">
+                    Need an account? <a href="signUp.php" style="color: var(--accent); text-decoration: none; font-weight: 700;">Register Now</a>
+                </div>
+            </form>
         </div>
-        
-        <div class="form-footer" style="margin-top: 30px;">
-            <p><a href="index.php"><i class="fa-solid fa-home me-1"></i> Back to Homepage</a></p>
-        </div>
+
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const alertMessages = document.querySelectorAll('.alert-message');
-        const roleRadios = document.querySelectorAll('input[name="role"]');
-        const loginDetailsStep = document.getElementById('login-details-step');
-        const hiddenRoleInput = document.getElementById('hidden-role-input');
-        const roleTitle = document.getElementById('role-title');
-        const signUpLink = document.getElementById('signUpLink');
-        const togglePassword = document.querySelector("#togglePassword");
-        const passwordField = document.querySelector("#password");
-        
-        
-        
-        if (alertMessages) {
-            alertMessages.forEach(function(message) {
-                setTimeout(() => {
-                    message.style.opacity = '0';
-                    setTimeout(() => {
-                        message.style.display = 'none';
-                    }, 500);
-                }, 5000);
-            });
-        }
-        
-        
-        function showLoginDetails(role, title) {
-            roleTitle.textContent = title;
-            hiddenRoleInput.value = role;
-            
-            
-            signUpLink.style.display = (role === 'user') ? 'block' : 'none';
-            
-            
-            document.getElementById('role-selection-step').style.display = 'none'; 
-            
-            
-            loginDetailsStep.classList.add('visible');
-            
-            
-            const emailInput = document.getElementById('email');
-            if (emailInput.value === '') {
-                emailInput.focus();
-            } else {
-                passwordField.focus();
-            }
-        }
+    function showLogin(val, title) {
+        document.getElementById('role-input').value = val;
+        document.getElementById('role-display').innerText = title;
+        document.getElementById('signUpLink').style.display = (val === 'user') ? 'block' : 'none';
 
-        roleRadios.forEach(radio => {
-            radio.addEventListener('change', function() {
-                showLoginDetails(this.value, this.dataset.title);
-            });
-        });
-        
-        
-        if (togglePassword && passwordField) {
-            togglePassword.classList.add("fa-eye-slash"); 
-            
-            togglePassword.addEventListener("click", function () {
-                const isPassword = passwordField.type === "password";
-                
-                if (isPassword) {
-                    passwordField.type = "text";
-                    this.classList.remove("fa-eye-slash");
-                    this.classList.add("fa-eye");
-                } else {
-                    passwordField.type = "password";
-                    this.classList.remove("fa-eye");
-                    this.classList.add("fa-eye-slash");
-                }
-            });
-        }
-        
-        
-        const attemptedRole = '<?= $login_attempt_role ?>';
-        if (attemptedRole) {
-            const radio = document.querySelector(`input[name="role"][value="${attemptedRole}"]`);
-            if (radio) {
-                radio.checked = true;
-                
-                setTimeout(() => {
-                    showLoginDetails(attemptedRole, radio.dataset.title);
-                }, 100);
-            }
-        }
+        document.getElementById('role-section').style.display = 'none';
+        document.getElementById('login-section').style.display = 'block';
+
+        const emailField = document.getElementById('email');
+        if(emailField.value === "") emailField.focus();
+        else document.getElementById('password').focus();
+    }
+
+    function goBack() {
+        document.getElementById('role-section').style.display = 'block';
+        document.getElementById('login-section').style.display = 'none';
+    }
+
+    // Toggle Password Visibility
+    const toggleBtn = document.querySelector("#togglePassword");
+    const passField = document.querySelector("#password");
+
+    toggleBtn.addEventListener("click", function() {
+        const type = passField.type === "password" ? "text" : "password";
+        passField.type = type;
+        this.classList.toggle("fa-eye");
+        this.classList.toggle("fa-eye-slash");
     });
+
+    // Auto-open if redirected back from error
+    const lastRole = '<?= $login_attempt_role ?>';
+    if(lastRole) {
+        let t = "Administrator";
+        if(lastRole === 'tech') t = "Technician";
+        if(lastRole === 'user') t = "Staff / Student";
+        showLogin(lastRole, t);
+    }
 </script>
 
 </body>
