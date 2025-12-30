@@ -900,50 +900,69 @@ case 'checkin_multi':
 
     if (empty($reservation_item_id) || empty($asset_conditions)) {
         http_response_code(400);
-        echo json_encode(['message' => 'Data tidak lengkap.']);
+        echo json_encode(['success' => false, 'message' => 'Data tidak lengkap.']);
         exit();
     }
 
     $conn->begin_transaction();
     try {
-        $all_remarks = []; // Untuk simpan gabungan nota ke reservation_items
+        $all_remarks = []; 
+        $has_unreturned = false; // Flag untuk check kalau ada barang tak balik
 
         foreach ($asset_conditions as $asset) {
             $asset_id = (int)$asset['asset_id'];
             $condition = $asset['condition']; 
             $remarks = isset($asset['remarks']) ? trim($asset['remarks']) : '';
 
-            // Tentukan status baru asset
-            $new_status = 'Available';
+            // --- LOGIC PENENTUAN STATUS ASSET ---
+            $new_status = 'Available'; // Default status
+            
             if ($condition === 'Damaged' || $condition === 'Maintenance') {
                 $new_status = 'Maintenance';
-                if(!empty($remarks)) $all_remarks[] = "Asset ID $asset_id: $remarks";
+                if(!empty($remarks)) $all_remarks[] = "Asset ID $asset_id ($condition): $remarks";
+            } 
+            elseif ($condition === 'Not_Returned_Yet') {
+                $new_status = 'Checked Out'; // Kekalkan status Checked Out sebab barang belum ada kat stor
+                $has_unreturned = true;
+                $all_remarks[] = "Asset ID $asset_id: NOT RETURNED YET";
             }
 
-            // 1. UPDATE table ASSETS (Simpan nota kerosakan pada asset tu sendiri)
-            $stmt_as = $conn->prepare("UPDATE assets SET status = ?, last_remarks = ?, last_return_date = CURDATE() WHERE asset_id = ?");
-            $stmt_as->bind_param("ssi", $new_status, $remarks, $asset_id);
+            // 1. UPDATE table ASSETS
+            // Kita guna CASE untuk elak update last_return_date kalau barang tak balik lagi
+            $stmt_as = $conn->prepare("UPDATE assets 
+                                       SET status = ?, 
+                                           last_remarks = ?, 
+                                           last_return_date = IF(? = 'Checked Out', last_return_date, CURDATE()) 
+                                       WHERE asset_id = ?");
+            $stmt_as->bind_param("sssi", $new_status, $remarks, $new_status, $asset_id);
             $stmt_as->execute();
         }
 
-        // 2. UPDATE table RESERVATION_ITEMS (Guna column return_remarks yang kau dah ada)
+        // --- 2. UPDATE table RESERVATION_ITEMS ---
+        // Kalau ada satu pun barang tak balik, status jangan jadi 'Returned'
+        $final_item_status = $has_unreturned ? 'Partially Returned' : 'Returned';
+        
         $final_remarks_str = implode(" | ", $all_remarks);
         $stmt_ri = $conn->prepare("UPDATE reservation_items 
-                                   SET status = 'Returned', 
+                                   SET status = ?, 
                                        return_remarks = ?, 
                                        checked_in_by = ?, 
                                        checked_in_on = NOW() 
                                    WHERE id = ?");
-        $stmt_ri->bind_param("sii", $final_remarks_str, $technician_id, $reservation_item_id);
+        $stmt_ri->bind_param("ssii", $final_item_status, $final_remarks_str, $technician_id, $reservation_item_id);
         $stmt_ri->execute();
 
+        // --- 3. LOGGER ---
+        log_activity($conn, $user_role, $person_id, "Check-in", "Processed Check-in for Item ID: $reservation_item_id. Status: $final_item_status");
+
         $conn->commit();
-        echo json_encode(['success' => true, 'message' => 'Check-in berjaya disimpan!']);
+        echo json_encode(['success' => true, 'message' => "Check-in $final_item_status successfully!"]);
 
     } catch (Exception $e) {
         $conn->rollback();
         http_response_code(500);
-        echo json_encode(['message' => 'Ralat: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Ralat Database: ' . $e->getMessage()]);
     }
     break;
 }
+?>

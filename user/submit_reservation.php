@@ -118,7 +118,7 @@ try {
     // Email Notifikasi
     $email_sent = false;
     if (defined('TECHNICIAN_GROUP_EMAIL')) {
-        $email_sent = sendNewReservationNotification(TECHNICIAN_GROUP_EMAIL, $reserve_id, $user_name, "$item_count items", $reserve_date_context, BASE_URL . "approvals.php");
+        $email_sent = sendNewReservationNotification(TECHNICIAN_GROUP_EMAIL, $reserve_id, $user_name, "$item_count items", $reserve_date_context, BASE_URL . "technician/check_out.php");
     }
     
     $email_msg = $email_sent ? ' Email notification sent.' : ' Email failed.';

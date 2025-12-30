@@ -1,185 +1,216 @@
+<?php
+// 1. Kesan role dari URL (contoh: forgot_password.php?role=technician)
+// Jika tiada role dalam URL, kita anggap dia 'user' biasa.
+$role = isset($_GET['role']) ? $_GET['role'] : 'user';
+
+// 2. Tentukan link "Back" berdasarkan role
+$back_url = ($role === 'technician') ? 'login_technician.php' : 'login.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Forgot Password | NexCheck RCMP</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
-        /* Tetapkan palet warna UniKL sebagai custom CSS variables */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        
         :root {
-            --unikl-navy: #002147; /* Primary Dark Navy Blue */
-            --unikl-orange: #f58220; /* Secondary Orange */
-            --unikl-blue-accent: #005a9c; /* Lighter Blue Accent */
-            --light-bg: #f5f8ff; /* Very light blue/gray background */
+            --primary: #002147;
+            --accent: #00A3C9;
+            --bg-body: #f8fafc;
+            --text-muted: #64748b;
+            --white: #ffffff;
         }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--light-bg); 
+        body {
+            font-family: 'Poppins', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-body);
+            position: relative;
+            margin: 0;
+            overflow: hidden;
         }
 
-        /* Gantikan warna Tailwind Indigo dengan warna UniKL */
-        /* Anda boleh menggunakan utiliti Tailwind dengan nilai heks/RGB secara terus, tetapi CSS variables memastikan konsistensi */
-        .text-unikl-navy { color: var(--unikl-navy); }
-        .bg-unikl-navy { background-color: var(--unikl-navy); }
-        .hover\:bg-unikl-navy-dark:hover { background-color: #003a73; }
-        .focus\:ring-unikl-orange:focus { --tw-ring-color: var(--unikl-orange); }
-        .text-unikl-orange { color: var(--unikl-orange); }
-        .text-unikl-blue-accent { color: var(--unikl-blue-accent); }
-        .hover\:text-unikl-orange-light:hover { color: #ff9d40; }
-
-        /* Gaya untuk spinner */
-        .spinner { border-top-color: #ffffff; }
-        
-        /* Gaya untuk borang */
-        .form-card {
-            box-shadow: 0 15px 40px rgba(0, 33, 71, 0.2);
+        body::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: url('img/view.png'); 
+            background-size: cover;
+            background-position: center;
+            filter: blur(8px) brightness(0.4);
+            z-index: -1;
         }
 
-        /* Override Tailwind border focus untuk input */
-        input:focus {
-            border-color: var(--unikl-orange) !important;
-            box-shadow: 0 0 0 2px rgba(245, 130, 32, 0.25) !important;
+        .main-container {
+            display: flex;
+            width: 900px;
+            max-width: 95%;
+            height: 550px;
+            background: var(--white);
+            border-radius: 40px; 
+            overflow: hidden;
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.4);
         }
 
-        /* Gaya Mesej Alert */
-        .alert-success {
-            background-color: #d1e7dd; /* Light Green */
-            border-color: #badbcc;
-            color: #0f5132;
+        .side-visual {
+            flex: 1;
+            background: var(--primary);
+            padding: 50px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
-        .alert-error {
-            background-color: #f8d7da; /* Light Red */
-            border-color: #f5c2c7;
-            color: #842029;
+
+        .side-visual img { height: 45px; width: auto; margin-bottom: 20px;}
+        .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+        .side-visual h1 span { color: var(--accent); }
+
+        .side-form {
+            flex: 1.2;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 10px; }
+        .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
+
+        .input-group { margin-bottom: 20px; }
+        .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; }
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            transition: 0.3s;
+        }
+        .input-group input:focus { 
+            outline: none; border-color: var(--accent); background: white;
+            box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
+        }
+
+        .btn-submit {
+            background: var(--primary);
+            color: white;
+            padding: 16px;
+            border-radius: 50px;
+            width: 100%;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            border: none;
+        }
+        .btn-submit:hover { background: var(--accent); transform: translateY(-2px); }
+
+        .back-btn {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 25px;
+        }
+
+        .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-bottom: 20px; font-weight: 500; }
+        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+        @media (max-width: 768px) {
+            .side-visual { display: none; }
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body>
 
-    <div class="w-full max-w-md bg-white p-8 rounded-xl form-card transition duration-300 transform hover:scale-[1.005]">
-        
-        <div class="flex flex-col items-center mb-6">
-            
-            <img src="assets/unikl-logo.png" alt="UniKL Logo" class="h-16 w-auto mb-4"> 
-            <h2 class="text-3xl font-extrabold text-unikl-navy text-center" style="font-weight: 800;">
-                Forgot Password
-            </h2>
-            <p class="text-gray-500 text-center text-sm font-medium mt-1">
-                RCMP NexCheck Portal
-            </p>
+<div class="main-container">
+    <div class="side-visual">
+        <div>
+            <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
+            <h1>Reset <span>Access.</span></h1>
+            <p>Secure protocol to recover your RCMP NexCheck credentials.</p>
         </div>
-
-        <p class="text-gray-600 mb-6 text-center text-sm font-medium">
-            Enter your email address (Registered in RCMP's system) to receive a verification code .
-        </p>
-
-        <form id="forgotForm">
-            <div class="mb-5">
-                <label for="email" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Email Address</label>
-                <input type="email" name="email" id="email" placeholder="contoh@unikl.edu.my" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-unikl-orange transition duration-150 ease-in-out shadow-sm">
-            </div>
-
-            <button type="submit" id="submitButton"
-                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-unikl-navy hover:bg-unikl-navy-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-unikl-orange transition duration-150 ease-in-out transform hover:scale-[1.01] active:scale-95"
-                    style="font-size: 16px;">
-                Send Verification Code
-            </button>
-        </form>
-
-        <div id="messageContainer" class="mt-6 p-4 rounded-lg hidden text-left border" role="alert">
-            <p id="resultText" class="text-sm font-semibold"></p>
-        </div>
-
-        <p class="mt-8 text-center text-sm text-gray-500">
-            Remember your password? 
-            <a href="login.php" class="font-bold text-unikl-blue-accent hover:text-unikl-orange transition duration-150">
-                <i class="fa-solid fa-arrow-left mr-1"></i> Back to Log In
-            </a>
-        </p>
+        <div style="font-size: 0.75rem; opacity: 0.6;"><i class="fas fa-lock"></i> Encryption Active</div>
     </div>
 
-    <script>
-        const API_URL = "forgot_password_api.php";
-        const form = document.getElementById("forgotForm");
-        const submitButton = document.getElementById("submitButton");
-        const messageContainer = document.getElementById('messageContainer');
-        const resultText = document.getElementById('resultText');
-        const originalButtonText = 'Send Reset Code (OTP)';
+    <div class="side-form">
+        <h2>Forgot Password?</h2>
+        <p class="sub-text">Enter your email to receive a secure OTP code.</p>
 
-        function displayMessage(isSuccess, message) {
-            resultText.textContent = message;
-            messageContainer.className = 'mt-6 p-4 rounded-lg text-left border'; // Reset classes
+        <div id="messageContainer" class="alert hidden">
+            <span id="resultText"></span>
+        </div>
+
+        <form id="forgotForm">
+            <div class="input-group">
+                <label>UniKL Email Address</label>
+                <input type="email" name="email" id="email" placeholder="name@unikl.edu.my" required>
+            </div>
+
+            <button type="submit" id="submitButton" class="btn-submit">SEND VERIFICATION CODE</button>
+        </form>
+
+        <div style="text-align: center;">
+            <a href="<?php echo $back_url; ?>" class="back-btn">
+                <i class="fas fa-arrow-left"></i> Back to Login
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById("forgotForm");
+    const submitButton = document.getElementById("submitButton");
+    const messageContainer = document.getElementById('messageContainer');
+    const resultText = document.getElementById('resultText');
+
+    form.addEventListener("submit", async function(e) {
+        e.preventDefault();
+        
+        submitButton.disabled = true;
+        submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> SENDING...`;
+        
+        const formData = new FormData(this);
+        const email = formData.get('email');
+        const role = "<?php echo $role; ?>"; // Ambil role dari PHP ke JS
+
+        try {
+            const res = await fetch("forgot_password_api.php", {
+                method: "POST",
+                body: new URLSearchParams(formData)
+            });
+
+            const data = await res.json();
             
-            if (isSuccess) {
-                messageContainer.classList.add('alert-success', 'border-green-500');
-            } else {
-                messageContainer.classList.add('alert-error', 'border-red-500');
-            }
+            resultText.textContent = data.message;
+            messageContainer.className = `alert ${data.success ? 'alert-success' : 'alert-error'}`;
             messageContainer.classList.remove('hidden');
 
-            
-            setTimeout(() => {
-                messageContainer.classList.add('hidden');
-            }, 8000); 
-        }
-
-        form.addEventListener("submit", async function(e) {
-            e.preventDefault();
-
-            
-            submitButton.disabled = true;
-            submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Sending...
-            `;
-            messageContainer.classList.add('hidden');
-
-            const formData = new FormData(this);
-            const email = formData.get('email');
-
-            try {
-                const res = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams(formData)
-                });
-
-                const data = await res.json();
-                
-                if (res.ok && data.success) {
-                    displayMessage(true, data.message);
-                    
-                    
-                    setTimeout(() => {
-                        window.location.href = `verify_otp_form.php?email=${encodeURIComponent(email)}`;
-                    }, 2000);
-
-                } else {
-                    const errorMessage = data.message || `Error ${res.status}: Connection failed.`;
-                    displayMessage(false, `Failed: ${errorMessage}`); 
-                }
-
-            } catch (error) {
-                console.error("Fetch Error:", error);
-                displayMessage(false, `Error: Server connection failed. Please check the network.`);
-            } finally {
-                
-                if (submitButton.disabled && messageContainer.classList.contains('alert-error')) {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalButtonText;
-                }
+            if (data.success) {
+                setTimeout(() => {
+                    // SINI PENTING: Kita bawa email DAN role ke page Verify OTP
+                    window.location.href = `verify_otp_form.php?email=${encodeURIComponent(email)}&role=${role}`;
+                }, 2000);
+            } else {
+                submitButton.disabled = false;
+                submitButton.innerHTML = "SEND VERIFICATION CODE";
             }
-        });
-    </script>
+        } catch (error) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = "SEND VERIFICATION CODE";
+        }
+    });
+</script>
 </body>
 </html>

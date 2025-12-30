@@ -22,19 +22,18 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        body {
+        body { 
             font-family: 'Poppins', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
             overflow-x: hidden;
-            line-height: 1.6;
+            line-height: 1.6; 
         }
 
-        /* Container - Kunci utama untuk elak "rapat border" */
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 40px; /* Ruang bernafas kiri & kanan */
+            padding: 0 40px;
             width: 100%;
         }
 
@@ -63,7 +62,7 @@
             gap: 12px;
             font-weight: 800;
             color: var(--primary);
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
 
         .navbar-brand img { height: 35px; border-radius: 5px; }
@@ -116,7 +115,7 @@
 
         /* Mockup Display */
         .mockup-img {
-            width: 100%;
+            width: 200%;
             max-width: 950px;
             border-radius: 25px;
             box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.2);
@@ -124,13 +123,13 @@
             transition: 0.5s;
         }
 
-        /* Features Section - Improved Grid */
+        /* Features Section */
         .features-wrapper { background: white; padding: 100px 0; margin-top: 50px; }
 
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 40px; /* Jarak antara kad */
+            gap: 40px;
         }
 
         .card {
@@ -157,6 +156,65 @@
         }
 
         .card h3 { margin-bottom: 15px; font-size: 1.4rem; color: var(--primary); }
+
+        /* FOOTER KORPORAT (NEW) */
+        .footer-rcmp {
+            background: #1a1a1a;
+            color: white;
+            padding: 60px 0 0 0;
+            margin-top: 50px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr;
+            gap: 40px;
+            padding-bottom: 50px;
+        }
+
+        .footer-col h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .footer-col p {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .footer-col i { color: var(--accent); margin-top: 3px; }
+
+        .social-links { display: flex; gap: 15px; margin-top: 20px; }
+        .social-links a { 
+            color: white; font-size: 1.2rem; opacity: 0.7; transition: 0.3s; 
+        }
+        .social-links a:hover { opacity: 1; color: var(--accent); }
+
+        .footer-logos { text-align: right; }
+        .footer-logos img.main-logo { height: 65px; margin-bottom: 25px; border-radius: 5px; }
+        
+        .cert-icons { 
+            display: flex; justify-content: flex-end; gap: 15px; flex-wrap: wrap; 
+        }
+        .cert-icons img { 
+            height: 45px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px; 
+        }
+
+        .footer-bottom {
+            background: #000033;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 0.75rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            opacity: 0.8;
+        }
 
         /* Modal Premium */
         .modal {
@@ -198,12 +256,17 @@
             transition: 0.3s;
         }
 
-        .btn-modal:hover { background: var(--accent); }
+        @media (max-width: 992px) {
+            .footer-grid { grid-template-columns: 1fr 1fr; }
+            .footer-logos { text-align: left; }
+            .cert-icons { justify-content: flex-start; }
+        }
 
         @media (max-width: 768px) {
             .container { padding: 0 25px; }
             .hero h1 { font-size: 2.5rem; }
             .navbar { width: 95%; padding: 10px 20px; }
+            .footer-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -212,7 +275,7 @@
     <nav class="navbar">
         <div class="navbar-brand">
             <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
-            <span>NexCheck | RCMP Inventory Reservation Check System</span>
+            <span>NexCheck | RCMP Inventory</span>
         </div>
         <a href="login.php" class="btn-login">Login</a>
     </nav>
@@ -250,6 +313,43 @@
             </div>
         </div>
     </section>
+
+    <footer class="footer-rcmp">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h4>UNIVERSITI KUALA LUMPUR <br>Royal College of Medicine Perak</h4>
+                    <p><i class="fas fa-map-marker-alt"></i> No.3, Jalan Greentown, 30450 Ipoh Perak</p>
+                    <p><i class="fas fa-phone"></i> 1 300-22-7267</p>
+                    <p><i class="fas fa-print"></i> +605 - 2432 636</p>
+                </div>
+
+                <div class="footer-col">
+                    <h4>CONNECT WITH #UniKLRCMP</h4>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/UniKLRoyalCollegeofMedicinePerak/"><i class="fab fa-facebook"></i></a>
+                        <a href="https://www.instagram.com/uniklrcmp/"><i class="fab fa-instagram"></i></a>
+                        <a href="https://www.youtube.com/channel/UCugrLnQZro3__D4R3x-bqRg"><i class="fab fa-youtube"></i></a>
+                    </div>
+                    <p style="margin-top: 20px; opacity: 0.6; font-size: 0.75rem;">
+                        MOE Registration Certification No: <br>DU011(W)
+                    </p>
+                </div>
+
+                <div class="footer-col footer-logos">
+                    <img src="img/Logo-UniKL-PCM.jpg" class="main-logo" alt="UniKL Logo">
+                    <div class="cert-icons">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <div class="container">
+                © 2025 Universiti Kuala Lumpur | All rights reserved | Legal | Site Map
+            </div>
+        </div>
+    </footer>
 
     <div class="modal" id="disclaimerModal">
         <div class="modal-content">

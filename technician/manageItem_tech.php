@@ -254,6 +254,27 @@ $query = "
     ORDER BY i.item_name ASC
 ";
 $item_details = $conn->query($query)->fetch_all(MYSQLI_ASSOC);
+
+function get_reservation_item_count($conn, $status) {
+    $sql = "SELECT COUNT(id) AS count FROM reservation_items WHERE status = ?";
+    
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log("Prepare failed: (" . $conn->errno . ") " . $conn->error);
+        return 0;
+    }
+    
+    $stmt->bind_param("s", $status);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    return $result ? (int) $result['count'] : 0;
+}
+
+
+$pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -488,7 +509,12 @@ endif;
             <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php">
+            <i class="fa-solid fa-dolly"></i> Manage Requests
+            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+        </a>
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>

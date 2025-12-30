@@ -2,6 +2,44 @@
 session_start();
 include '../config.php';
 
+// --- LOGIK AUTO-CANCEL (TAMBAH DI SINI) ---
+// Cari reservation_items yang 'Approved' tapi tarikh reserve_date dah LEPAS (Yesterday or older)
+$today_date = date('Y-m-d');
+
+// 1. Dapatkan senarai ID yang perlu di-cancel
+$sql_check_expired = "
+    SELECT ri.id, ri.reserve_id, ri.item_id 
+    FROM reservation_items ri
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    WHERE ri.status = 'Approved' 
+    AND r.reserve_date < '$today_date'
+";
+$expired_res = $conn->query($sql_check_expired);
+
+if ($expired_res && $expired_res->num_rows > 0) {
+    while ($row = $expired_res->fetch_assoc()) {
+        $ri_id = $row['id'];
+        
+        // 1. Update status item jadi Rejected
+        $update_item = "UPDATE reservation_items SET 
+                        status = 'Rejected', 
+                        rejection_reason = 'Auto-Cancelled: Failed to collect the item on the scheduled date' 
+                        WHERE id = '$ri_id'";
+        $conn->query($update_item);
+
+        // 2. BETULKAN DI SINI: Lepaskan asset guna table reservation_assets
+        // Kita cari asset_id yang link dengan reservation_item_id ini
+        $update_asset = "UPDATE assets 
+                         SET status = 'Available' 
+                         WHERE asset_id IN (
+                             SELECT asset_id FROM reservation_assets WHERE reservation_item_id = '$ri_id'
+                         )"; 
+        $conn->query($update_asset);
+        
+        // (Optional) Rekod aktiviti
+        log_activity($conn, $user_role, $person_id, "Auto-Cancel", "Item ID $ri_id terbatal automatik.");
+    }
+}
 
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
@@ -495,6 +533,16 @@ function create_request_table($requests) {
     color: var(--text-muted);
     padding-left: 15px;
 }
+/* Warna khas untuk status Auto-Cancelled dalam table */
+.status-auto-cancel {
+    background-color: #f8d7da; /* Merah lembut */
+    color: #842029;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 1px solid #f5c2c7;
+}
 
 /* Responsive: Search bar penuh bila kat mobile */
 @media (max-width: 768px) {
@@ -545,103 +593,107 @@ function create_request_table($requests) {
     </div>
 
     <div class="container-fluid">
-        <div class="row g-4">
-            <div class="col-lg-12">
-
-<div class="card shadow-sm border-0 mb-3" style="padding: 15px 25px;">
-    <div class="card-body p-0">
-        <div class="row align-items-center">
-            <div class="col-md-4">
-                <h6 class="mb-0 text-dark fw-bold">
-                    <i class="fa-solid fa-filter me-2 text-primary"></i>Filter by Apply Date
-                </h6>
-            </div>
-            
-            <div class="col-md-8">
-                <form class="d-flex justify-content-md-end align-items-center gap-2">
-                    <label for="applyDate" class="small text-muted mb-0 d-none d-lg-block">Select Date:</label>
-                    <input type="date" id="applyDate" class="form-control form-control-sm" style="width: 180px; border-radius: 8px;">
-                    <button type="submit" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">Filter</button>
-                    <button type="reset" class="btn btn-outline-secondary btn-sm px-3" style="border-radius: 8px;">Reset</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-               <div class="card shadow-sm border-0">
-    <div class="card-body">
-        <div class="main-actions-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fa-solid fa-list-check me-2 text-primary"></i> 
-                Reservation Actions
-            </h5>
-            
-            <div class="search-box" style="width: 320px;">
-                <div class="input-group">
-                    <span class="input-group-text border-end-0">
-                        <i class="fa-solid fa-magnifying-glass text-muted"></i>
-                    </span>
-                    <input type="text" id="userSearchInput" class="form-control" placeholder="Search for name or phone number...">
-                </div>
-            </div>
-        </div>
-
-        <ul class="nav nav-tabs nav-fill mt-4" id="myTab" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tab-pane" type="button" role="tab">New Requests <span class="badge rounded-pill text-bg-warning ms-1"><?= count($pending_requests) ?></span></button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved-tab-pane" type="button" role="tab">To Be Collected <span class="badge rounded-pill text-bg-primary ms-1"><?= count($approved_requests) ?></span></button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="onloan-tab" data-bs-toggle="tab" data-bs-target="#onloan-tab-pane" type="button" role="tab">On Loan <span class="badge rounded-pill text-bg-danger ms-1"><?= count($on_loan_requests) ?></span></button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button" role="tab">Completed Archive</button>
-                            </li>
-                        </ul>
-
-                        <div class="tab-content pt-3" id="myTabContent">
-                            <div class="tab-pane fade show active tab-container" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
-                            <div class="tab-pane fade tab-container" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
-                            <div class="tab-pane fade tab-container" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
-                            <div class="tab-pane fade tab-container" id="completed-tab-pane" role="tabpanel"><?php create_request_table($completed_requests); ?></div>
-                        </div>
+        <div class="card shadow-sm border-0 mb-3" style="padding: 15px 25px;">
+            <div class="card-body p-0">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <h6 class="mb-0 text-dark fw-bold">
+                            <i class="fa-solid fa-filter me-2 text-primary"></i>Filter by Apply Date
+                        </h6>
+                    </div>
+                    <div class="col-md-8">
+                        <form class="d-flex justify-content-md-end align-items-center gap-2">
+                            <label for="applyDate" class="small text-muted mb-0 d-none d-lg-block">Select Date:</label>
+                            <input type="date" id="applyDate" class="form-control form-control-sm" style="width: 180px; border-radius: 8px;">
+                            <button type="submit" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">Filter</button>
+                            <button type="reset" class="btn btn-outline-secondary btn-sm px-3" style="border-radius: 8px;">Reset</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="main-actions-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fa-solid fa-list-check me-2 text-primary"></i> Reservation Actions</h5>
+                    <div class="search-box" style="width: 320px;">
+                        <div class="input-group">
+                            <span class="input-group-text border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <input type="text" id="userSearchInput" class="form-control" placeholder="Search name or phone...">
+                        </div>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs nav-fill mt-4" id="myTab" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tab-pane" type="button">New Requests <span class="badge rounded-pill text-bg-warning ms-1"><?= count($pending_requests) ?></span></button></li>
+                    <li class="nav-item"><button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved-tab-pane" type="button">To Be Collected <span class="badge rounded-pill text-bg-primary ms-1"><?= count($approved_requests) ?></span></button></li>
+                    <li class="nav-item"><button class="nav-link" id="onloan-tab" data-bs-toggle="tab" data-bs-target="#onloan-tab-pane" type="button">On Loan <span class="badge rounded-pill text-bg-danger ms-1"><?= count($on_loan_requests) ?></span></button></li>
+                    <li class="nav-item"><button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button">Archive</button></li>
+                </ul>
+
+                <div class="tab-content pt-3" id="myTabContent">
+                    <div class="tab-pane fade show active" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
+                    <div class="tab-pane fade" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
+                    <div class="tab-pane fade" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
+                    <div class="tab-pane fade" id="completed-tab-pane" role="tabpanel"><?php create_request_table($completed_requests); ?></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="modal fade" id="approveDetailsModal" tabindex="-1" role="dialog" aria-labelledby="approveModalLabel" aria-hidden="true">
+<div class="modal fade" id="approveDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="approveModalLabel">Approve Reservation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Approve Reservation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p><strong>User:</strong> <span id="userName"></span> (<span id="userPhone"></span>)</p>
+                <p><strong>User:</strong> <span id="userName"></span></p>
                 <p><strong>Item:</strong> <span id="itemName"></span></p>
-                <p><strong>Quantity Requested:</strong> <span id="requestedQtyText"></span></p>
-                <p><strong>Reason:</strong> <span id="reservationReasonText"></span></p>
-                <hr>
+                <p><strong>Requested Qty:</strong> <span id="requestedQtyText"></span></p> <hr>
                 <div class="mb-3">
-                    <label for="approve_actual_qty" class="form-label fw-bold">Quantity to Approve:</label>
-                    <input type="number" class="form-control" id="approve_actual_qty" min="1">
+                    <label class="form-label fw-bold">Quantity to Approve:</label>
+                    <input type="number" class="form-control" id="approve_actual_qty">
                 </div>
-                <div class="mb-3" id="partialRejectionReasonContainer" style="display:none;">
-                    <label for="partial_reject_reason" class="form-label fw-bold text-danger">Reason for Quantity Reduction:</label>
-                    <textarea class="form-control" id="partial_reject_reason" placeholder="e.g., Only 2 units are available now."></textarea>
+
+                <div id="partialRejectionReasonContainer" style="display: none;" class="mb-3">
+                    <label for="partial_reject_reason" class="form-label fw-bold text-danger">Reason for Partial Approval:</label>
+                    <textarea class="form-control" id="partial_reject_reason" rows="2" placeholder="Why are you giving less than requested?"></textarea>
+                    <small class="text-muted">Min. 5 characters required.</small>
                 </div>
+
                 <div id="assetListContainer"></div>
+                
                 <input type="hidden" id="approve_reservation_item_id">
                 <input type="hidden" id="approve_original_qty"> 
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirmApproveBtn" disabled>Approve Request</button>
+                <button type="button" class="btn btn-success" id="confirmApproveBtn" disabled>Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger fw-bold"><i class="fa-solid fa-circle-xmark me-2"></i>Reject Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="reject_reason" class="form-label fw-bold">Reason for Rejection:</label>
+                    <textarea class="form-control" id="reject_reason" rows="3" placeholder="Explain why the request is rejected..."></textarea>
+                </div>
+                <input type="hidden" id="reject_reservation_item_id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="confirmRejectBtn">Confirm Rejection</button>
             </div>
         </div>
     </div>
@@ -664,6 +716,7 @@ function create_request_table($requests) {
         </div>
     </div>
 </div>
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -907,64 +960,59 @@ function openApproveModal(id) {
         }
     }
 
-    function validateApproveButton() {
-        const currentQtyToApprove = parseInt($approveQtyInput.val());
-        const checkedCount = $('.asset-checkbox:checked').length;
-        
-        let isReasonValid = true;
-        if (currentQtyToApprove < originalQty) {
-             isReasonValid = $partialRejectReason.val().trim().length >= 5; 
-        }
-        
-        if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0 || !isReasonValid) {
-              $approveBtn.prop('disabled', true);
-        } else if (currentQtyToApprove > 0) {
-            $approveBtn.prop('disabled', checkedCount !== currentQtyToApprove);
-        } else if (currentQtyToApprove === 0) {
-            $approveBtn.prop('disabled', !isReasonValid);
-        } else {
-            $approveBtn.prop('disabled', true);
-        }
+function validateApproveButton() {
+    const currentQtyToApprove = parseInt($approveQtyInput.val());
+    const checkedCount = $('.asset-checkbox:checked').length;
+    const originalQty = parseInt($('#approve_original_qty').val());
+    const reasonText = $partialRejectReason.val().trim();
+    
+    let isReasonValid = true;
+    
+    // Syarat 1: Kalau bagi kurang dari yang diminta, WAJIB ada alasan (min 5 huruf)
+    if (currentQtyToApprove < originalQty) {
+        isReasonValid = reasonText.length >= 5;
     }
+
+    // Syarat 2: Bilangan yang di-tick MESTI SAMA dengan nombor dalam input Quantity
+    const isQtyMatch = (currentQtyToApprove > 0 && checkedCount === currentQtyToApprove);
+
+    // Kalau semua syarat lepas, baru hidupkan butang
+    if (isQtyMatch && isReasonValid) {
+        $approveBtn.prop('disabled', false);
+    } else {
+        $approveBtn.prop('disabled', true);
+    }
+}
 
 function buildAssetCheckboxes() {
     const currentQtyToApprove = parseInt($approveQtyInput.val());
 
     if (isNaN(currentQtyToApprove) || currentQtyToApprove < 0) {
         $assetContainer.html('<div class="alert alert-warning">Please enter a valid quantity.</div>');
+    } else if (assets.length === 0) {
+        $assetContainer.html('<div class="alert alert-danger">No assets available for this item!</div>');
     } else {
         let html = `
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                <table class="table table-sm table-hover align-middle border-top-0">
+                <table class="table table-sm table-hover align-middle">
                     <thead class="table-light sticky-top">
                         <tr style="font-size: 0.75rem;" class="text-uppercase text-muted">
                             <th class="text-center" style="width: 40px;">Sel</th>
-                            <th style="width: 120px;">Asset Code</th>
-                            <th>Brand / Model Information</th>
+                            <th>Asset Details</th>
                         </tr>
                     </thead>
                     <tbody>`;
 
         assets.forEach(a => {
-            // Kita pecahkan brand dan model supaya lebih senang baca
-            const brandName = a.brand || 'No Brand';
-            const modelName = a.model || 'No Model';
-
             html += `
                 <tr style="font-size: 0.85rem;">
                     <td class="text-center">
                         <input class="form-check-input asset-checkbox" type="checkbox" value="${a.asset_id}" id="asset-${a.asset_id}">
                     </td>
                     <td>
-                        <label for="asset-${a.asset_id}" class="fw-bold mb-0 text-primary" style="cursor: pointer;">
-                            ${a.asset_code}
-                        </label>
-                    </td>
-                    <td>
-                        <label for="asset-${a.asset_id}" class="mb-0 d-block" style="cursor: pointer;">
-                            <span class="fw-bold text-dark">${brandName}</span> 
-                            <span class="text-muted mx-1">|</span> 
-                            <span class="text-secondary">${modelName}</span>
+                        <label for="asset-${a.asset_id}" class="d-block" style="cursor: pointer;">
+                            <span class="fw-bold text-primary">${a.asset_code}</span><br>
+                            <small class="text-muted">${a.brand || ''} ${a.model || ''}</small>
                         </label>
                     </td>
                 </tr>`;
@@ -972,9 +1020,15 @@ function buildAssetCheckboxes() {
 
         html += `</tbody></table></div>`;
         $assetContainer.html(html);
+
+        // RE-BIND EVENT: Ini penting supaya checkbox baru ni boleh dikesan
+        $('.asset-checkbox').on('change', function() {
+            validateApproveButton();
+        });
     }
     validateApproveButton();
 }
+
     $approveQtyInput.off('change keyup');
     $assetContainer.off('change.assetcheck');
     $partialRejectReason.off('change keyup'); 
@@ -1040,14 +1094,29 @@ function buildAssetCheckboxes() {
 
 
     
-    function openRejectModal(id) {
-        $('#reject_reservation_item_id').val(id);
-        $('#reject_reason').val('');
-        new bootstrap.Modal('#rejectModal').show();
+function openRejectModal(id) {
+    // 1. Pastikan ID dimasukkan ke hidden input dalam modal
+    const inputId = document.getElementById('reject_reservation_item_id');
+    if (inputId) {
+        inputId.value = id;
     }
-    
-    window.openRejectModal = openRejectModal;
 
+    // 2. Kosongkan ruangan alasan
+    const reasonInput = document.getElementById('reject_reason');
+    if (reasonInput) {
+        reasonInput.value = '';
+    }
+
+    // 3. Cara paling selamat untuk buka modal di Bootstrap 5
+    const modalElement = document.getElementById('rejectModal');
+    if (modalElement) {
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+        modalInstance.show();
+    } else {
+        console.error("Error: Element #rejectModal tidak dijumpai dalam HTML!");
+    }
+}
+window.openRejectModal = openRejectModal;
     
     $('#confirmRejectBtn').on('click', function() {
         const reservation_item_id = $('#reject_reservation_item_id').val();

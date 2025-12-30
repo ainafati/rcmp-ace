@@ -2,7 +2,7 @@
 session_start();
 include 'config.php';
 
-// Logic switch role - Jika sudah login, terus ke dashboard
+// 1. Logic switch role - Jika sudah login, terus ke dashboard
 if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     $role = $_SESSION['logged_in_role'];
     switch ($role) {
@@ -12,14 +12,16 @@ if (isset($_SESSION['person_id']) && isset($_SESSION['logged_in_role'])) {
     }
 }
 
+// 2. Ambil data dari session jika ada error login sebelum ni
 $login_attempt_role = $_SESSION['login_attempt_role'] ?? '';
 $login_attempt_email = $_SESSION['login_attempt_email'] ?? '';
-unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email']);
+unset($_SESSION['login_attempt_role'], $_SESSION['login_attempt_email'], $_SESSION['registered_email']);
 
 $errorMessage = $_SESSION['error'] ?? '';
 $successMessage = $_SESSION['success'] ?? '';
 unset($_SESSION['error'], $_SESSION['success']);
 
+// 3. Remember Me Cookie
 $remembered_email = $_COOKIE['remember_email'] ?? '';
 if (empty($login_attempt_email) && !empty($remembered_email)) {
     $login_attempt_email = $remembered_email;
@@ -37,8 +39,8 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
 
 <style>
     :root {
-        --primary: #002147;      /* Navy RCMP */
-        --accent: #00A3C9;       /* Cyan RCMP */
+        --primary: #002147;
+        --accent: #00A3C9;
         --bg-body: #f8fafc;
         --text-main: #1e293b;
         --text-muted: #64748b;
@@ -58,12 +60,11 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         position: relative;
     }
 
-    /* Background Image dengan Blur (Sebahagian dari Branding) */
     body::before {
         content: "";
         position: absolute;
         inset: 0;
-        background-image: url('img/view.png'); /* Pastikan path fail betul */
+        background-image: url('img/view.png'); 
         background-size: cover;
         background-position: center;
         filter: blur(10px) brightness(0.4);
@@ -77,13 +78,12 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         max-width: 95%;
         height: 550px;
         background: var(--white);
-        border-radius: 40px; /* Rounding besar macam card landing page */
+        border-radius: 40px;
         overflow: hidden;
         box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.3);
         border: 1px solid rgba(255,255,255,0.3);
     }
 
-    /* KIRI: Visual Branding */
     .side-visual {
         flex: 1;
         background: var(--primary);
@@ -96,26 +96,11 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         overflow: hidden;
     }
 
-    /* Efek hiasan sikit kat tepi */
-    .side-visual::after {
-        content: "";
-        position: absolute;
-        bottom: -50px;
-        right: -50px;
-        width: 200px;
-        height: 200px;
-        background: var(--accent);
-        border-radius: 50%;
-        opacity: 0.2;
-        filter: blur(40px);
-    }
-
     .side-visual img { height: 45px; width: auto; border-radius: 8px; margin-bottom: 20px;}
     .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; letter-spacing: -1px; }
     .side-visual h1 span { color: var(--accent); }
     .side-visual p { font-size: 0.9rem; opacity: 0.8; margin-top: 20px; font-weight: 300; }
 
-    /* KANAN: Form Section */
     .side-form {
         flex: 1.2;
         padding: 50px;
@@ -125,10 +110,9 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         justify-content: center;
     }
 
-    h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; letter-spacing: -1px; margin-bottom: 10px; }
+    h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 10px; }
     .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
 
-    /* Role Cards */
     .roles-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -152,26 +136,22 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         background: rgba(0, 163, 201, 0.05);
     }
 
-    /* Login Form (Step 2) */
     #login-section { display: none; animation: fadeIn 0.5s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     .input-group { margin-bottom: 20px; position: relative; }
-    .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; }
     .input-group input {
         width: 100%;
         padding: 14px 16px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        font-family: inherit;
         font-size: 0.9rem;
-        transition: 0.3s;
         background: #f8fafc;
+        transition: 0.3s;
     }
     .input-group input:focus { 
-        outline: none; 
-        border-color: var(--accent); 
-        background: white;
+        outline: none; border-color: var(--accent); background: white;
         box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
     }
 
@@ -191,13 +171,12 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         margin-top: 10px;
         box-shadow: 0 10px 20px -5px rgba(0, 33, 71, 0.3);
     }
-    .btn-login:hover { background: var(--accent); transform: translateY(-3px); box-shadow: 0 15px 25px -5px rgba(0, 163, 201, 0.4); }
+    .btn-login:hover { background: var(--accent); transform: translateY(-3px); }
 
     .back-btn {
         background: none; border: none; color: var(--accent); font-weight: 700; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 20px;
     }
 
-    /* Alerts */
     .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-bottom: 20px; font-weight: 500; }
     .alert-error { background: #fee2e2; color: #991b1b; }
 
@@ -217,39 +196,24 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
             <h1>NexCheck <span>Portal.</span></h1>
             <p>High-precision IT asset reservation and inventory management ecosystem for UniKL RCMP.</p>
         </div>
-        
-        <div style="font-size: 0.75rem; opacity: 0.6;">
-            <i class="fas fa-shield-alt"></i> Secure Protocol Active
-        </div>
+        <div style="font-size: 0.75rem; opacity: 0.6;"><i class="fas fa-shield-alt"></i> Secure Protocol Active</div>
     </div>
 
     <div class="side-form">
-        
         <div id="role-section">
             <h2>Welcome Back</h2>
             <p class="sub-text">Identify your access level to continue to the dashboard.</p>
-            
             <div class="roles-grid">
                 <div class="role-card" onclick="showLogin('Admin', 'Administrator')">
-                    <div class="role-box">
-                        <i class="fas fa-user-shield"></i>
-                        <span>Admin</span>
-                    </div>
+                    <div class="role-box"><i class="fas fa-user-shield"></i><span>Admin</span></div>
                 </div>
                 <div class="role-card" onclick="showLogin('tech', 'Technician')">
-                    <div class="role-box">
-                        <i class="fas fa-screwdriver-wrench"></i>
-                        <span>Technician</span>
-                    </div>
+                    <div class="role-box"><i class="fas fa-screwdriver-wrench"></i><span>Technician</span></div>
                 </div>
                 <div class="role-card" onclick="showLogin('user', 'Staff / Student')">
-                    <div class="role-box">
-                        <i class="fas fa-user"></i>
-                        <span>Staff/Student</span>
-                    </div>
+                    <div class="role-box"><i class="fas fa-user"></i><span>Staff/Student</span></div>
                 </div>
             </div>
-            
             <div style="text-align: center; margin-top: 20px;">
                 <a href="index.php" style="color: var(--text-muted); text-decoration: none; font-size: 0.75rem; font-weight: 600;">
                     <i class="fas fa-arrow-left"></i> Back to Homepage
@@ -284,7 +248,7 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted);">
                         <input type="checkbox" name="remember_me" value="1" <?= (!empty($remembered_email)) ? 'checked' : '' ?>> Remember Me
                     </label>
-                    <a href="forgot_password.php" style="color: var(--accent); text-decoration: none; font-weight: 700;">Forgot Password?</a>
+                    <a href="javascript:void(0)" onclick="goToForgot()" style="color: var(--accent); text-decoration: none; font-weight: 700;">Forgot Password?</a>
                 </div>
 
                 <button type="submit" class="btn-login">SIGN IN</button>
@@ -294,11 +258,11 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
                 </div>
             </form>
         </div>
-
     </div>
 </div>
 
 <script>
+    // 1. Fungsi Tunjuk Form Login
     function showLogin(val, title) {
         document.getElementById('role-input').value = val;
         document.getElementById('role-display').innerText = title;
@@ -306,37 +270,50 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
 
         document.getElementById('role-section').style.display = 'none';
         document.getElementById('login-section').style.display = 'block';
-
-        const emailField = document.getElementById('email');
-        if(emailField.value === "") emailField.focus();
-        else document.getElementById('password').focus();
     }
 
+    // 2. Fungsi Patah Balik ke Pilih Role
     function goBack() {
         document.getElementById('role-section').style.display = 'block';
         document.getElementById('login-section').style.display = 'none';
     }
 
-    // Toggle Password Visibility
-    const toggleBtn = document.querySelector("#togglePassword");
-    const passField = document.querySelector("#password");
+    // 3. Fungsi Dinamik Forgot Password (Bawa Role)
+    function goToForgot() {
+        const role = document.getElementById('role-input').value;
+        window.location.href = `forgot_password.php?role=${role}`;
+    }
 
-    toggleBtn.addEventListener("click", function() {
+    // 4. Toggle Password Visibility
+    document.querySelector("#togglePassword").addEventListener("click", function() {
+        const passField = document.querySelector("#password");
         const type = passField.type === "password" ? "text" : "password";
         passField.type = type;
         this.classList.toggle("fa-eye");
         this.classList.toggle("fa-eye-slash");
     });
 
-    // Auto-open if redirected back from error
-    const lastRole = '<?= $login_attempt_role ?>';
-    if(lastRole) {
-        let t = "Administrator";
-        if(lastRole === 'tech') t = "Technician";
-        if(lastRole === 'user') t = "Staff / Student";
-        showLogin(lastRole, t);
-    }
-</script>
+    // 5. AUTO-DETECT ROLE DARI URL (Sangat Penting untuk 'Back' button)
+    window.addEventListener('load', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roleParam = urlParams.get('role');
 
+        if (roleParam) {
+            let title = "Staff / Student";
+            if (roleParam === 'Admin') title = "Administrator";
+            if (roleParam === 'tech') title = "Technician";
+            showLogin(roleParam, title);
+            // Optional: Bersihkan URL
+            window.history.replaceState({}, document.title, "login.php");
+        } else {
+            // Logic asal: kalau ada error session
+            const lastRole = '<?= $login_attempt_role ?>';
+            if(lastRole) {
+                let t = (lastRole === 'Admin') ? "Administrator" : (lastRole === 'tech' ? "Technician" : "Staff / Student");
+                showLogin(lastRole, t);
+            }
+        }
+    });
+</script>
 </body>
 </html>

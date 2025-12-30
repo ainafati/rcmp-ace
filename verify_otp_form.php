@@ -3,381 +3,331 @@ $email = '';
 if (isset($_GET['email'])) {
     $email = htmlspecialchars(urldecode($_GET['email']));
 }
+
+// 1. TANGKAP ROLE DARI URL (Dihantar dari forgot_password.php)
+$role = isset($_GET['role']) ? htmlspecialchars($_GET['role']) : 'user';
+
+// 2. TENTUKAN LINK BACK TO LOGIN
+$back_url = ($role === 'technician') ? 'login_technician.php' : 'login.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Set New Password | NexCheck Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Set New Password </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
-        /* Define UniKL color palette as custom CSS variables */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        
         :root {
-            --unikl-navy: #002147; /* Primary Dark Navy Blue */
-            --unikl-orange: #f58220; /* Secondary Orange */
-            --unikl-blue-accent: #005a9c; /* Lighter Blue Accent */
-            --light-bg: #f5f8ff; /* Very light blue/gray background */
+            --primary: #002147; 
+            --accent: #00A3C9;
+            --bg-body: #f8fafc;
+            --white: #ffffff;
+            --text-muted: #64748b;
         }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--light-bg); 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-body);
+            overflow: hidden;
+            position: relative;
         }
 
-        /* Map UniKL colors to Tailwind styles */
-        .text-unikl-navy { color: var(--unikl-navy); }
-        .bg-unikl-navy { background-color: var(--unikl-navy); }
-        .hover\:bg-unikl-navy-dark:hover { background-color: #003a73; }
-        .focus\:ring-unikl-orange:focus { --tw-ring-color: var(--unikl-orange); }
-        .text-unikl-blue-accent { color: var(--unikl-blue-accent); }
-        .hover\:text-unikl-orange:hover { color: var(--unikl-orange); }
-
-        /* General styles */
-        .form-card {
-            box-shadow: 0 15px 40px rgba(0, 33, 71, 0.2);
-        }
-        .spinner { border-top-color: #ffffff; }
-
-        /* Input focus styling using UniKL Orange */
-        input:focus {
-            border-color: var(--unikl-orange) !important;
-            box-shadow: 0 0 0 2px rgba(245, 130, 32, 0.25) !important;
+        body::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: url('img/view.png'); 
+            background-size: cover;
+            background-position: center;
+            filter: blur(10px) brightness(0.4);
+            z-index: -1;
         }
 
-        /* Message Alert Styles */
-        .alert-success { background-color: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
-        .alert-error { background-color: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
-        
-        /* 🚀 PEMBETULAN AGRESIF: Sembunyikan Ikon 'Reveal Password' Lalai Pelayar */
-        /* 1. Untuk Webkit (Chrome/Edge): Menyembunyikan ikon mata lalai */
+        .main-container {
+            display: flex;
+            width: 950px;
+            max-width: 95%;
+            height: 650px;
+            background: var(--white);
+            border-radius: 40px; 
+            overflow: hidden;
+            box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.4);
+        }
+
+        .side-visual {
+            flex: 0.8;
+            background: var(--primary);
+            padding: 50px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .side-visual img { width: 120px; border-radius: 8px; margin-bottom: 25px; }
+        .side-visual h1 { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+        .side-visual h1 span { color: var(--accent); }
+        .side-visual p { font-size: 0.9rem; opacity: 0.8; margin-top: 15px; font-weight: 300; }
+
+        .side-form {
+            flex: 1.2;
+            padding: 40px 60px;
+            background: var(--white);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow-y: auto;
+        }
+
+        h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 5px; }
+        .sub-text { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 25px; }
+
+        .input-group { margin-bottom: 15px; position: relative; }
+        .input-group label { font-size: 0.7rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 5px; text-transform: uppercase; }
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            background: #f8fafc;
+            transition: 0.3s;
+        }
+        .input-group input:focus { 
+            outline: none; border-color: var(--accent); background: white;
+            box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
+        }
+
+        #otp {
+            text-align: center;
+            font-size: 1.4rem;
+            letter-spacing: 0.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-submit {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 50px;
+            width: 100%;
+            font-weight: 700;
+            margin-top: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px -5px rgba(0, 33, 71, 0.3);
+        }
+        .btn-submit:hover:not(:disabled) { background: var(--accent); transform: translateY(-2px); }
+        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 35px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .resend-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        #resendOtpButton { font-size: 0.75rem; font-weight: 700; color: var(--accent); cursor: pointer; border: none; background: none; }
+        #resendOtpButton:disabled { color: #cbd5e1; cursor: not-allowed; }
+
+        .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-top: 20px; font-weight: 500; }
+        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
         input[type="password"]::-webkit-reveal,
-        input[type="password"]::-webkit-search-decoration {
-            display: none !important; 
-            -webkit-appearance: none;
-        }
-        
-        /* 2. Untuk IE/Edge (Sintaks lama) */
-        input[type="password"]::-ms-reveal {
-            display: none !important;
-            -ms-appearance: none;
-        }
-        
-        /* 3. Menangani ruang padding yang ditinggalkan oleh ikon yang dihilangkan (penting) */
-        /* Kita tambahkan padding semula jika input tidak mempunyai ikon toggle anda sendiri */
-        /* Walau bagaimanapun, kita akan kekalkan pr-10 pada kedua-dua input untuk memberi ruang kepada ikon buatan sendiri */
+        input[type="password"]::-ms-reveal { display: none !important; }
 
-        /* Custom style untuk menjarakkan ikon mata buatan sendiri dari input */
-        .password-toggle-btn {
-            right: 0.75rem; /* Melaraskan ikon mata sedikit ke kiri */
+        @media (max-width: 768px) {
+            .side-visual { display: none; }
+            .main-container { height: auto; border-radius: 30px; }
+            .side-form { padding: 40px 30px; }
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body>
 
-    <div class="w-full max-w-sm bg-white p-8 rounded-xl form-card transition duration-300">
-        
-        <div class="flex flex-col items-center mb-6">
-            <img src="assets/unikl-logo.png" alt="UniKL Logo" class="h-14 w-auto mb-3"> 
-            <h2 class="text-3xl font-extrabold text-unikl-navy text-center" style="font-weight: 800;">
-                Set New Password
-            </h2>
+<div class="main-container">
+    <div class="side-visual">
+        <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
+        <h1>Secure <span>Reset.</span></h1>
+        <p>Complete the verification process to regain access to your NexCheck account.</p>
+        <div style="margin-top: 30px; font-size: 0.7rem; opacity: 0.6;">
+            <i class="fas fa-shield-alt"></i> Two-Factor Authentication Active
         </div>
-        
-        <p id="instructionText" class="text-gray-600 mb-6 text-center text-sm font-medium">
-            Please enter the verification code and set your new password.
-        </p>
+    </div>
+
+    <div class="side-form">
+        <h2>Verification</h2>
+        <p class="sub-text" id="instructionText">We've sent a 6-digit code to your email.</p>
 
         <form id="resetForm">
             <input type="hidden" name="email" id="hiddenEmail" value="<?= $email ?>">
-            
-            <div class="mb-5">
-                <label for="otp" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Verification Code</label>
-                <input type="text" name="token" id="otp" placeholder="Enter 6-digit code" required maxlength="6"
-                        class="w-full text-center text-xl font-bold tracking-widest px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm">
+            <input type="hidden" name="role" value="<?= $role ?>">
+
+            <div class="input-group">
+                <label>Verification Code</label>
+                <input type="text" name="token" id="otp" placeholder="000000" required maxlength="6">
             </div>
 
-            <div class="flex justify-between items-center mb-6">
-                <p id="otpTimerText" class="text-xs text-gray-500 hidden">Code expires in <span id="cooldownDisplay" class="font-bold">60s</span></p>
-
-                <button type="button" id="resendOtpButton" class="text-sm font-semibold text-unikl-blue-accent hover:text-unikl-orange disabled:text-gray-400 disabled:cursor-not-allowed transition duration-150 ml-auto">
-                    Resend Code
-                </button>
+            <div class="resend-box">
+                <span id="otpTimerText" class="text-[10px] text-gray-400 font-bold hidden">
+                    EXPIRES IN <span id="cooldownDisplay">60s</span>
+                </span>
+                <button type="button" id="resendOtpButton">RESEND CODE</button>
             </div>
 
-            <div class="mb-5">
-                <label for="new_password" class="block text-sm font-semibold text-gray-700 mb-2 text-left">New Password</label>
-                <div class="relative">
-                    <input type="password" name="new_password" id="new_password" required minlength="8" 
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm pr-10">
-                    <button type="button" id="toggleNewPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent password-toggle-btn">
-                        <i id="newPasswordIcon" class="fa-solid fa-eye-slash"></i>
-                    </button>
-                </div>
+            <div class="input-group">
+                <label>New Password</label>
+                <input type="password" name="new_password" id="new_password" required minlength="8" placeholder="••••••••">
+                <i class="fas fa-eye-slash password-toggle" id="toggleNewPassword"></i>
             </div>
 
-            <div class="mb-5">
-                <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-2 text-left">Confirm Password</label>
-                <div class="relative">
-                    <input type="password" name="confirm_password" id="confirm_password" required minlength="8"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-unikl-orange transition duration-150 ease-in-out shadow-sm pr-10">
-                    <button type="button" id="toggleConfirmPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-unikl-blue-accent password-toggle-btn">
-                        <i id="confirmPasswordIcon" class="fa-solid fa-eye-slash"></i>
-                    </button>
-                </div>
+            <div class="input-group">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" id="confirm_password" required minlength="8" placeholder="••••••••">
+                <i class="fas fa-eye-slash password-toggle" id="toggleConfirmPassword"></i>
             </div>
 
-            <button type="submit" id="resetButton"
-                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-bold text-white bg-unikl-navy hover:bg-unikl-navy-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-unikl-orange transition duration-150 ease-in-out transform hover:scale-[1.01] active:scale-95">
-                Set New Password
-            </button>
+            <button type="submit" id="resetButton" class="btn-submit">SET NEW PASSWORD</button>
         </form>
 
-        <div id="messageContainer" class="mt-6 p-4 rounded-lg hidden text-left" role="alert">
-            <p id="resultText" class="text-sm font-semibold"></p>
+        <div id="messageContainer" class="alert hidden">
+            <span id="resultText"></span>
         </div>
-        
-        <p class="mt-6 text-center text-sm text-gray-500">
-            <a href="login.php" class="font-bold text-unikl-blue-accent hover:text-unikl-orange transition duration-150">
-                <i class="fa-solid fa-arrow-left mr-1"></i> Back to Log In
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="<?= $back_url ?>" style="font-size: 0.8rem; color: var(--accent); font-weight: 700; text-decoration: none;">
+                <i class="fas fa-arrow-left"></i> Back to Login
             </a>
-        </p>
-
+        </div>
     </div>
+</div>
 
-    <script>
-        const form = document.getElementById("resetForm");
-        const resetButton = document.getElementById("resetButton");
-        const messageContainer = document.getElementById('messageContainer');
-        const resultText = document.getElementById('resultText');
-        const hiddenEmailInput = document.getElementById('hiddenEmail');
-        const otpInput = document.getElementById('otp'); 
-        const resendOtpButton = document.getElementById('resendOtpButton');
-        const cooldownDisplay = document.getElementById('cooldownDisplay');
-        const otpTimerText = document.getElementById('otpTimerText');
-        const originalResetButtonText = 'Set New Password';
-        const newPasswordInput = document.getElementById('new_password');
-        const confirmPasswordInput = document.getElementById('confirm_password');
+<script>
+    // Inisialisasi Elements
+    const form = document.getElementById("resetForm");
+    const resetButton = document.getElementById("resetButton");
+    const messageContainer = document.getElementById('messageContainer');
+    const resultText = document.getElementById('resultText');
+    const hiddenEmailInput = document.getElementById('hiddenEmail');
+    const otpInput = document.getElementById('otp'); 
+    const resendOtpButton = document.getElementById('resendOtpButton');
+    const cooldownDisplay = document.getElementById('cooldownDisplay');
+    const otpTimerText = document.getElementById('otpTimerText');
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const toggleNewPasswordButton = document.getElementById('toggleNewPassword');
+    const toggleConfirmPasswordButton = document.getElementById('toggleConfirmPassword');
 
-        
-        const toggleNewPasswordButton = document.getElementById('toggleNewPassword');
-        const toggleConfirmPasswordButton = document.getElementById('toggleConfirmPassword');
-        const newPasswordIcon = document.getElementById('newPasswordIcon');
-        const confirmPasswordIcon = document.getElementById('confirmPasswordIcon');
+    const RESEND_API_URL = 'forgot_password_api.php'; 
+    const VERIFY_API_URL = 'verify_otp_api.php'; 
 
-        const RESEND_API_URL = 'forgot_password_api.php'; 
-        const VERIFY_API_URL = 'verify_otp_api.php'; 
+    let cooldownSeconds = 0; 
+    let isRedirecting = false;
+    const role = "<?= $role ?>"; // Role dari PHP ke JS
+    const backUrl = "<?= $back_url ?>"; // Back URL dari PHP ke JS
 
-        let cooldownSeconds = 0; 
-        let isRedirecting = false; 
+    // Helper: Tunjuk Message
+    function displayMessage(isSuccess, message) {
+        resultText.textContent = message;
+        messageContainer.className = 'alert mt-6'; 
+        messageContainer.classList.add(isSuccess ? 'alert-success' : 'alert-error');
+        messageContainer.classList.remove('hidden');
+    }
 
-        
-        function getUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return {
-                email: urlParams.get('email')
-            };
-        }
-
-        function displayMessage(isSuccess, message) {
-            resultText.textContent = message;
-            messageContainer.className = 'mt-6 p-4 rounded-lg text-left'; 
-            
-            if (isSuccess) {
-                messageContainer.classList.add('alert-success');
-            } else {
-                messageContainer.classList.add('alert-error');
-            }
-            messageContainer.classList.remove('hidden');
-
-            if (!isSuccess) {
-                setTimeout(() => {
-                    messageContainer.classList.add('hidden');
-                }, 8000); 
-            }
-        }
-        
-        function startResendCooldown() {
-            cooldownSeconds = 60; 
-            resendOtpButton.disabled = true;
-            otpTimerText.classList.remove('hidden');
-
+    // Timer Cooldown
+    function startResendCooldown() {
+        cooldownSeconds = 60; 
+        resendOtpButton.disabled = true;
+        otpTimerText.classList.remove('hidden');
+        const timer = setInterval(() => {
+            cooldownSeconds--;
             cooldownDisplay.textContent = `${cooldownSeconds}s`;
-            resendOtpButton.textContent = 'Waiting...';
-
-            const timer = setInterval(() => {
-                cooldownSeconds--;
-                if (cooldownSeconds >= 0) {
-                    cooldownDisplay.textContent = `${cooldownSeconds}s`;
-                }
-                
-                if (cooldownSeconds < 0) {
-                    clearInterval(timer);
-                    resendOtpButton.disabled = false;
-                    resendOtpButton.textContent = 'Resend Code';
-                    otpTimerText.classList.add('hidden');
-                }
-            }, 1000);
-        }
-
-        async function resendOtp() {
-            const email = hiddenEmailInput.value;
-            if (!email) {
-                displayMessage(false, "Session invalid. Email not detected.");
-                return;
-            }
-
-            startResendCooldown();
-            displayMessage(true, "Requesting new verification code...");
-            otpInput.value = '';
-
-            try {
-                const resendData = new FormData();
-                resendData.append('email', email);
-
-                const response = await fetch(RESEND_API_URL, { 
-                    method: 'POST',
-                    body: resendData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    displayMessage(true, data.message); 
-                } else {
-                    displayMessage(false, `Resend Failed: ${data.message}`);
-                }
-
-            } catch (error) {
-                displayMessage(false, `Error: Failed to connect to OTP resend server. (${error.message})`);
-            }
-        }
-
-        /**
-         * Toggles the visibility of a password input field.
-         * @param {HTMLElement} inputField - The password input element.
-         * @param {HTMLElement} iconElement - The icon element (fa-eye/fa-eye-slash).
-         */
-        function togglePasswordVisibility(inputField, iconElement) {
-            const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
-            inputField.setAttribute('type', type);
-            
-            
-            if (type === 'text') {
-                iconElement.classList.remove('fa-eye-slash');
-                iconElement.classList.add('fa-eye');
-            } else {
-                iconElement.classList.remove('fa-eye');
-                iconElement.classList.add('fa-eye-slash');
-            }
-        }
-
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            const params = getUrlParams();
-            if (params.email) {
-                hiddenEmailInput.value = params.email; 
-                document.getElementById('instructionText').innerHTML = `Please enter the verification code and new password for <b>${params.email}</b>.`;
-                startResendCooldown(); 
-            } else {
-                document.getElementById('instructionText').textContent = "Session invalid. Please go back to the forgot password page.";
-                displayMessage(false, "Session invalid. Email not detected in URL.");
-                resendOtpButton.disabled = true; 
+            if (cooldownSeconds <= 0) {
+                clearInterval(timer);
+                resendOtpButton.disabled = false;
                 otpTimerText.classList.add('hidden');
             }
+        }, 1000);
+    }
+
+    // Toggle Password
+    function setupToggle(btn, input) {
+        btn.addEventListener('click', () => {
+            const isPass = input.type === 'password';
+            input.type = isPass ? 'text' : 'password';
+            btn.classList.toggle('fa-eye', isPass);
+            btn.classList.toggle('fa-eye-slash', !isPass);
         });
-        
-        
-        if (toggleNewPasswordButton) {
-            toggleNewPasswordButton.addEventListener('click', (e) => {
-                e.preventDefault(); 
-                togglePasswordVisibility(newPasswordInput, newPasswordIcon);
-            });
+    }
+    setupToggle(toggleNewPasswordButton, newPasswordInput);
+    setupToggle(toggleConfirmPasswordButton, confirmPasswordInput);
+
+    // Resend OTP logic
+    resendOtpButton.addEventListener('click', async () => {
+        startResendCooldown();
+        const formData = new FormData();
+        formData.append('email', hiddenEmailInput.value);
+        try {
+            const res = await fetch(RESEND_API_URL, { method: 'POST', body: formData });
+            const data = await res.json();
+            displayMessage(data.success, data.message);
+        } catch (e) { displayMessage(false, "Connection error"); }
+    });
+
+    // Form Submit
+    form.addEventListener("submit", async function(e) {
+        e.preventDefault();
+        if (newPasswordInput.value !== confirmPasswordInput.value) {
+            displayMessage(false, "Passwords do not match.");
+            return;
         }
-        
-        
-        if (toggleConfirmPasswordButton) {
-            toggleConfirmPasswordButton.addEventListener('click', (e) => {
-                e.preventDefault(); 
-                togglePasswordVisibility(confirmPasswordInput, confirmPasswordIcon);
-            });
+
+        resetButton.disabled = true;
+        resetButton.innerHTML = `<i class="fas fa-circle-notch fa-spin mr-2"></i> UPDATING...`;
+
+        try {
+            const response = await fetch(VERIFY_API_URL, { method: 'POST', body: new FormData(form) });
+            const data = await response.json();
+
+            if (data.success) {
+                isRedirecting = true;
+                displayMessage(true, data.message + " Redirecting...");
+                setTimeout(() => {
+                    // REDIRECT KE LOGIN YANG BETUL BERDASARKAN ROLE
+                    window.location.href = backUrl; 
+                }, 2000);
+            } else {
+                displayMessage(false, data.message);
+                resetButton.disabled = false;
+                resetButton.textContent = "SET NEW PASSWORD";
+            }
+        } catch (error) {
+            displayMessage(false, "System error occurred.");
+            resetButton.disabled = false;
+            resetButton.textContent = "SET NEW PASSWORD";
         }
+    });
 
-
-        
-        resendOtpButton.addEventListener('click', resendOtp);
-
-        
-        form.addEventListener("submit", async function(e) {
-            e.preventDefault();
-
-            const newPassword = newPasswordInput.value;
-            const confirmPassword = confirmPasswordInput.value;
-            
-            
-            if (newPassword !== confirmPassword) {
-                displayMessage(false, "New password and confirmation do not match.");
-                return;
-            }
-            
-            if (newPassword.length < 8) { 
-                displayMessage(false, "Password must be at least 8 characters long (including upper/lower case, number, and symbol).");
-                return;
-            }
-            if (otpInput.value.length < 6) { 
-                displayMessage(false, "Please enter the complete 6-digit verification code.");
-                return;
-            }
-
-            
-            resetButton.disabled = true;
-            resendOtpButton.disabled = true;
-            resetButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...`;
-            messageContainer.classList.add('hidden');
-
-            const formData = new FormData(form);
-            let data = null; 
-
-            try {
-                const response = await fetch(VERIFY_API_URL, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.headers.get('content-type')?.includes('application/json')) {
-                     data = await response.json();
-                } else {
-                    throw new Error('API did not return JSON. Check verify_otp_api.php for errors.');
-                }
-
-                if (data.success) {
-                    isRedirecting = true; 
-                    displayMessage(data.success, data.message + " Redirecting to Login...");
-                    
-                    setTimeout(() => {
-                        window.location.href = `login.php`; 
-                    }, 3000);
-
-                } else {
-                    displayMessage(data.success, `Failed: ${data.message}`); 
-                }
-
-            } catch (error) {
-                displayMessage(false, `System Error: Failed to connect to server/API. (${error.message})`);
-            } finally {
-                if (!isRedirecting) {
-                    resetButton.disabled = false; 
-                    resetButton.textContent = originalResetButtonText;
-                    if (cooldownSeconds <= 0) {
-                        resendOtpButton.disabled = false;
-                    }
-                }
-            }
-        });
-    </script>
+    // Start cooldown on load
+    document.addEventListener('DOMContentLoaded', () => {
+        if (hiddenEmailInput.value) startResendCooldown();
+    });
+</script>
 </body>
 </html>

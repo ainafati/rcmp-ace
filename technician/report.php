@@ -467,8 +467,7 @@ $pagination_params = http_build_query([
                                     <small class="text-muted d-block">Asset: <?= htmlspecialchars($record['asset_code'] ?: 'N/A') ?></small>
                                     
                                     <?php 
-                                    $condition = htmlspecialchars($record['return_condition']);
-                                    
+										$condition = htmlspecialchars($record['return_condition'] ?? '');                                    
                                     if ($condition === 'Damaged'): 
                                     ?>
                                         <span class="badge bg-danger mt-1">

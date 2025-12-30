@@ -19,7 +19,7 @@ $otp_token = isset($_POST['token']) ? trim($_POST['token']) : '';
 $new_password = isset($_POST['new_password']) ? $_POST['new_password'] : '';
 
 if (empty($email) || empty($otp_token) || empty($new_password)) {
-    sendJsonResponse(false, "Data tidak lengkap (E-mel, kod pengesahan, atau kata laluan baharu tiada).");
+    sendJsonResponse(false, "Incomplete data (Email, verification code, or new password missing).");
 }
 
 $password = $new_password;
@@ -31,7 +31,7 @@ $number    = preg_match('@[0-9]@', $password);
 $specialChars = preg_match('@[\W_]@', $password);
 
 if (!$uppercase || !$lowercase || !$number || !$specialChars || strlen($password) < 8) {
-    $error_message = 'Kata laluan tidak memenuhi keperluan. Sila pastikan ia mengandungi sekurang-kurangnya 8 aksara, huruf besar, huruf kecil, nombor, dan aksara khas.';
+    $error_message = 'The password does not meet the requirements. Please make sure it contains at least 8 characters, uppercase letters, lowercase letters, numbers, and special characters.';
     sendJsonResponse(false, $error_message);
 }
 
@@ -114,7 +114,7 @@ if ($result->num_rows === 1) {
         $delete_stmt->execute();
 
         $conn->close();
-        sendJsonResponse(true, "Kata laluan anda telah berjaya ditetapkan!");
+        sendJsonResponse(true, "Your password has been successfully set!");
     } else {
         
         $error_message = "Gagal menetapkan kata laluan. Ralat DB: " . $update_stmt->error;
@@ -126,6 +126,6 @@ if ($result->num_rows === 1) {
 } else {
     
     $conn->close();
-    sendJsonResponse(false, "Kod pengesahan tidak sah atau telah luput. Sila hantar semula kod jika perlu.");
+    sendJsonResponse(false, "The verification code is invalid or has expired. Please resend the code if necessary.");
 }
 ?>
