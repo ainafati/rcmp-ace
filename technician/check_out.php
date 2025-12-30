@@ -1,12 +1,15 @@
 <?php
 session_start();
 include '../config.php';
+include '../logger.php';
 
-// --- LOGIK AUTO-CANCEL (TAMBAH DI SINI) ---
-// Cari reservation_items yang 'Approved' tapi tarikh reserve_date dah LEPAS (Yesterday or older)
+// Ambil data session untuk logger
+$user_role = $_SESSION['logged_in_role'] ?? 'System';
+$person_id = $_SESSION['person_id'] ?? 0;
+
+// --- LOGIK AUTO-CANCEL ---
 $today_date = date('Y-m-d');
 
-// 1. Dapatkan senarai ID yang perlu di-cancel
 $sql_check_expired = "
     SELECT ri.id, ri.reserve_id, ri.item_id 
     FROM reservation_items ri
@@ -27,8 +30,7 @@ if ($expired_res && $expired_res->num_rows > 0) {
                         WHERE id = '$ri_id'";
         $conn->query($update_item);
 
-        // 2. BETULKAN DI SINI: Lepaskan asset guna table reservation_assets
-        // Kita cari asset_id yang link dengan reservation_item_id ini
+        // 2. Lepaskan asset
         $update_asset = "UPDATE assets 
                          SET status = 'Available' 
                          WHERE asset_id IN (
@@ -36,11 +38,10 @@ if ($expired_res && $expired_res->num_rows > 0) {
                          )"; 
         $conn->query($update_asset);
         
-        // (Optional) Rekod aktiviti
+        // 3. Rekod aktiviti - PASTIKAN NAMA FUNGSI SAMA DENGAN logger.php
         log_activity($conn, $user_role, $person_id, "Auto-Cancel", "Item ID $ri_id terbatal automatik.");
     }
 }
-
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();

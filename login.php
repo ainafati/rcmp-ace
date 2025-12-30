@@ -185,6 +185,11 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         .main-container { width: 100%; height: auto; border-radius: 30px; }
         .side-form { padding: 40px 30px; }
     }
+	/* Buang ikon mata automatik di Microsoft Edge */
+input::-ms-reveal,
+input::-ms-clear {
+    display: none;
+}
 </style>
 </head>
 <body>

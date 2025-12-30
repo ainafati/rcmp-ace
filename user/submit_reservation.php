@@ -115,12 +115,18 @@ try {
     }
     $stmt_notif->close();
 
-    // Email Notifikasi
-    $email_sent = false;
-    if (defined('TECHNICIAN_GROUP_EMAIL')) {
-        $email_sent = sendNewReservationNotification(TECHNICIAN_GROUP_EMAIL, $reserve_id, $user_name, "$item_count items", $reserve_date_context, BASE_URL . "technician/check_out.php");
-    }
-    
+$email_sent = false;
+if (defined('TECHNICIAN_GROUP_EMAIL')) {
+    // Tukar bahagian hujung sekali kepada BASE_URL sahaja atau ke index.php
+    $email_sent = sendNewReservationNotification(
+        TECHNICIAN_GROUP_EMAIL, 
+        $reserve_id, 
+        $user_name, 
+        "$item_count items", 
+        $reserve_date_context, 
+		BASE_URL . "login.php"
+    );
+}    
     $email_msg = $email_sent ? ' Email notification sent.' : ' Email failed.';
     echo json_encode(['status' => 'success', 'message' => 'Booking successfully sent! ID: #' . $reserve_id . $email_msg]);
 

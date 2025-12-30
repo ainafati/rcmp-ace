@@ -1,7 +1,7 @@
 <?php
 if (!defined('LOCAL_MAIL_TEST_CHECK')) {
 
-    define('LOCAL_MAIL_TEST', true); // <--- Tukar ke false untuk hantar email betul
+    define('LOCAL_MAIL_TEST', false); // <--- Tukar ke false untuk hantar email betul
 
     define('LIVE_SMTP_HOST', 'smtp.office365.com'); 
     define('LIVE_SMTP_USER', 'nexcheck.rcmp@unikl.edu.my'); 
