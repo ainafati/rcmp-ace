@@ -275,14 +275,16 @@
     <nav class="navbar">
         <div class="navbar-brand">
             <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
-            <span>NexCheck | RCMP Inventory</span>
+            <span>NexCheck | RCMP Inventory Reservation Check System</span>
         </div>
         <a href="login.php" class="btn-login">Login</a>
     </nav>
 
     <section class="hero">
         <div class="container">
-            <div class="badge-ui"><i class="fas fa-shield-alt"></i> UniKL RCMP OFFICIAL</div>
+<a href="https://rcmp.unikl.edu.my/" target="_blank" class="badge-ui" style="text-decoration: none;">
+    <i class="fas fa-shield-alt"></i> UniKL RCMP OFFICIAL
+</a>
             <h1>Precision Inventory Tracking <br>for <span>UniKL RCMP.</span></h1>
             <p>Seamlessly manage, audit, and track UniKL RCMP's IT assets with a high-precision ecosystem designed for accountability.</p>
             
