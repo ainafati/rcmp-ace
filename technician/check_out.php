@@ -808,7 +808,7 @@ $(document).ready(function() {
                         }
                     },
                     error: function(xhr) {
-                        Swal.fire('Network Error', 'A network error occurred or server did not respond correctly.', 'error');
+                        Swal.fire('Network Error', 'A network error occurred or server did 						respond correctly.', 'error');
                         $button.prop('disabled', false).html(originalText);
                     }
                 });

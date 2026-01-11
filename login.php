@@ -209,7 +209,7 @@ input::-ms-clear {
             <h2>Welcome Back</h2>
             <p class="sub-text">Identify your access level to continue to the dashboard.</p>
             <div class="roles-grid">
-                <div class="role-card" onclick="showLogin('Admin', 'Administrator')">
+                <div class="role-card" onclick="showLogin('admin', 'Administrator')">
                     <div class="role-box"><i class="fas fa-user-shield"></i><span>Admin</span></div>
                 </div>
                 <div class="role-card" onclick="showLogin('tech', 'Technician')">

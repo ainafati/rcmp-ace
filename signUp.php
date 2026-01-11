@@ -102,77 +102,125 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #002147; --accent: #00A3C9; --bg-body: #f8fafc;
-            --text-muted: #64748b; --white: #ffffff; --success: #22c55e; --error: #ef4444;
-        }
+<style>
+    :root {
+        --primary: #002147; --accent: #00A3C9; --bg-body: #f8fafc;
+        --text-muted: #64748b; --white: #ffffff; --success: #22c55e; --error: #ef4444;
+    }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    body {
+        font-family: 'Poppins', sans-serif;
+        min-height: 100vh; width: 100vw;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg-body);
+        position: relative;
+        padding: 20px; /* Tambah padding supaya kotak tak rapat sangat dengan tepi phone */
+    }
+
+    body::before {
+        content: ""; position: absolute; inset: 0;
+        background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('img/view.png') center/cover;
+        filter: blur(5px); z-index: -1;
+    }
+
+    .main-container {
+        display: flex; 
+        width: 1000px; 
+        max-width: 100%; 
+        min-height: 600px; /* Gunakan min-height supaya content boleh memanjang */
+        background: var(--white); 
+        border-radius: 30px; 
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+
+    .side-visual {
+        flex: 0.8; background: var(--primary); padding: 40px; color: white;
+        display: flex; flex-direction: column; justify-content: center;
+    }
+
+    .side-form {
+        flex: 1.2; padding: 30px 50px; display: flex; flex-direction: column;
+        justify-content: center;
+    }
+
+    #name, #person_id { text-transform: uppercase; }
+
+    h2 { font-weight: 800; color: var(--primary); margin-bottom: 5px; }
+    .sub-text { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; }
+
+    .form-row { display: flex; gap: 15px; }
+    .input-group { margin-bottom: 12px; flex: 1; }
+    .input-group label { font-size: 0.7rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 4px; text-transform: uppercase; }
+    .input-group input { width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.85rem; }
+
+    #password-requirements {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+        list-style: none; margin: 10px 0; padding: 10px;
+        background: #f8f9fa; border-radius: 8px;
+    }
+
+    #password-requirements li { font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+    #password-requirements li.valid { color: var(--success); font-weight: bold; }
+
+    .btn-register {
+        background: var(--primary); color: white; border: none; padding: 14px;
+        border-radius: 8px; width: 100%; font-weight: 700; cursor: pointer; transition: 0.3s;
+    }
+
+    .btn-register:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-register:hover:not(:disabled) { background: var(--accent); }
+
+    .auth-footer { text-align: center; margin-top: 15px; font-size: 0.8rem; }
+    .auth-footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
+
+    .alert-error { color: var(--error); font-size: 0.75rem; margin-bottom: 10px; }
+
+    /* --- RESPONSIVE SETTINGS (UNTUK PHONE) --- */
+    @media (max-width: 768px) {
         body {
-            font-family: 'Poppins', sans-serif;
-            height: 100vh; width: 100vw;
-            display: flex; align-items: center; justify-content: center;
-            overflow: hidden; background: var(--bg-body);
+            overflow: auto; /* Benarkan skrol pada phone */
+            padding: 10px;
         }
-
-        body::before {
-            content: ""; position: absolute; inset: 0;
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('img/view.png') center/cover;
-            filter: blur(5px); z-index: -1;
-        }
-
+        
         .main-container {
-            display: flex; width: 1000px; max-width: 95%; height: 90vh; max-height: 650px;
-            background: var(--white); border-radius: 30px; overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            flex-direction: column; /* Tukar dari mendatar ke menegak */
+            height: auto;
+            max-width: 100%;
+            border-radius: 20px;
         }
 
         .side-visual {
-            flex: 0.8; background: var(--primary); padding: 40px; color: white;
-            display: flex; flex-direction: column; justify-content: center;
+            flex: none;
+            padding: 30px 20px;
+            text-align: center;
+            align-items: center;
+        }
+
+        .side-visual img {
+            width: 80px !important; /* Kecilkan logo sikit */
+        }
+
+        .side-visual h1 {
+            font-size: 1.5rem;
         }
 
         .side-form {
-            flex: 1.2; padding: 30px 50px; display: flex; flex-direction: column;
-            justify-content: center; overflow: hidden; /* HILANGKAN SCROLL */
+            padding: 30px 20px;
         }
 
-        /* Auto Uppercase Visual */
-        #name, #person_id { text-transform: uppercase; }
-
-        h2 { font-weight: 800; color: var(--primary); margin-bottom: 5px; }
-        .sub-text { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; }
-
-        .form-row { display: flex; gap: 15px; }
-        .input-group { margin-bottom: 12px; flex: 1; }
-        .input-group label { font-size: 0.7rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 4px; text-transform: uppercase; }
-        .input-group input { width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.85rem; }
+        .form-row {
+            flex-direction: column; /* Input Email & Phone jadi atas bawah */
+            gap: 0;
+        }
 
         #password-requirements {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
-            list-style: none; margin: 10px 0; padding: 10px;
-            background: #f8f9fa; border-radius: 8px;
+            grid-template-columns: 1fr; /* Requirement password jadi 1 column */
         }
-
-        #password-requirements li { font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
-        #password-requirements li.valid { color: var(--success); font-weight: bold; }
-
-        .btn-register {
-            background: var(--primary); color: white; border: none; padding: 14px;
-            border-radius: 8px; width: 100%; font-weight: 700; cursor: pointer; transition: 0.3s;
-        }
-
-        .btn-register:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-register:hover:not(:disabled) { background: var(--accent); }
-
-        .auth-footer { text-align: center; margin-top: 15px; font-size: 0.8rem; }
-        .auth-footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
-
-        .alert-error { color: var(--error); font-size: 0.75rem; margin-bottom: 10px; }
-    </style>
-</head>
+    }
+</style></head>
 <body>
 
 <div class="main-container">
