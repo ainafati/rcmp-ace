@@ -49,69 +49,71 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
+    html, body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden; 
         font-family: 'Poppins', sans-serif;
-        height: 100vh;
+    }
+
+    body {
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: var(--bg-body);
-        overflow: hidden;
+        background-color: var(--primary);
         position: relative;
     }
 
     body::before {
         content: "";
         position: absolute;
-        inset: 0;
+        top: 0; left: 0; right: 0; bottom: 0;
         background-image: url('img/view.png'); 
         background-size: cover;
         background-position: center;
-        filter: blur(10px) brightness(0.4);
-        transform: scale(1.1);
+        filter: blur(8px) brightness(0.4);
         z-index: -1;
     }
 
     .main-container {
         display: flex;
-        width: 900px;
+        width: 1000px;
         max-width: 95%;
-        height: 550px;
+        height: 600px; 
         background: var(--white);
         border-radius: 40px;
         overflow: hidden;
-        box-shadow: 0 40px 100px -20px rgba(0, 33, 71, 0.3);
-        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+        position: relative;
+        z-index: 10;
     }
 
     .side-visual {
         flex: 1;
         background: var(--primary);
-        padding: 50px;
+        padding: 40px;
         color: white;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        position: relative;
-        overflow: hidden;
     }
 
-    .side-visual img { height: 45px; width: auto; border-radius: 8px; margin-bottom: 20px;}
-    .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; letter-spacing: -1px; }
+    .side-visual img { height: 40px; width: auto; margin-bottom: 20px; }
+    .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; }
     .side-visual h1 span { color: var(--accent); }
-    .side-visual p { font-size: 0.9rem; opacity: 0.8; margin-top: 20px; font-weight: 300; }
+    .side-visual p { font-size: 0.85rem; opacity: 0.8; margin-top: 15px; font-weight: 300; }
 
     .side-form {
         flex: 1.2;
-        padding: 50px;
+        padding: 40px;
         background: var(--white);
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
 
-    h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 10px; }
-    .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
+    h2 { font-weight: 800; color: var(--primary); font-size: 1.6rem; margin-bottom: 5px; }
+    .sub-text { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 25px; }
 
     .roles-grid {
         display: grid;
@@ -120,76 +122,99 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         margin-bottom: 20px;
     }
 
-    .role-card { cursor: pointer; text-align: center; }
     .role-box {
+        cursor: pointer;
         padding: 20px 10px;
         border-radius: 20px;
         border: 2px solid #f1f5f9;
-        transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transition: 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 130px; 
+        text-align: center;
     }
-    .role-box i { font-size: 1.8rem; color: var(--accent); margin-bottom: 10px; display: block; }
+
+    .role-box i { font-size: 1.8rem; color: var(--accent); margin-bottom: 10px; }
     .role-box span { font-size: 0.75rem; font-weight: 700; color: var(--text-main); }
+    .role-box:hover { border-color: var(--accent); transform: translateY(-5px); background: #f0f9ff; }
 
-    .role-box:hover { 
-        transform: translateY(-5px);
-        border-color: var(--accent);
-        background: rgba(0, 163, 201, 0.05);
+    #login-section { display: none; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .input-group { 
+        margin-bottom: 15px; 
+        position: relative; 
+        width: 100%;
     }
 
-    #login-section { display: none; animation: fadeIn 0.5s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .input-group label { 
+        font-size: 0.7rem; 
+        font-weight: 700; 
+        color: var(--primary); 
+        text-transform: uppercase; 
+        margin-bottom: 5px; 
+        display: block; 
+    }
 
-    .input-group { margin-bottom: 20px; position: relative; }
-    .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; }
+    /* CONTAINER PASSWORD */
+    .password-container {
+        position: relative;
+        width: 100%;
+    }
+
     .input-group input {
         width: 100%;
-        padding: 14px 16px;
+        padding: 12px 45px 12px 15px; /* Tambah padding kanan supaya tak bertindih dengan mata */
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         background: #f8fafc;
-        transition: 0.3s;
-    }
-    .input-group input:focus { 
-        outline: none; border-color: var(--accent); background: white;
-        box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
+        display: block;
+        outline: none;
     }
 
-    .toggle-password { position: absolute; right: 16px; bottom: 14px; color: var(--text-muted); cursor: pointer; }
+    /* FIX: BUANG MATA DEFAULT DARI BROWSER (EDGE/CHROME) */
+    input::-ms-reveal,
+    input::-ms-clear {
+        display: none;
+    }
+
+    /* IKON MATA ANDA */
+    .toggle-password {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%); 
+        color: var(--text-muted);
+        cursor: pointer;
+        z-index: 10;
+        padding: 5px;
+    }
 
     .btn-login {
         background: var(--primary);
         color: white;
         border: none;
-        padding: 16px;
+        padding: 14px;
         border-radius: 50px;
         width: 100%;
         font-weight: 700;
-        font-size: 1rem;
         cursor: pointer;
         transition: 0.3s;
-        margin-top: 10px;
-        box-shadow: 0 10px 20px -5px rgba(0, 33, 71, 0.3);
     }
-    .btn-login:hover { background: var(--accent); transform: translateY(-3px); }
+    .btn-login:hover { background: var(--accent); }
 
-    .back-btn {
-        background: none; border: none; color: var(--accent); font-weight: 700; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; margin-bottom: 20px;
-    }
+    .back-btn { background: none; border: none; color: var(--accent); font-weight: 700; font-size: 0.7rem; cursor: pointer; margin-bottom: 15px; }
 
-    .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-bottom: 20px; font-weight: 500; }
-    .alert-error { background: #fee2e2; color: #991b1b; }
+    .alert { padding: 10px; border-radius: 10px; font-size: 0.75rem; margin-bottom: 15px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
     @media (max-width: 768px) {
+        .main-container { flex-direction: column; height: auto; max-height: 95vh; overflow-y: auto; }
         .side-visual { display: none; }
-        .main-container { width: 100%; height: auto; border-radius: 30px; }
-        .side-form { padding: 40px 30px; }
+        .side-form { padding: 30px 20px; }
     }
-	/* Buang ikon mata automatik di Microsoft Edge */
-input::-ms-reveal,
-input::-ms-clear {
-    display: none;
-}
 </style>
 </head>
 <body>
@@ -232,7 +257,7 @@ input::-ms-clear {
             <p class="sub-text">Enter your UniKL credentials below.</p>
 
             <?php if ($errorMessage): ?>
-                <div class="alert alert-error"><i class="fas fa-circle-exclamation"></i> <?= htmlspecialchars($errorMessage) ?></div>
+                <div class="alert"><i class="fas fa-circle-exclamation"></i> <?= htmlspecialchars($errorMessage) ?></div>
             <?php endif; ?>
 
             <form action="login_process.php" method="POST">
@@ -245,8 +270,10 @@ input::-ms-clear {
 
                 <div class="input-group">
                     <label>Password</label>
-                    <input type="password" name="password" id="password" placeholder="••••••••" required>
-                    <i class="fas fa-eye-slash toggle-password" id="togglePassword"></i>
+                    <div class="password-container">
+                        <input type="password" name="password" id="password" placeholder="••••••••" required>
+                        <i class="fas fa-eye-slash toggle-password" id="togglePassword"></i>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; font-size: 0.75rem;">
@@ -267,56 +294,48 @@ input::-ms-clear {
 </div>
 
 <script>
-    // 1. Fungsi Tunjuk Form Login
     function showLogin(val, title) {
         document.getElementById('role-input').value = val;
         document.getElementById('role-display').innerText = title;
         document.getElementById('signUpLink').style.display = (val === 'user') ? 'block' : 'none';
-
         document.getElementById('role-section').style.display = 'none';
         document.getElementById('login-section').style.display = 'block';
     }
 
-    // 2. Fungsi Patah Balik ke Pilih Role
     function goBack() {
         document.getElementById('role-section').style.display = 'block';
         document.getElementById('login-section').style.display = 'none';
     }
 
-    // 3. Fungsi Dinamik Forgot Password (Bawa Role)
     function goToForgot() {
         const role = document.getElementById('role-input').value;
         window.location.href = `forgot_password.php?role=${role}`;
     }
 
-    // 4. Toggle Password Visibility
-    document.querySelector("#togglePassword").addEventListener("click", function() {
-        const passField = document.querySelector("#password");
-        const type = passField.type === "password" ? "text" : "password";
-        passField.type = type;
+    // TOGGLE PASSWORD - Kod yang lebih bersih
+    const togglePassword = document.querySelector("#togglePassword");
+    const password = document.querySelector("#password");
+
+    togglePassword.addEventListener("click", function () {
+        const type = password.getAttribute("type") === "password" ? "text" : "password";
+        password.setAttribute("type", type);
+        
+        // Tukar ikon
         this.classList.toggle("fa-eye");
         this.classList.toggle("fa-eye-slash");
     });
 
-    // 5. AUTO-DETECT ROLE DARI URL (Sangat Penting untuk 'Back' button)
     window.addEventListener('load', function() {
         const urlParams = new URLSearchParams(window.location.search);
         const roleParam = urlParams.get('role');
+        const lastRole = '<?= $login_attempt_role ?>';
 
-        if (roleParam) {
+        if (roleParam || lastRole) {
+            let activeRole = roleParam || lastRole;
             let title = "Staff / Student";
-            if (roleParam === 'Admin') title = "Administrator";
-            if (roleParam === 'tech') title = "Technician";
-            showLogin(roleParam, title);
-            // Optional: Bersihkan URL
-            window.history.replaceState({}, document.title, "login.php");
-        } else {
-            // Logic asal: kalau ada error session
-            const lastRole = '<?= $login_attempt_role ?>';
-            if(lastRole) {
-                let t = (lastRole === 'Admin') ? "Administrator" : (lastRole === 'tech' ? "Technician" : "Staff / Student");
-                showLogin(lastRole, t);
-            }
+            if (activeRole === 'Admin') title = "Administrator";
+            if (activeRole === 'tech') title = "Technician";
+            showLogin(activeRole, title);
         }
     });
 </script>

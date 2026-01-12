@@ -118,7 +118,7 @@ $maintenance_count = ($result_maintenance && $result_maintenance->num_rows > 0) 
 $total_assets_details = fetch_asset_details($conn, "a.status NOT IN ('Broken', 'Decommissioned', 'Missing')");
 $available_assets_details = fetch_asset_details($conn, "a.status = 'Available'");
 
-// Kueri aset yang telah dikeluarkan (Checked Out) - (Tiada perubahan)
+// Kueri aset yang telah dikeluarkan (Checked Out) - FIXED VERSION
 $checked_out_sql = "
     SELECT
         a.asset_id, a.asset_code, a.status,
@@ -126,15 +126,19 @@ $checked_out_sql = "
         u.name as user_name,
         r.return_date
     FROM assets a
-    LEFT JOIN item i ON a.item_id = i.item_id
-    LEFT JOIN categories c ON i.category_id = c.category_id
-    LEFT JOIN reservation_assets ra ON a.asset_id = ra.asset_id
-    LEFT JOIN reservation_items ri ON ra.reservation_item_id = ri.id AND ri.status = 'Checked Out' 
-    LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
-    LEFT JOIN person u ON r.person_id = u.person_id
-    WHERE a.status = 'Checked Out'
-    ORDER BY u.name, c.category_name, i.item_name, a.asset_code
+    JOIN item i ON a.item_id = i.item_id
+    JOIN categories c ON i.category_id = c.category_id
+    /* Gunakan INNER JOIN supaya hanya aset yang ADA rekod pinjaman aktif sahaja keluar */
+    JOIN reservation_assets ra ON a.asset_id = ra.asset_id
+    JOIN reservation_items ri ON ra.reservation_item_id = ri.id
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    JOIN person u ON r.person_id = u.person_id
+    /* Tapis hanya untuk pinjaman yang belum dipulangkan */
+    WHERE a.status = 'Checked Out' 
+    AND ri.status = 'Checked Out'
+    ORDER BY r.return_date ASC, a.asset_code ASC
 ";
+
 $checked_out_result = $conn->query($checked_out_sql);
 $checked_out_details = $checked_out_result ? $checked_out_result->fetch_all(MYSQLI_ASSOC) : [];
 
@@ -1162,11 +1166,16 @@ checkScreenSize(); // Ini MESTI dijalankan semasa muatan
 
                 const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
 
-                tableHTML += `<tr>
-                                    <td><strong>${asset.asset_code || 'N/A'}</strong></td>
-                                    <td>${itemName}</td>
-                                    <td>${categoryName}</td>`;
-                if (includeUserAndReturnDate) {
+tableHTML += `<tr>
+                <td>
+                    <a href="check_out.php?search_id=${encodeURIComponent(asset.asset_code)}" 
+                       class="btn btn-sm btn-outline-primary fw-bold" 
+                       style="text-decoration: none;">
+                       ${asset.asset_code || 'N/A'}
+                    </a>
+                </td>
+                <td>${itemName}</td>
+                <td>${categoryName}</td>`;                if (includeUserAndReturnDate) {
                     const userName = asset.user_name || '<em class="text-muted">N/A</em>';
                     
                     const returnDate = asset.return_date ? new Date(asset.return_date + 'T00:00:00') : null;

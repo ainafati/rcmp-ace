@@ -33,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $stmt->execute();
     $stmt->close();
     
-    header("Location: assets_technician.php?item_id=" . $item_id_filter);
+    header("Location: assets.php?item_id=" . $item_id_filter);
     exit();
 }
 
@@ -47,7 +47,7 @@ if (isset($_GET['delete_asset_id'])) {
     $stmt->execute();
     $stmt->close();
     
-    header("Location: assets_technician.php?item_id=" . $item_id_return);
+    header("Location: assets.php?item_id=" . $item_id_return);
     exit();
 }
 
@@ -67,7 +67,7 @@ if (!empty($status_filter) && $status_filter != 'All') {
     $param_values[] = $status_filter;
 }
 
-// Ambil maklumat item (Tajuk & Deskripsi)
+// Ambil maklumat item
 $stmt_item = $conn->prepare("SELECT item_name FROM item WHERE item_id = ?");
 $stmt_item->bind_param("i", $item_id_filter);
 $stmt_item->execute();
@@ -102,7 +102,6 @@ $stmt_assets->execute();
 $all_assets = $stmt_assets->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_assets->close();
 
-// Konfigurasi Warna Status
 $status_data = [
     'Available'   => ['color' => '#10b981', 'bg' => '#ecfdf5', 'label' => 'Available'],
     'Checked Out' => ['color' => '#f59e0b', 'bg' => '#fffbeb', 'label' => 'Checked Out'],
@@ -110,12 +109,20 @@ $status_data = [
     'Damaged'     => ['color' => '#ef4444', 'bg' => '#fef2f2', 'label' => 'Damaged']
 ];
 
-// Pengiraan Statistik Automatik
 $count_available = 0;
 $count_on_loan = 0;
 foreach ($all_assets as $asset) {
     if ($asset['status'] === 'Available') $count_available++;
     if ($asset['status'] === 'Checked Out') $count_on_loan++;
+}
+
+// Ambil jumlah pending requests untuk badge di sidebar
+$query_pending = "SELECT COUNT(*) as total FROM reservation_items WHERE status = 'Pending'";
+$result_pending = $conn->query($query_pending);
+$pending_count_for_badge = 0;
+if ($result_pending) {
+    $row_pending = $result_pending->fetch_assoc();
+    $pending_count_for_badge = $row_pending['total'];
 }
 ?>
 
@@ -123,7 +130,7 @@ foreach ($all_assets as $asset) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Asset Unit Management | UniKL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -138,13 +145,13 @@ foreach ($all_assets as $asset) {
         --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
     }
 
-    body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: #1e293b; overflow-x: hidden; }
+    body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: #1e293b; overflow-x: hidden; width: 100%; }
 
     /* SIDEBAR */
     .sidebar { 
         width: var(--sidebar-width); position: fixed; top: 0; bottom: 0; left: 0; 
         background: #fff; padding: 30px 20px; border-right: 1px solid #e2e8f0; 
-        display: flex; flex-direction: column; z-index: 1000;
+        display: flex; flex-direction: column; z-index: 1050; transition: transform 0.3s ease;
     }
     .sidebar-header { display: flex; align-items: center; gap: 15px; margin-bottom: 40px; padding-left: 10px; }
     .logo-icon { 
@@ -164,29 +171,26 @@ foreach ($all_assets as $asset) {
     }
     .sidebar a:hover { background: #f1f5f9; color: var(--primary-color); transform: translateX(5px); }
     .sidebar a.active { background: #ecfeff; color: var(--primary-color); font-weight: 600; }
-    
-    .sidebar a.logout-link { 
-        margin-top: auto; color: #ef4444; background: #fef2f2; border: 1px solid #fecaca;
-    }
-    .sidebar a.logout-link:hover { background: #ef4444; color: #fff; }
+    .sidebar a.logout-link { margin-top: auto; color: #ef4444; background: #fef2f2; border: 1px solid #fecaca; }
 
     /* MAIN CONTENT */
-    .main-content { margin-left: var(--sidebar-width); padding: 50px; }
+    .main-content { margin-left: var(--sidebar-width); padding: 50px; min-height: 100vh; transition: 0.3s; }
+
+    /* MOBILE NAV */
+    .mobile-header {
+        display: none; position: sticky; top: 0; left: 0; right: 0; 
+        background: #fff; padding: 15px 20px; z-index: 1000;
+        border-bottom: 1px solid #e2e8f0; justify-content: space-between; align-items: center;
+    }
 
     /* STATS CARD */
     .stat-card {
         background: #fff; padding: 25px; border-radius: 20px; box-shadow: var(--card-shadow);
-        display: flex; align-items: center; gap: 15px; border: 1px solid transparent; transition: 0.3s;
+        display: flex; align-items: center; gap: 15px; border: 1px solid transparent; transition: 0.3s; height: 100%;
     }
-    .stat-card:hover { transform: translateY(-5px); }
     .stat-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
 
-    /* TABLE */
-    .card { border-radius: 24px; border: none; box-shadow: var(--card-shadow); background: #fff; padding: 30px; }
-    .table thead th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; padding: 15px; border: none; }
-    .asset-code-pill { background: #f1f5f9; color: #475569; font-weight: 700; padding: 6px 12px; border-radius: 8px; font-family: monospace; font-size: 0.9rem; }
-
-    /* STATUS DOT & TOOLTIP */
+    /* STATUS INDICATOR (CURSORMU DI SINI) */
     .status-indicator {
         width: 28px; height: 28px; border-radius: 50%; display: flex;
         align-items: center; justify-content: center; margin: 0 auto;
@@ -195,11 +199,34 @@ foreach ($all_assets as $asset) {
     .status-indicator:hover { transform: scale(1.2); }
     .inner-dot { width: 10px; height: 10px; border-radius: 50%; }
 
+    /* ASSET CODE PILL */
+    .card { border-radius: 24px; border: none; box-shadow: var(--card-shadow); background: #fff; padding: 30px; }
+    .asset-code-pill { background: #f1f5f9; color: #475569; font-weight: 700; padding: 6px 12px; border-radius: 8px; font-family: monospace; font-size: 0.9rem; }
     .btn-action { width: 38px; height: 38px; border-radius: 10px; border: none; background: #f1f5f9; transition: 0.2s; }
-    .btn-action:hover { transform: scale(1.1); }
+
+    @media (max-width: 991px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.active { transform: translateX(0); }
+        .main-content { margin-left: 0; padding: 20px; }
+        .mobile-header { display: flex; }
+        
+        .table-responsive { border: none; }
+        .table thead { display: none; }
+        .table tbody tr { 
+            display: block; background: #fff; border: 1px solid #f1f5f9 !important; 
+            border-radius: 15px; margin-bottom: 15px; padding: 15px;
+        }
+        .table td { 
+            display: flex; justify-content: space-between; align-items: center; 
+            border: none !important; padding: 8px 0 !important;
+        }
+        .table td::before { content: attr(data-label); font-weight: 600; color: #94a3b8; font-size: 0.8rem; }
+        .status-indicator { margin: 0; }
+    }
 </style>
 </head>
 <body>
+
 
 <div class="sidebar" id="offcanvasSidebar">
     <div>
@@ -208,65 +235,54 @@ foreach ($all_assets as $asset) {
             <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php">
+            <i class="fa-solid fa-dolly"></i> Manage Requests
+            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+        </a>
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
-
 <div class="main-content">
-    <div class="d-flex justify-content-between align-items-end mb-5">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
         <div>
             <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
+                <ol class="breadcrumb mb-1 small">
                     <li class="breadcrumb-item"><a href="manageItem_tech.php" class="text-decoration-none text-muted">Items</a></li>
-                    <li class="breadcrumb-item active">Asset Details</li>
+                    <li class="breadcrumb-item active">Details</li>
                 </ol>
             </nav>
             <h1 class="fw-bold h2 mb-0"><?= htmlspecialchars($item_name_title) ?></h1>
         </div>
-        <a href="manageItem_tech.php" class="btn btn-white border shadow-sm px-4 py-2 rounded-4 bg-white">
-            <i class="fa fa-chevron-left me-2"></i> Back
-        </a>
+        <a href="manageItem_tech.php" class="btn btn-white border shadow-sm px-4 rounded-4 bg-white">Back</a>
     </div>
 
-    <div class="row g-4 mb-5">
-        <div class="col-md-4">
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
             <div class="stat-card">
-                <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="fa-solid fa-boxes-stacked"></i></div>
-                <div><div class="small text-muted">Total Units</div><div class="fw-bold h4 mb-0"><?= count($all_assets) ?></div></div>
+                <div class="stat-icon bg-info bg-opacity-10 text-info d-none d-sm-flex"><i class="fa-solid fa-boxes-stacked"></i></div>
+                <div><div class="small text-muted">Total</div><div class="fw-bold h4 mb-0"><?= count($all_assets) ?></div></div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-6 col-md-4">
             <div class="stat-card" style="border-bottom: 4px solid #10b981;">
-                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="fa-solid fa-check-double"></i></div>
-                <div><div class="small text-muted">Available</div><div class="fw-bold h4 mb-0 text-success"><?= $count_available ?></div></div>
+                <div class="stat-icon bg-success bg-opacity-10 text-success d-none d-sm-flex"><i class="fa-solid fa-check-double"></i></div>
+                <div><div class="small text-muted">Ready</div><div class="fw-bold h4 mb-0 text-success"><?= $count_available ?></div></div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-12 col-md-4">
             <div class="stat-card" style="border-bottom: 4px solid #f59e0b;">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-handshake"></i></div>
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning d-none d-sm-flex"><i class="fa-solid fa-handshake"></i></div>
                 <div><div class="small text-muted">On Loan</div><div class="fw-bold h4 mb-0 text-warning"><?= $count_on_loan ?></div></div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold m-0">Asset Units List</h4>
-            <form method="GET">
-                <input type="hidden" name="item_id" value="<?= $item_id_filter ?>">
-                <select name="status" class="form-select border-0 bg-light rounded-3 shadow-sm" onchange="this.form.submit()">
-                    <option value="All">🔍 Filter: All Status</option>
-                    <?php foreach($status_data as $key => $val): ?>
-                        <option value="<?= $key ?>" <?= $status_filter == $key ? 'selected' : '' ?>><?= $key ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </form>
-        </div>
-
+    <div class="card p-3 p-md-4">
         <div class="table-responsive">
             <table class="table table-borderless align-middle">
                 <thead>
@@ -275,44 +291,35 @@ foreach ($all_assets as $asset) {
                         <th>Info Unit</th>
                         <th class="text-center">Status</th>
                         <th>Borrower</th>
-                        <th class="text-end pe-3">Actions</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($all_assets)): ?>
-                        <tr><td colspan="5" class="text-center py-5 text-muted">Tiada aset dijumpai.</td></tr>
-                    <?php else: foreach($all_assets as $asset): 
+                    <?php foreach($all_assets as $asset): 
                         $info = $status_data[$asset['status']] ?? ['color' => '#64748b', 'bg' => '#f1f5f9', 'label' => $asset['status']];
                     ?>
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                        <td class="ps-3"><span class="asset-code-pill"><?= htmlspecialchars($asset['asset_code']) ?></span></td>
-                        <td>
+                    <tr>
+                        <td data-label="Asset Code" class="ps-md-3"><span class="asset-code-pill"><?= htmlspecialchars($asset['asset_code']) ?></span></td>
+                        <td data-label="Info Unit">
                             <div class="fw-bold text-dark"><?= htmlspecialchars($asset['brand'] ?: '-') ?></div>
                             <div class="text-muted small"><?= htmlspecialchars($asset['model'] ?: '-') ?></div>
                         </td>
-                        <td class="text-center">
-                            <div class="status-indicator" 
+                        <td data-label="Status" class="text-center">
+                            <div class="status-indicator mx-md-auto" 
                                  style="background: <?= $info['bg'] ?>; border-color: <?= $info['color'] ?>40;"
-                                 data-bs-toggle="tooltip" title="<?= $info['label'] ?>">
+                                 data-bs-toggle="tooltip" data-bs-placement="top" title="<?= $info['label'] ?>">
                                 <div class="inner-dot" style="background: <?= $info['color'] ?>;"></div>
                             </div>
                         </td>
-                        <td>
-                            <?php if ($asset['borrower_name']): ?>
-                                <div class="d-flex align-items-center">
-                                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($asset['borrower_name']) ?>&background=random&size=32" class="rounded-circle me-2">
-                                    <span class="small fw-500"><?= htmlspecialchars($asset['borrower_name']) ?></span>
-                                </div>
-                            <?php else: ?>
-                                <span class="text-muted small">--</span>
-                            <?php endif; ?>
+                        <td data-label="Borrower">
+                            <span class="small"><?= htmlspecialchars($asset['borrower_name'] ?: '--') ?></span>
                         </td>
-                        <td class="text-end pe-3">
-                            <button class="btn-action text-warning me-1" onclick='openEditModal(<?= json_encode($asset) ?>)'><i class="fa fa-edit"></i></button>
+                        <td data-label="Actions" class="text-end">
+                            <button class="btn-action text-warning" onclick='openEditModal(<?= json_encode($asset) ?>)'><i class="fa fa-edit"></i></button>
                             <button class="btn-action text-danger" onclick="confirmDel(<?= $asset['asset_id'] ?>, '<?= $asset['asset_code'] ?>')"><i class="fa fa-trash"></i></button>
                         </td>
                     </tr>
-                    <?php endforeach; endif; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
@@ -321,25 +328,20 @@ foreach ($all_assets as $asset) {
 
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content p-3">
-            <div class="modal-header border-0"><h5 class="fw-bold">Update Asset Info</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content rounded-4 border-0 p-3">
+            <div class="modal-header border-0"><h5 class="fw-bold">Update Asset</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form method="post">
                 <div class="modal-body">
-                    <input type="hidden" name="edit_asset" value="1">
-                    <input type="hidden" id="edit_id" name="asset_id">
-                    <input type="hidden" name="item_id_return" value="<?= $item_id_filter ?>">
-                    <div class="mb-3"><label class="small fw-bold mb-1">Asset Code</label><input type="text" id="edit_code" class="form-control bg-light" readonly></div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6"><label class="small fw-bold mb-1">Brand</label><input type="text" id="edit_brand" name="brand" class="form-control"></div>
-                        <div class="col-6"><label class="small fw-bold mb-1">Model</label><input type="text" id="edit_model" name="model" class="form-control"></div>
-                    </div>
+                    <input type="hidden" name="edit_asset" value="1"><input type="hidden" id="edit_id" name="asset_id"><input type="hidden" name="item_id_return" value="<?= $item_id_filter ?>">
+                    <div class="mb-3"><label class="small fw-bold mb-1">Brand</label><input type="text" id="edit_brand" name="brand" class="form-control"></div>
+                    <div class="mb-3"><label class="small fw-bold mb-1">Model</label><input type="text" id="edit_model" name="model" class="form-control"></div>
                     <div><label class="small fw-bold mb-1">Status</label>
                         <select name="status" id="edit_status" class="form-select">
                             <?php foreach($status_data as $key => $val): ?><option value="<?= $key ?>"><?= $key ?></option><?php endforeach; ?>
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer border-0 mt-3"><button type="submit" class="btn btn-primary w-100 py-3 rounded-3 shadow">Save Changes</button></div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100 py-2 rounded-3">Save Changes</button></div>
             </form>
         </div>
     </div>
@@ -347,25 +349,24 @@ foreach ($all_assets as $asset) {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Aktifkan Tooltip Bootstrap
+    // INITIALIZE TOOLTIP (PENTING!)
     document.addEventListener('DOMContentLoaded', function () {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        tooltipTriggerList.map(function (t) { return new bootstrap.Tooltip(t) })
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
     });
 
+    function toggleSidebar() { document.getElementById('admin-sidebar').classList.toggle('active'); }
     function openEditModal(asset) {
         document.getElementById('edit_id').value = asset.asset_id;
-        document.getElementById('edit_code').value = asset.asset_code;
         document.getElementById('edit_brand').value = asset.brand;
         document.getElementById('edit_model').value = asset.model;
         document.getElementById('edit_status').value = asset.status;
         new bootstrap.Modal(document.getElementById('editModal')).show();
     }
-
     function confirmDel(id, code) {
-        if(confirm("Padam aset " + code + "?")) {
-            window.location.href = 'assets_technician.php?delete_asset_id=' + id + '&item_id_return=<?= $item_id_filter ?>';
-        }
+        if(confirm("Delete " + code + "?")) { window.location.href = 'assets.php?delete_asset_id=' + id + '&item_id_return=<?= $item_id_filter ?>'; }
     }
 </script>
 </body>

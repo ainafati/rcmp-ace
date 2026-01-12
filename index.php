@@ -26,49 +26,32 @@
             font-family: 'Poppins', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-main);
-            overflow-x: hidden;
+            overflow-x: hidden; 
             line-height: 1.6; 
-
-            /* --- PATTERN IT CONNECTIVITY (LEBIH JELAS/POP UP) --- */
-            background-image: 
-                radial-gradient(var(--accent) 1px, transparent 1px), 
-                radial-gradient(var(--accent) 1px, transparent 1px);
-            background-size: 40px 40px;
-            background-position: 0 0, 20px 20px;
-            background-attachment: fixed;
-        }
-
-        /* Overlay supaya teks tak tenggelam dalam pattern */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, rgba(248, 250, 252, 0.85) 0%, rgba(248, 250, 252, 0.5) 100%);
-            z-index: -1;
+            background-image: radial-gradient(var(--accent) 0.5px, transparent 0.5px);
+            background-size: 30px 30px;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 40px;
+            padding: 0 20px;
             width: 100%;
         }
 
-        /* Navbar */
+        /* --- NAVBAR RESPONSIVE --- */
         .navbar {
             background: var(--glass);
             backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            margin: 20px auto;
-            width: 90%;
-            max-width: 1100px;
+            margin: 15px auto;
+            width: 92%;
             border-radius: 100px;
-            padding: 12px 30px;
+            padding: 10px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
-            top: 20px;
+            top: 15px;
             z-index: 1000;
             box-shadow: var(--shadow-premium);
         }
@@ -76,61 +59,58 @@
         .navbar-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             font-weight: 800;
             color: var(--primary);
-            font-size: 0.85rem;
         }
 
         .navbar-brand img { height: 35px; border-radius: 5px; }
+        .navbar-brand span { font-size: 0.85rem; }
 
         .btn-login {
             background: var(--primary);
             color: white;
-            padding: 10px 25px;
+            padding: 8px 20px;
             border-radius: 100px;
             text-decoration: none;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: 0.3s;
         }
 
-        .btn-login:hover { background: var(--accent); transform: translateY(-2px); }
-
-        /* Hero Section */
-        .hero { padding: 60px 0; text-align: center; }
+        /* --- HERO SECTION --- */
+        .hero { padding: 40px 0; text-align: center; }
 
         .badge-ui {
             background: white;
             color: var(--accent);
             padding: 8px 20px;
             border-radius: 50px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
             display: inline-block;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             text-decoration: none;
-            border: 1px solid rgba(0, 163, 201, 0.3);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0, 163, 201, 0.2);
         }
 
         .hero h1 {
-            font-size: clamp(2.2rem, 6vw, 3.5rem);
+            font-size: clamp(1.8rem, 7vw, 3.2rem);
             font-weight: 800;
             color: var(--primary);
-            line-height: 1.1;
-            margin-bottom: 25px;
+            line-height: 1.2;
+            margin-bottom: 20px;
         }
 
         .hero h1 span { color: var(--accent); }
 
-        /* Mockup Slider */
+        /* --- MOCKUP SLIDER FIX --- */
         .mockup-container {
             position: relative;
-            max-width: 950px;
-            margin: 40px auto;
-            border-radius: 30px;
-            padding: 12px;
+            max-width: 850px;
+            margin: 30px auto;
+            border-radius: 20px;
+            padding: 8px;
             background: white;
             box-shadow: var(--shadow-premium);
         }
@@ -139,9 +119,8 @@
             position: relative;
             width: 100%;
             overflow: hidden;
-            border-radius: 20px;
+            border-radius: 15px;
             aspect-ratio: 16 / 9;
-            background: #f1f5f9;
         }
 
         .mockup-img {
@@ -149,67 +128,111 @@
             top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover;
             opacity: 0;
-            transition: opacity 1s ease-in-out;
-            z-index: 1;
+            transition: opacity 0.8s ease-in-out;
         }
 
-        .mockup-img.active { opacity: 1; z-index: 2; }
+        .mockup-img.active { opacity: 1; }
 
         .slider-dots {
-            margin-top: 25px;
+            margin-top: 15px;
             display: flex;
-            justify-content: center; gap: 12px;
+            justify-content: center; gap: 8px;
         }
 
         .dot {
-            width: 10px; height: 10px;
+            width: 8px; height: 8px;
             background: #cbd5e1;
             border-radius: 50%;
             cursor: pointer;
-            transition: 0.3s;
         }
 
-        .dot.active { background: var(--accent); width: 30px; border-radius: 10px; }
+        .dot.active { background: var(--accent); width: 25px; border-radius: 10px; }
 
-        /* Features Section */
+        /* --- FEATURES GRID --- */
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 60px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 50px;
         }
 
         .card {
             background: white;
-            padding: 40px;
-            border-radius: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
-            transition: 0.4s;
+            padding: 30px;
+            border-radius: 25px;
             text-align: left;
-            border-bottom: 4px solid transparent;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            transition: 0.3s;
         }
 
-        .card:hover { transform: translateY(-10px); border-color: var(--accent); }
-        .card i { font-size: 2.5rem; color: var(--accent); margin-bottom: 20px; }
-        .card h3 { color: var(--primary); margin-bottom: 10px; }
+        .card:hover { transform: translateY(-5px); }
+        .card i { font-size: 2rem; color: var(--accent); margin-bottom: 15px; }
 
-        /* Footer */
-        .footer-rcmp { background: #0f172a; color: white; padding: 80px 0 0 0; margin-top: 100px; }
-        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; padding-bottom: 60px; }
-        .footer-col h4 { color: var(--accent); margin-bottom: 25px; font-size: 0.9rem; text-transform: uppercase; }
-        .footer-col p { font-size: 0.85rem; opacity: 0.7; margin-bottom: 15px; }
-        .social-links a { color: white; font-size: 1.5rem; margin-right: 20px; transition: 0.3s; }
+        /* --- FOOTER RESPONSIVE FIX --- */
+        .footer-rcmp { 
+            background: #0f172a; 
+            color: white; 
+            padding: 60px 0 0 0; 
+            margin-top: 80px; 
+        }
+
+        .footer-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; /* Mobile default */
+            gap: 40px; 
+            padding-bottom: 50px; 
+        }
+
+        .footer-col h4 { color: var(--accent); margin-bottom: 20px; font-size: 0.9rem; text-transform: uppercase; }
+        .footer-col p { font-size: 0.85rem; opacity: 0.7; margin-bottom: 12px; }
+        
+        .social-links { display: flex; gap: 15px; }
+        .social-links a { color: white; font-size: 1.4rem; transition: 0.3s; }
         .social-links a:hover { color: var(--accent); }
-        .footer-logos img { height: 70px; border-radius: 8px; }
-        .footer-bottom { background: #020617; padding: 25px 0; text-align: center; font-size: 0.75rem; opacity: 0.5; }
 
-        /* MODAL POPUP */
+        /* FIX LOGO FOOTER MELETUP */
+        .footer-logos {
+            display: flex;
+            justify-content: center;
+        }
+
+        .footer-logos img { 
+            height: auto; 
+            max-width: 180px; /* Hadkan saiz logo */
+            width: 100%;
+            border-radius: 8px; 
+        }
+
+        .footer-bottom { 
+            background: #020617; 
+            padding: 20px 0; 
+            text-align: center; 
+            font-size: 0.75rem; 
+            opacity: 0.5; 
+        }
+
+        /* --- MEDIA QUERIES --- */
+        @media (min-width: 768px) {
+            .footer-grid { grid-template-columns: 2fr 1fr 1fr; }
+            .footer-logos { justify-content: flex-end; }
+            .footer-logos img { max-width: 200px; }
+        }
+
+        @media (max-width: 600px) {
+            .navbar-brand span { display: none; }
+            .navbar-brand::after { content: "NexCheck RCMP"; font-size: 0.8rem; }
+            .hero { padding: 30px 0; }
+            .footer-grid { text-align: center; justify-items: center; }
+            .social-links { justify-content: center; }
+        }
+
+        /* MODAL */
         .modal {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0, 33, 71, 0.7);
-            backdrop-filter: blur(10px);
+            background: rgba(0, 33, 71, 0.75);
+            backdrop-filter: blur(8px);
             z-index: 2000;
             align-items: center; 
             justify-content: center;
@@ -217,28 +240,23 @@
         .modal.active { display: flex; }
         .modal-content {
             background: white;
-            padding: 45px;
-            border-radius: 40px;
-            max-width: 500px;
+            padding: 40px;
+            border-radius: 30px;
+            max-width: 450px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
-            animation: slideUp 0.4s ease;
         }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         .btn-modal {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 15px 40px;
+            padding: 12px 30px;
             border-radius: 50px;
             font-weight: 700;
             cursor: pointer;
             width: 100%;
-            margin-top: 30px;
-            transition: 0.3s;
+            margin-top: 25px;
         }
-        .btn-modal:hover { background: var(--accent); }
     </style>
 </head>
 <body>
@@ -256,8 +274,9 @@
             <a href="https://rcmp.unikl.edu.my/" target="_blank" class="badge-ui">
                 <i class="fas fa-network-wired"></i> UniKL RCMP OFFICIAL
             </a>
-<h1>Precision Inventory Tracking <br>for <span>UniKL RCMP.</span></h1>
-<p>Seamlessly manage, audit, and track UniKL RCMP's IT assets with a high-precision ecosystem designed for accountability.</p>            
+            <h1>Precision Inventory Tracking <br>for <span>UniKL RCMP.</span></h1>
+            <p>Seamlessly manage, audit, and track UniKL RCMP's IT assets with a high-precision ecosystem.</p>            
+            
             <div class="mockup-container">
                 <div class="mockup-slider">
                     <img src="img/view.png" class="mockup-img active" alt="Dashboard 1">
@@ -275,17 +294,17 @@
                 <div class="card">
                     <i class="fas fa-calendar-check"></i>
                     <h3>Instant Booking</h3>
-                    <p>Reserve laptops, projectors, and peripherals for your academic sessions in seconds.</p>
+                    <p>Reserve laptops and projectors for your academic sessions in seconds.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-history"></i>
                     <h3>Loan History</h3>
-                    <p>Keep track of all your previous and current asset borrowings with detailed timestamps.</p>
+                    <p>Keep track of all your previous and current asset borrowings.</p>
                 </div>
                 <div class="card">
                     <i class="fas fa-shield-virus"></i>
                     <h3>Asset Security</h3>
-                    <p>Ensuring all equipment is verified and in top condition before and after every loan.</p>
+                    <p>Ensuring all equipment is verified before and after every loan.</p>
                 </div>
             </div>
         </div>
@@ -293,10 +312,10 @@
 
     <div class="modal" id="disclaimerModal">
         <div class="modal-content">
-            <i class="fas fa-id-badge" style="font-size: 3.5rem; color: var(--accent); margin-bottom: 25px;"></i>
+            <i class="fas fa-id-badge" style="font-size: 3rem; color: var(--accent); margin-bottom: 20px;"></i>
             <h2 style="color: var(--primary);">Important Notice</h2>
-            <p style="color: var(--text-muted); margin-top: 15px;">
-                All borrowed items must be collected and returned personally at the UniKL RCMP IT Department office.
+            <p style="color: var(--text-muted); margin-top: 10px;">
+                All borrowed items must be collected and returned personally at the UniKL RCMP IT Department.
             </p>
             <button onclick="closeModal()" class="btn-modal">I UNDERSTAND</button>
         </div>
@@ -314,9 +333,9 @@
                 <div class="footer-col">
                     <h4>Follow Us</h4>
                     <div class="social-links">
-                        <a href="https://www.facebook.com/UniKLRoyalCollegeofMedicinePerak/"><i class="fab fa-facebook"></i></a>
-                        <a href="https://www.instagram.com/uniklrcmp/"><i class="fab fa-instagram"></i></a>
-                        <a href="https://www.youtube.com/channel/UCugrLnQZro3__D4R3x-bqRg"><i class="fab fa-youtube"></i></a>
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-youtube"></i></a>
                     </div>
                 </div>
                 <div class="footer-col footer-logos">
@@ -325,7 +344,7 @@
             </div>
         </div>
         <div class="footer-bottom">
-© 2025 Universiti Kuala Lumpur | All rights reserved | Legal | Site Map
+            &copy; 2025 Universiti Kuala Lumpur | All rights reserved
         </div>
     </footer>
 

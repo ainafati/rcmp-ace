@@ -290,7 +290,6 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
             --primary-color: #06b6d4; 
             --primary-hover: #0891b2; 
             --danger-color: #ef4444; 
-            
             --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
             --text-dark: #1e293b; 
@@ -298,294 +297,139 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
             --border-color: #e5e7eb;
         }
 
-        /* BASE & TYPOGRAPHY */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; margin: 0; }
         
         /* SIDEBAR */
         .sidebar { 
             width: 250px; position: fixed; top: 0; bottom: 0; left: 0; 
             background: var(--card-bg); padding: 20px; 
-            border-right: 1px solid var(--border-color); z-index: 1000; 
-            display: flex; flex-direction: column; justify-content: space-between; 
+            border-right: 1px solid var(--border-color); z-index: 1050; 
+            display: flex; flex-direction: column; transition: transform 0.3s ease-in-out;
         }
         .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-        
-        /* LOGO ICON (Using --primary-color) */
-        .logo-icon { 
-            width: 40px; height: 40px; 
-            background-color: var(--primary-color); /* Cyan */
-            color: white; border-radius: 8px; 
-            display: flex; align-items: center; justify-content: center; font-size: 20px; 
-        }
-        
+        .logo-icon { width: 40px; height: 40px; background-color: var(--primary-color); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
         .logo-text span { font-size: 12px; color: #94a3b8; }
         
-        .sidebar a { 
-            display: flex; align-items: center; gap: 12px; 
-            color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
-            margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; 
-        }
-        
-        /* ACTIVE & HOVER LINK (Using --primary-color) */
-        .sidebar a.active, .sidebar a:hover { 
-            background: var(--primary-color); /* Cyan */
-            color: #fff; 
-        }
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; transition: 0.2s; }
+        .sidebar a.active, .sidebar a:hover { background: var(--primary-color); color: #fff; }
+        .sidebar a.logout-link { color: var(--danger-color); margin-top: auto; font-weight: 600; }
+        .sidebar a.logout-link:hover { background: var(--danger-color); color: #fff; }
 
-        /* LOGOUT LINK */
-        .sidebar a.logout-link { 
-            color: var(--danger-color); 
-            font-weight: 600; 
-            margin-top: auto; 
-        } 
-		
-		/* Dalam Bahagian 2, di dalam tag <style> */
+        /* MAIN CONTENT */
+        .main-content { margin-left: 250px; transition: margin 0.3s; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+        
+        /* MODERN ACTION BUTTONS */
+        .action-btn {
+            width: 36px; height: 36px; border-radius: 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: 0.2s; border: 1px solid transparent; margin: 0 2px;
+            text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-view { background-color: #ecfeff; color: #0891b2; border-color: #cffafe; }
+        .btn-view:hover { background-color: #0891b2; color: white; }
+        .btn-edit { background-color: #fffbeb; color: #d97706; border-color: #fef3c7; }
+        .btn-edit:hover { background-color: #d97706; color: white; }
+        .btn-delete { background-color: #fef2f2; color: #dc2626; border-color: #fee2e2; }
+        .btn-delete:hover { background-color: #dc2626; color: white; }
 
-/* LOGOUT LINK */
-.sidebar a.logout-link { 
-    color: var(--danger-color); 
-    font-weight: 600; 
-    margin-top: 10px; /* Tukar 10px ini jika ada */
-}
-/* Tambah atau pastikan baris ini ada: */
-.sidebar > a.logout-link { /* Guna selector yang lebih spesifik jika perlu */
-    margin-top: auto; /* KUNCI UNTUK MENDAPATKANNYA DI BAWAH */
-}
-        .sidebar a.logout-link:hover { 
-            color: #fff; 
-            background: var(--danger-color); 
-        }
-        
-        /* SIDEBAR BADGE STYLE */
-        .sidebar a .badge {
-            margin-left: auto; 
-            font-size: 0.75rem;
-            padding: 0.4em 0.6em;
-            font-weight: 700;
-            border-radius: 10px;
-            background-color: var(--danger-color); 
-            color: white;
-        }
+        /* RESPONSIVE & OVERLAY */
+        .menu-toggle { font-size: 22px; cursor: pointer; color: var(--text-dark); display: none; }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1040; }
 
-        /* Badge on Active/Hover state */
-        .sidebar a.active .badge, .sidebar a:hover .badge {
-            background-color: #ffffff;
-            color: var(--danger-color); 
-        }
-
-        /* MAIN CONTENT & TOPBAR */
-        .main-content { margin-left: 250px; }
-        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); } 
-        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
-        .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: #334155; }
-        .container-fluid { padding: 30px; }
-        
-        /* CARD & TABLE */
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5, .modal-title { font-weight: 600; color: var(--text-dark); }
-        .table thead th { background: var(--bg-light-gray); color: var(--text-muted); border: none; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-        .table tbody td { border-bottom: 1px solid #f1f5f9; }
-        .table tbody tr:last-child td { border-bottom: none; }
-        .badge.rounded-pill { padding: .4em .8em; font-weight: 500; }
-        
-        /* FORM & BUTTONS */
-        .form-label { font-weight: 500; color: #334155; }
-        .form-control, .form-select { border-radius: 8px; }
-        .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
-        
-        /* PRIMARY BUTTON (Using --primary-color and --primary-hover) */
-        .btn-primary { 
-            background-color: var(--primary-color); /* Cyan */
-            border: none; 
-        }
-        .btn-primary:hover { 
-            background-color: var(--primary-hover); /* Darker Cyan */
-        }
-        
-        .item-img-sm { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-right: 15px; }
-        
-        /* Hide menu toggle on desktop */
-        .menu-toggle {
-            display: none;
-        }
-
-        /* --- MOBILE VIEW CODE (RESPONSIVE) STARTS --- */
         @media (max-width: 992px) {
-            .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s ease-in-out;
-                width: 280px; 
-                display: block; 
-            }
-
-            /* New class for active mobile sidebar */
-            .sidebar.active {
-                transform: translateX(0);
-                box-shadow: 4px 0 10px rgba(0,0,0,0.1);
-            }
-
-            /* Main content uses 100% width, no left margin */
-            .main-content {
-                margin-left: 0;
-            }
-            
-            /* Add top padding for topbar clearance */
-            body {
-                padding-top: 70px;
-            }
-
-            /* Fix topbar to the top */
-            .topbar {
-                position: fixed; 
-                top: 0; 
-                left: 0; 
-                right: 0;
-                z-index: 999;
-                padding: 15px 20px;
-                flex-wrap: wrap; 
-                gap: 10px;
-            }
-            .topbar h3 {
-                font-size: 20px;
-                margin-left: 15px; 
-                flex-grow: 1; 
-            }
-
-            /* Show menu toggle on mobile */
-            .menu-toggle {
-                display: block !important; 
-                font-size: 24px;
-                cursor: pointer;
-                color: #334155;
-            }
-
-            /* Ensure form (col-lg-4) is stacked above table (col-lg-8) on mobile */
-            .col-lg-4, .col-lg-8 {
-                width: 100% !important;
-            }
-
-            /* Adjust container padding */
-            .container-fluid {
-                padding: 20px;
-            }
-
-            /* Table: Ensure horizontal scrollability */
-            .table-responsive {
-                overflow-x: auto;
-            }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.active { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .menu-toggle { display: block; }
+            .sidebar-overlay.active { display: block; }
+            .topbar { padding: 15px 20px; }
+            .topbar h3 { font-size: 18px; margin-left: 10px; }
         }
-        /* --- MOBILE VIEW CODE (RESPONSIVE) ENDS --- */
     </style>
 </head>
 <body>
-<?php 
 
-if (isset($_SESSION['message'])):
-    $message = $_SESSION['message'];
-    $type = $message['type'] === 'success' ? 'success' : 'error';
-    $text = $message['text'];
-    
-    unset($_SESSION['message']);
-    
-    echo "<script>
-        document.addEventListener('DOMContentLoaded', function() {
-            Swal.fire({
-                icon: '{$type}',
-                title: 'Operation Status', 
-                text: '{$text}', 
-                showConfirmButton: true
-            });
-        });
-    </script>";
-endif;
-?>
-
-<div class="sidebar" id="offcanvasSidebar">
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
             <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php">
-            <i class="fa-solid fa-dolly"></i> Manage Requests
-            <?php if ($pending_count_for_badge > 0): ?>
-                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
-            <?php endif; ?>
-        </a>
+        <a href="check_out.php" ><i class="fa-solid fa-dolly"></i> Manage Requests</a>
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
+
 <div class="main-content">
     <div class="topbar">
-        <i class="fa fa-bars menu-toggle" id="sidebarToggle"></i>
-        
-        <h3>Inventory Management</h3>
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="fa fa-list me-2"></i> Manage Categories</button>
-            <div class="user-profile">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
-                <a href="profile_tech.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                    <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
-                </a>
+        <div class="d-flex align-items-center">
+            <i class="fa fa-bars menu-toggle" id="sidebarToggle"></i>
+            <h3 class="mb-0 ms-2 fw-bold">Inventory Management</h3>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-info btn-sm fw-medium px-3 rounded-pill" data-bs-toggle="modal" data-bs-target="#categoryModal">
+                <i class="fa fa-list-ul me-1"></i> Categories
+            </button>
+<span class="user-name"><?= $displayName ?></span>
+            <div class="user-profile ms-2">
+                <a href="profile_admin.php" class="text-secondary"><i class="fa-solid fa-circle-user fa-2x"></i></a>
             </div>
         </div>
     </div>
-	
-    <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+
+    <div class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
             <div>
-                <p class="text-muted small">Manage your equipment types and stock levels.</p>
+                <h4 class="fw-bold mb-0">Equipment List</h4>
+                <p class="text-muted small">Manage your tech assets and stock levels.</p>
             </div>
-            <a href="addItem_tech.php" class="btn btn-primary px-4 shadow-sm">
+            <a href="addItem_tech.php" class="btn btn-primary px-4 py-2 rounded-3 shadow-sm">
                 <i class="fa fa-plus-circle me-2"></i> Add New Item
             </a>
         </div>
 
-        <div class="card">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
                         <tr>
-                            <th>Item Type</th>
+                            <th class="ps-4 py-3">Item Type</th>
                             <th>Category</th>
-                            <th class="text-center">Total Units</th>
+                            <th class="text-center">Total</th>
                             <th class="text-center">Available</th>
-                            <th class="text-end">Actions</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($item_details)): ?>
-                            <tr><td colspan="5" class="text-center py-5 text-muted">No items found.</td></tr>
-                        <?php else: foreach($item_details as $item): ?>
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <?php if (!empty($item['image_url'])): ?>
-                                            <img src="../<?= htmlspecialchars($item['image_url']) ?>" class="item-img-sm">
-                                        <?php endif; ?>
-                                        <strong><?= ucwords(htmlspecialchars($item['item_name'])) ?></strong>
-                                    </div>
-                                </td>
-                                <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($item['category_name']) ?></span></td>
-                                <td class="text-center"><span class="fw-bold"><?= $item['total_units'] ?></span></td>
-                                <td class="text-center"><span class="badge rounded-pill bg-success"><?= $item['available_units'] ?></span></td>
-                                <td class="text-end">
-                                    <div class="btn-group">
-                                        <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="btn btn-sm btn-outline-info"><i class="fa fa-eye"></i></a>
-                                        <button class="btn btn-sm btn-outline-warning" onclick='openEditItemModal(<?= json_encode($item) ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= addslashes($item['item_name']) ?>')"><i class="fa fa-trash"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
+                        <?php if (!empty($item_details)): foreach($item_details as $item): ?>
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <img src="../<?= htmlspecialchars($item['image_url'] ?: 'assets/default.png') ?>" class="rounded-3 me-3" style="width: 45px; height: 45px; object-fit: cover; border: 1px solid #eee;">
+                                    <span class="fw-semibold"><?= htmlspecialchars($item['item_name']) ?></span>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-light text-secondary border px-3 py-2 rounded-pill"><?= htmlspecialchars($item['category_name']) ?></span></td>
+                            <td class="text-center fw-bold"><?= $item['total_units'] ?></td>
+                            <td class="text-center"><span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill"><?= $item['available_units'] ?></span></td>
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="assets_technician.php?item_id=<?= $item['item_id'] ?>" class="action-btn btn-view" title="View"><i class="fa fa-eye small"></i></a>
+                                    <button type="button" class="action-btn btn-edit" onclick='openEditItemModal(<?= json_encode($item) ?>)' title="Edit"><i class="fa fa-pen small"></i></button>
+                                    <button type="button" class="action-btn btn-delete" onclick="deleteItem(<?= $item['item_id'] ?>, '<?= addslashes($item['item_name']) ?>')" title="Delete"><i class="fa-solid fa-trash-can small"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; else: ?>
+                        <tr><td colspan="5" class="text-center py-5 text-muted">No items found.</td></tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -593,41 +437,33 @@ endif;
     </div>
 </div>
 
-<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header">
-                <h5 class="modal-title" id="categoryModalLabel">Manage Categories</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title fw-bold">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <div class="col-md-5">
-                        <h6>Add New Category</h6>
-                        <hr>
+                    <div class="col-md-5 border-end">
                         <form method="post" action="manageItem_tech.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
-                                <label for="category_name" class="form-label">Category Name</label>
-                                <input type="text" class="form-control" id="category_name" name="category_name" required>
+                                <label class="form-label fw-bold">New Category</label>
+                                <input type="text" class="form-control rounded-3" name="category_name" placeholder="e.g. Laptop" required>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Add Category</button>
+                            <button type="submit" class="btn btn-primary w-100 rounded-3">Add Category</button>
                         </form>
                     </div>
-                    <div class="col-md-7">
-                        <h6>Existing Categories</h6>
-                        <hr>
+                    <div class="col-md-7 ps-md-4">
                         <div class="list-group" style="max-height: 300px; overflow-y: auto;">
-                            <?php if (empty($categories)): ?>
-                                <p class="text-center text-muted">No categories found.</p>
-                            <?php else: foreach($categories as $cat): ?>
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <span><?= htmlspecialchars($cat['category_name']) ?></span>
-                                    </div>
+                            <?php if (!empty($categories)): foreach($categories as $cat): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center border-0 border-bottom">
+                                    <span><?= htmlspecialchars($cat['category_name']) ?></span>
                                     <div>
-                                        <button class="btn btn-sm btn-outline-warning" onclick='openEditCategoryModal(<?= htmlspecialchars(json_encode($cat), ENT_QUOTES, 'UTF-8') ?>)'><i class="fa fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(<?= $cat['category_id'] ?>, '<?= htmlspecialchars(addslashes($cat['category_name']), ENT_QUOTES, 'UTF-8') ?>')"><i class="fa fa-trash"></i></button>
+                                        <button class="btn btn-sm text-warning" onclick='openEditCategoryModal(<?= json_encode($cat) ?>)'><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-sm text-danger" onclick="deleteCategory(<?= $cat['category_id'] ?>, '<?= addslashes($cat['category_name']) ?>')"><i class="fa fa-trash"></i></button>
                                     </div>
                                 </div>
                             <?php endforeach; endif; ?>
@@ -639,266 +475,117 @@ endif;
     </div>
 </div>
 
-<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="post" action="manageItem_tech.php">
-                <div class="modal-body">
-                    <input type="hidden" name="edit_category" value="1">
-                    <input type="hidden" id="edit_category_id" name="edit_category_id">
-                    <div class="mb-3">
-                        <label for="edit_category_name" class="form-label">Category Name</label>
-                        <input type="text" class="form-control" id="edit_category_name" name="edit_category_name" required>
-                    </div>
-                    </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-
-<div class="modal fade" id="editItemModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Item Type</h5>
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Edit Item Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
-
-                    <div class="mb-3">
-                        <label class="form-label">Item Name</label>
-                        <input type="text" id="edit_item_name" name="edit_item_name" class="form-control" required>
-                    </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">New Item Image (Optional)</label>
-                        <input type="file" name="edit_item_image" class="form-control" accept="image/*">
-                        <small class="text-muted">Upload a new image to replace the old one.</small>
+                        <label class="form-label small fw-bold">Item Name</label>
+                        <input type="text" id="edit_item_name" name="edit_item_name" class="form-control rounded-3" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select id="edit_category_id_select" name="edit_category_id" class="form-select" required>
+                        <label class="form-label small fw-bold">Category</label>
+                        <select id="edit_category_id_select" name="edit_category_id" class="form-select rounded-3">
                             <?php foreach($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
 
-
-                    <hr>
-                    <h6 class="mt-3">Add More Units (Optional)</h6>
-                    <p class="small text-muted">Kuantiti baru akan ditambah ke dalam sistem untuk item ini.</p>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Number of New Units to Add</label>
-<input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control" min="0" value="0" required>
-                    </div>
-
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
-                        <label class="form-check-label" for="edit_enable_manual_code">I want to enter asset codes manually for these new units</label>
+                    <div class="p-3 bg-light rounded-3 mb-3">
+                        <label class="form-label small fw-bold">Add New Units (Quantity)</label>
+                        <input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control mb-2" min="0" value="0">
+                        
+                        <div class="form-check small">
+                            <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
+                            <label class="form-check-label" for="edit_enable_manual_code">Manual asset codes for new units</label>
+                        </div>
                     </div>
 
                     <div id="edit_manual_assets_container" style="display: none;">
-                        <label class="form-label text-primary fw-bold">Enter Manual Codes:</label>
                         <div id="edit_dynamic_asset_inputs"></div>
                     </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Brand for New Units</label>
-                            <input type="text" id="edit_item_brand" name="batch_brand" class="form-control" placeholder="e.g., Dell">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Model for New Units</label>
-                            <input type="text" id="edit_item_model" name="batch_model" class="form-control" placeholder="e.g., Latitude 5420">
-                        </div>
-                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_item_type_btn" class="btn btn-primary rounded-pill px-4">Update Item</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // --- 1. SWEETALERT PHP NOTIFICATION ---
-    <?php if (isset($_SESSION['message'])): ?>
-        Swal.fire({
-            icon: '<?= $_SESSION['message']['type'] ?>',
-            title: '<?= addslashes($_SESSION['message']['title'] ?? "Notification") ?>',
-            text: '<?= addslashes($_SESSION['message']['text']) ?>',
-            confirmButtonColor: '#06b6d4',
-            timer: 4000,
-            timerProgressBar: true
-        });
-        <?php unset($_SESSION['message']); ?>
-    <?php endif; ?>
-
-    // --- 2. SIDEBAR TOGGLE (MOBILE) ---
+    // 1. SIDEBAR & OVERLAY LOGIC
     const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('offcanvasSidebar');
-    if (sidebarToggle && sidebar) {
-        sidebarToggle.addEventListener('click', () => {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('overlay');
+
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
             sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
         });
     }
 
-    // --- 3. DYNAMIC INPUTS FOR MANUAL ASSET CODES ---
+    overlay.addEventListener('click', function() {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+
+    // 2. DYNAMIC INPUTS LOGIC
     const editQtyInput = document.getElementById('edit_item_quantity');
     const editCheckbox = document.getElementById('edit_enable_manual_code');
     const editContainer = document.getElementById('edit_manual_assets_container');
     const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
 
     function updateEditAssetInputs() {
-        if (!editDynamicInputs) return; 
         const qty = parseInt(editQtyInput.value) || 0;
-
-        if (editCheckbox && editCheckbox.checked && qty > 0) {
+        if (editCheckbox.checked && qty > 0) {
             editContainer.style.display = 'block';
-            let htmlContent = '';
-            const safeQty = Math.min(qty, 50); 
-
-            for (let i = 1; i <= safeQty; i++) {
-                htmlContent += `
-                    <div class="input-group mb-2">
-                        <span class="input-group-text text-primary small">Unit ${i}</span>
-                        <input type="text" name="manual_codes[]" class="form-control manual-code-input" 
-                               placeholder="Enter Asset Code..." required>
-                    </div>`;
+            let html = '';
+            for (let i = 1; i <= Math.min(qty, 50); i++) {
+                html += `<div class="mb-2"><input type="text" name="manual_codes[]" class="form-control manual-code-input small" placeholder="Asset Code ${i}" required></div>`;
             }
-            editDynamicInputs.innerHTML = htmlContent;
-            attachDuplicateChecker(); // Panggil checker lepas generate input
+            editDynamicInputs.innerHTML = html;
         } else {
-            if (editContainer) editContainer.style.display = 'none';
+            editContainer.style.display = 'none';
             editDynamicInputs.innerHTML = '';
         }
     }
 
-    // --- 4. ULTIMATE DUPLICATE CHECKER (AJAX + CLIENT SIDE) ---
-    function attachDuplicateChecker() {
-        const inputs = document.querySelectorAll('.manual-code-input');
-        const saveBtn = document.querySelector('button[name="edit_item_type"]');
-
-        inputs.forEach(input => {
-            input.addEventListener('input', function() {
-                const currentInput = this;
-                const codeValue = currentInput.value.trim().toUpperCase();
-
-                if (codeValue === '') {
-                    currentInput.classList.remove('is-invalid', 'is-valid');
-                    return;
-                }
-
-                // A. Check duplicate dalam list modal (Client-side)
-                const allValues = Array.from(inputs).map(i => i.value.trim().toUpperCase());
-                const selfDuplicate = allValues.filter(v => v === codeValue).length > 1;
-
-                if (selfDuplicate) {
-                    showStatus(currentInput, 'Duplicate in list!', 'error');
-                    saveBtn.disabled = true;
-                    return;
-                }
-
-                // B. Check duplicate dengan Database (AJAX)
-                fetch('check_asset_code.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'asset_code=' + encodeURIComponent(codeValue)
-                })
-                .then(response => response.text())
-                .then(data => {
-                    if (data === 'exists') {
-                        showStatus(currentInput, 'Already exists!', 'error');
-                    } else {
-                        showStatus(currentInput, 'Valid code & can be used', 'success');
-                    }
-                    
-                    // Enable/Disable butang berdasarkan keadaan semua input
-                    const anyInvalid = Array.from(inputs).some(i => i.classList.contains('is-invalid'));
-                    saveBtn.disabled = anyInvalid;
-                });
-            });
-        });
-    }
-
-    function showStatus(el, msg, type) {
-        let feedback = el.nextElementSibling;
-        if (!feedback || !feedback.classList.contains('dynamic-feedback')) {
-            feedback = document.createElement('div');
-            feedback.className = 'dynamic-feedback small mt-1';
-            el.parentNode.appendChild(feedback);
-        }
-
-        if (type === 'error') {
-            el.classList.add('is-invalid');
-            el.classList.remove('is-valid');
-            feedback.className = 'dynamic-feedback invalid-feedback d-block';
-            feedback.innerText = msg;
-        } else {
-            el.classList.remove('is-invalid');
-            el.classList.add('is-valid');
-            feedback.className = 'dynamic-feedback valid-feedback d-block';
-            feedback.innerText = msg;
-        }
-    }
-
-    if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
-    if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
+    editQtyInput.addEventListener('input', updateEditAssetInputs);
+    editCheckbox.addEventListener('change', updateEditAssetInputs);
 });
 
-// --- 5. GLOBAL MODAL FUNCTIONS ---
+// GLOBAL FUNCTIONS
 function openEditItemModal(item) {
-    const modalElement = document.getElementById('editItemModal');
-    if (!modalElement) return;
-
     document.getElementById('edit_item_id').value = item.item_id;
     document.getElementById('edit_item_name').value = item.item_name;
     document.getElementById('edit_category_id_select').value = item.category_id;
     
-    const qtyInput = document.getElementById('edit_item_quantity');
-    const manualCheck = document.getElementById('edit_enable_manual_code');
-    const saveBtn = document.querySelector('button[name="edit_item_type"]');
-    
-    if(qtyInput) qtyInput.value = 0;
-    if(manualCheck) manualCheck.checked = false;
-    if(saveBtn) saveBtn.disabled = false; // Reset butang
-    
-    const container = document.getElementById('edit_manual_assets_container');
-    if(container) container.style.display = 'none';
-
-    document.getElementById('edit_item_brand').value = '';
-    document.getElementById('edit_item_model').value = '';
-
-    const myModal = new bootstrap.Modal(modalElement);
+    var myModal = new bootstrap.Modal(document.getElementById('editItemModal'));
     myModal.show();
 }
 
 function deleteItem(id, name) {
     Swal.fire({
         title: 'Are you sure?',
-        text: `Delete "${name}" and all its units?`,
+        text: "Delete " + name + " and all units?",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',

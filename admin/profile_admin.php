@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 include '../config.php';
 
@@ -20,7 +19,6 @@ if ($stmt === false) {
 $stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
-
 $admin = $result->fetch_assoc(); 
 $stmt->close();
 
@@ -30,98 +28,86 @@ if (!$admin) {
     exit();
 }
 
-// Untuk memastikan pautan aktif, anda boleh tetapkan halaman ini sebagai aktif.
 $current_page = 'profile_admin.php'; 
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>My Profile — UniKL Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* TEMA WARNA CYAN DARI FAIL SEBELUM INI */
         :root {
-            --primary-color: #06b6d4;   /* Cyan */
-            --primary-hover: #0891b2;   /* Darker Cyan */
-            --danger-color: #ef4444;    /* Red */
-            
+            --primary-color: #06b6d4;
+            --primary-hover: #0891b2;
+            --danger-color: #ef4444;
             --bg-light-gray: #f8fafc;
             --card-bg: #ffffff;
             --text-dark: #1e293b; 
             --text-muted: #64748b; 
             --border-color: #e5e7eb;
+            --sidebar-width: 260px;
         }
 
-        /* BASE & TYPOGRAPHY */
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; overflow-x: hidden; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; overflow-x: hidden; }
 
         /* SIDEBAR */
-        .sidebar { width: 250px; position: fixed; top: 0; bottom: 0; left: 0; background: var(--card-bg); padding: 20px; border-right: 1px solid var(--border-color); z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
-        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1040; }
-        .sidebar-overlay.active { display: block; }
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+        .sidebar { 
+            width: var(--sidebar-width); 
+            position: fixed; 
+            top: 0; bottom: 0; left: 0; 
+            background: var(--card-bg); 
+            padding: 25px 20px; 
+            border-right: 1px solid var(--border-color); 
+            z-index: 1100; /* Paling atas */
+            display: flex; 
+            flex-direction: column; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+
+        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 35px; }
+        .logo-icon { width: 40px; height: 40px; background: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         
-        /* LOGO ICON (Menggunakan --primary-color) */
-        .logo-icon { width: 40px; height: 40px; background-color: var(--primary-color); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .sidebar a { 
+            display: flex; align-items: center; gap: 12px; color: var(--text-muted); 
+            text-decoration: none; padding: 12px 15px; margin-bottom: 5px; 
+            border-radius: 10px; font-weight: 500; transition: 0.2s; 
+        }
         
-        .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
-        .logo-text span { font-size: 12px; color: #94a3b8; }
-        
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: var(--text-muted); text-decoration: none; padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; font-weight: 500; font-size: 15px; transition: all 0.2s ease-in-out; }
-        
-        /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
         .sidebar a.active, .sidebar a:hover { background: var(--primary-color); color: #fff; }
-        
-        .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: auto; }
-        .sidebar a.logout-link:hover { color: #fff; background: var(--danger-color); }
-        
-        /* MAIN CONTENT & TOPBAR */
-        .main-content { margin-left: 250px; transition: margin-left 0.3s ease; }
-        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
-        .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
-        .container-fluid { padding: 30px; }
+        .sidebar a.logout-link { color: var(--danger-color); margin-top: auto; }
+        .sidebar a.logout-link:hover { background: var(--danger-color); color: white; }
 
-        /* CARD & BUTTONS */
-        .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .card h5 { font-weight: 600; color: var(--text-dark); }
-        .profile-header-card { text-align: center; }
-        .avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 48px; font-weight: 600; }
-        .btn { border-radius: 8px; padding: 10px 20px; font-weight: 500; }
+        /* OVERLAY */
+        .sidebar-overlay { 
+            display: none; position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0, 0, 0, 0.4); z-index: 1050; 
+        }
+        .sidebar-overlay.active { display: block; }
+
+        /* MAIN CONTENT */
+        .main-content { margin-left: var(--sidebar-width); transition: 0.3s; min-height: 100vh; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1000; }
         
-        /* PRIMARY BUTTON (Menggunakan --primary-color) */
-        .btn-primary { background-color: var(--primary-color); border: none; }
-        .btn-primary:hover { background-color: var(--primary-hover); }
+        /* AVATAR */
+        .avatar { width: 90px; height: 90px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 36px; font-weight: 700; }
 
-        /* Tambah ini untuk mobile tables (tidak digunakan di sini, tetapi baik untuk konsistensi) */
-        .table-responsive-sm { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-        /* --- MOBILE VIEW (MAX-WIDTH 992px) --- */
-        #sidebar-toggle-btn { display: none; background: none; border: none; color: #334155; font-size: 20px; padding: 0; margin-right: 15px; }
+        /* MOBILE VIEW */
+        #sidebar-toggle-btn { display: none; background: #f1f5f9; border: none; padding: 8px 12px; border-radius: 8px; color: var(--text-dark); margin-right: 15px; }
 
         @media (max-width: 992px) {
             #sidebar-toggle-btn { display: block; }
-            .sidebar { transform: translateX(-100%); box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); z-index: 1050; }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; width: 100%; }
-            .topbar { padding: 10px 15px; justify-content: space-between; } 
-            .topbar h3 { font-size: 18px; flex-grow: 1; text-align: center; margin-left: -35px; }
-            .topbar .d-flex { margin-left: auto; }
-            .container-fluid { padding: 15px; }
-            .card { padding: 20px; }
-            .col-lg-4, .col-lg-8 { width: 100%; }
-            .profile-header-card { margin-bottom: 15px; }
-
-            /* Mobile button stacking */
-            #viewMode .d-flex { flex-direction: column; align-items: flex-start !important; }
-            #viewMode .d-flex button { width: 100%; margin-top: 15px; }
-            #editMode .btn { width: 100%; margin-top: 10px; }
-            #editMode .btn-secondary { margin-top: 0; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); box-shadow: 15px 0 30px rgba(0,0,0,0.1); }
+            .main-content { margin-left: 0; }
+            .topbar h3 { font-size: 1.2rem; flex-grow: 1; text-align: center; margin-bottom: 0; }
         }
+
+        .card { border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
@@ -129,97 +115,107 @@ $current_page = 'profile_admin.php';
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
 <div class="sidebar" id="admin-sidebar">
-    <div>
-        <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
-            <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
-        </div>
+    <div class="sidebar-header">
+        <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <div class="logo-text"><strong>UniKL Admin</strong><span class="small text-muted d-block">System Control</span></div>
+    </div>
+    
+    <nav class="flex-grow-1">
         <a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
         <a href="report_admin.php"><i class="fa-solid fa-chart-pie"></i> System Report</a>
-    </div>
+    </nav>
+    
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
 
 <div class="main-content">
     <div class="topbar">
-        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
-        <h3>My Profile</h3>
-        <div class="d-flex align-items-center">
-            <a href="profile_admin.php" title="My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x" style="color: var(--primary-color);"></i>
-            </a>
+        <button id="sidebar-toggle-btn"><i class="fa fa-bars"></i></button>
+        <h3 class="mb-0">My Profile</h3>
+        <div class="ms-auto">
+            <i class="fa-solid fa-circle-user fa-2x" style="color: var(--primary-color);"></i>
         </div>
     </div>
 
-    <div class="container-fluid">
-        <div class="row">
+    <div class="container-fluid py-4">
+        <div class="row g-4">
             <div class="col-lg-4">
-                <div class="card profile-header-card h-100">
+                <div class="card p-4 text-center h-100">
                     <div class="avatar">
                         <?= htmlspecialchars(strtoupper(substr($admin['name'], 0, 1))) ?>
                     </div>
-                    <h4 class="fw-bold"><?= htmlspecialchars($admin['name']) ?></h4>
-                    <p class="text-muted mb-0"><?= htmlspecialchars($admin['email']) ?></p>
+                    <h4 class="fw-bold mb-1"><?= htmlspecialchars($admin['name']) ?></h4>
+                    <p class="text-muted small"><?= htmlspecialchars($admin['email']) ?></p>
+                    <div class="mt-3 p-2 bg-light rounded-3">
+                        <small class="text-uppercase fw-bold text-muted" style="font-size: 10px;">Account Role</small>
+                        <div class="text-dark fw-bold">System Administrator</div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-lg-8">
-                <div class="card">
+                <div class="card p-4">
                     <?php if (isset($_SESSION['message'])): ?>
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <div class="alert alert-success border-0 shadow-sm alert-dismissible fade show">
                             <?= $_SESSION['message']; unset($_SESSION['message']); ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (isset($_SESSION['error'])): ?>
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <?= $_SESSION['error']; unset($_SESSION['error']); ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
 
                     <div id="viewMode">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5><i class="fa-solid fa-id-card me-2" style="color: var(--primary-color);"></i> Personal Information</h5>
-                            <button id="editBtn" class="btn btn-primary"><i class="fa-solid fa-pen me-2"></i> Edit Profile</button>
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-id-card me-2 text-info"></i> Personal Info</h5>
+                            <button id="editBtn" class="btn btn-primary px-4 rounded-pill"><i class="fa-solid fa-pen-to-square me-2"></i>Edit</button>
                         </div>
-                        <hr>
-                        <p><strong>Full Name:</strong> <?= htmlspecialchars($admin['name']) ?></p>
-                        <p><strong>Email Address:</strong> <?= htmlspecialchars($admin['email']) ?></p>
-                        <p class="mb-0"><strong>Phone Number:</strong> <?= htmlspecialchars($admin['phoneNum']) ?></p>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label class="small text-muted">Full Name</label>
+                                <div class="fw-bold"><?= htmlspecialchars($admin['name']) ?></div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="small text-muted">Phone Number</label>
+                                <div class="fw-bold"><?= htmlspecialchars($admin['phoneNum']) ?></div>
+                            </div>
+                            <div class="col-12">
+                                <label class="small text-muted">Email Address</label>
+                                <div class="fw-bold"><?= htmlspecialchars($admin['email']) ?></div>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="editMode" style="display: none;">
-                        <h5><i class="fa-solid fa-pen-to-square me-2" style="color: var(--primary-color);"></i> Edit Your Information</h5>
-                        <hr>
+                        <h5 class="mb-4 fw-bold">Update Profile</h5>
                         <form action="update_profile_admin.php" method="POST">
                             <div class="mb-3">
-                                <label for="name" class="form-label">Full Name</label>
+                                <label class="form-label small fw-bold">Full Name</label>
                                 <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($admin['name']) ?>" required>
                             </div>
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($admin['email']) ?>" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="phoneNum" class="form-label">Phone Number</label>
-                                <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum']) ?>" required>
-                            </div>
-                            <hr>
-                            <p class="text-muted">Update your password (optional)</p>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="new_password" class="form-label">New Password</label>
-                                    <input type="password" class="form-control" name="new_password" placeholder="Leave blank to keep current">
+                                    <label class="form-label small fw-bold">Email</label>
+                                    <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($admin['email']) ?>" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                    <label class="form-label small fw-bold">Phone</label>
+                                    <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum']) ?>" required>
+                                </div>
+                            </div>
+                            <hr class="my-4">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label small fw-bold">New Password (Optional)</label>
+                                    <input type="password" class="form-control" name="new_password">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label small fw-bold">Confirm Password</label>
                                     <input type="password" class="form-control" name="confirm_password">
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save me-2"></i> Save Changes</button>
-                            <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel</button>
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary px-4">Save Changes</button>
+                                <button type="button" id="cancelBtn" class="btn btn-light px-4 ms-2">Cancel</button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -230,37 +226,27 @@ $current_page = 'profile_admin.php';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebar-toggle-btn');
         const overlay = document.getElementById('sidebar-overlay');
         
-        if (toggleBtn) {
-            function toggleSidebar() {
-                // Gunakan kelas 'open' untuk mobile, seperti yang didefinisikan dalam CSS @media
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-            }
+        // Toggle Sidebar Function
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
 
-            toggleBtn.addEventListener('click', toggleSidebar);
-            overlay.addEventListener('click', toggleSidebar);
-            
-            // Tambah logik untuk menutup sidebar apabila pautan diklik (untuk mobile)
-            const sidebarLinks = sidebar.querySelectorAll('a');
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function() {
-                    if (window.innerWidth <= 992) {
-                        setTimeout(() => { 
-                            sidebar.classList.remove('open');
-                            overlay.classList.remove('active');
-                        }, 100);
-                    }
-                });
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleSidebar();
             });
         }
 
-        // Logik Toggle Edit Mode
+        overlay.addEventListener('click', toggleSidebar);
+
+        // Edit/View Toggle
         const viewMode = document.getElementById('viewMode');
         const editMode = document.getElementById('editMode');
         const editBtn = document.getElementById('editBtn');
@@ -277,6 +263,5 @@ $current_page = 'profile_admin.php';
         });
     });
 </script>
-
 </body>
 </html>

@@ -214,24 +214,25 @@ function create_request_table($requests) {
             $reserve_collapse_id = 'collapse_reserve_' . $user_index . '_' . $reserve_index;
             $status_check = strtolower(trim($reservation_items[0]['status']));
 
-            // --- LEVEL 2: RESERVATION ID CARD ---
+            // --- LEVEL 2: RESERVATION ID CARD (INI YANG DIKEKALKAN) ---
             echo '<div class="accordion-item booking-card ' . $priorityClass . ' shadow-sm mb-3 border">';
             echo '  <div class="d-flex align-items-center bg-white py-3 px-3 w-100 justify-content-between rounded-3">';
             
-            // Klik sini untuk buka item list
             echo '    <div class="d-flex align-items-center flex-grow-1" data-bs-toggle="collapse" data-bs-target="#' . $reserve_collapse_id . '" style="cursor: pointer;">';
             echo '      <div class="id-badge me-3">';
             echo '        <span class="text-muted small fw-bold" style="font-size: 0.7rem;">ID</span>';
             echo '        <span class="text-primary fw-bold ms-1">#' . htmlspecialchars($reserve_id) . '</span>';
             echo '      </div>';
+            
+            // NI BAHAGIAN "APPLIED ON" YANG JANGAN HILANG TU
             echo '      <div class="d-none d-md-block text-start">';
             echo '        <div class="text-muted small" style="font-size: 0.7rem;">Applied on</div>';
             echo '        <div class="fw-bold small">' . date('d M Y', strtotime($reservation_items[0]['apply_date'])) . '</div>';
             echo '      </div>';
+            
             echo '      <i class="fa-solid fa-chevron-down ms-3 text-muted small"></i>';
             echo '    </div>';
 
-            // Check Out All Button (Jika status Approved)
             echo '    <div class="d-flex align-items-center" style="position: relative; z-index: 100;">';
             if ($status_check === 'approved') {
                 echo '<button type="button" class="btn btn-primary btn-sm me-3 rounded-pill px-3 checkout-all-btn" data-reserve-id="' . $reserve_id . '"><i class="fa-solid fa-box-open me-1"></i> Check Out All</button>';
@@ -240,12 +241,17 @@ function create_request_table($requests) {
             echo '    </div>';
             echo '  </div>';
 
+            // --- LEVEL 3: TABLE DETAIL ---
             echo '  <div id="' . $reserve_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $inner_accordion_id . '">';
             echo '    <div class="accordion-body p-0">';
-            echo '      <div class="table-responsive"><table class="table mb-0 align-middle table-sm">';
-            echo '        <thead><tr class="table-light">';
-            echo '          <th class="ps-3 py-2">Item / Priority</th><th class="text-center">Qty</th><th>Duration</th>';
-            echo '          <th class="text-center" style="width: 100px;">STATUS</th><th class="text-center pe-3">Actions</th>';
+            echo '      <div class="table-responsive"><table class="table mb-0 align-middle">';
+            echo '        <thead><tr class="table-light text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">';
+            echo '          <th class="ps-3 py-3" style="width: 20%;">Item / Priority</th>';
+            echo '          <th style="width: 25%;">Reason / Note</th>'; // Reason sebaris
+            echo '          <th class="text-center" style="width: 10%;">Qty</th>';
+            echo '          <th style="width: 20%;">Duration</th>';
+            echo '          <th class="text-center" style="width: 10%;">Status</th>';
+            echo '          <th class="text-center pe-3" style="width: 15%;">Actions</th>';
             echo '        </tr></thead><tbody>';
 
             foreach ($reservation_items as $row) {
@@ -254,44 +260,65 @@ function create_request_table($requests) {
                 $p_class = ($row['priority'] == 1) ? 'bg-danger' : (($row['priority'] == 2) ? 'bg-warning text-dark' : 'bg-info text-dark');
                 $p_text = ($row['priority'] == 1) ? 'High' : (($row['priority'] == 2) ? 'Moderate' : 'Low');
 
-                // Status Icon Logic
                 $icon = 'fa-clock'; $color = '#ffc107'; $title = 'Pending';
                 if($status == 'approved'){ $icon = 'fa-check-circle'; $color = '#198754'; $title = 'Approved'; }
-                elseif($status == 'checked out'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
+                elseif($status == 'checked out' || $status == 'on loan'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
                 elseif($status == 'returned'){ $icon = 'fa-hand-holding-heart'; $color = '#0dcaf0'; $title = 'Returned'; }
                 elseif($status == 'rejected'){ $icon = 'fa-times-circle'; $color = '#dc3545'; $title = 'Rejected'; }
 
-                // --- PENTING: ID & DATA UNTUK JAVASCRIPT ---
                 echo "<tr id='row-{$id}' 
                         data-qty='{$row['quantity']}' 
                         data-item-id='{$row['item_id']}' 
                         data-user-name='" . htmlspecialchars($user_name) . "' 
-                        data-itemname='" . htmlspecialchars($row['item_name']) . "' 
-                        data-phone='" . htmlspecialchars($row['user_phone']) . "' 
-                        data-reason='" . htmlspecialchars($row['reservation_reason'] ?? '') . "'>";
+                        data-itemname='" . htmlspecialchars($row['item_name']) . "'>";
                 
-                echo "  <td class='ps-3'><strong>" . htmlspecialchars($row['item_name']) . "</strong><br><span class='badge $p_class' style='font-size:0.65rem;'>$p_text Priority</span></td>";
-                echo "  <td class='text-center'><strong>{$row['quantity']}</strong></td>";
-                echo "  <td><small>" . date('d M', strtotime($row['reserve_date'])) . " - " . date('d M Y', strtotime($row['return_date'])) . "</small></td>";
+                echo "  <td class='ps-3 py-3'>";
+                echo "    <div class='fw-bold text-dark'>" . htmlspecialchars($row['item_name']) . "</div>";
+                echo "    <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
+                echo "  </td>";
+
+                // BAHAGIAN REASON SEBARIS TANPA SIMBOL ;;
+                echo "  <td>";
+                if ($status === 'rejected' && !empty($row['rejection_reason'])) {
+                    echo "    <div class='text-danger small' style='line-height: 1.2;'>";
+                    echo "      <i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']);
+                    echo "    </div>";
+                } elseif (!empty($row['reservation_reason'])) {
+                    echo "    <div class='text-muted small' style='line-height: 1.2;'>";
+                    echo "      <i class='fa-solid fa-file-lines me-1' style='font-size: 0.7rem; opacity:0.7;'></i>" . htmlspecialchars($row['reservation_reason']);
+                    echo "    </div>";
+                } else {
+                    echo "    <span class='text-muted opacity-50 small'>—</span>";
+                }
+                echo "  </td>";
                 
-                // Status Icon
-                echo "  <td class='text-center'><div style='display:flex; justify-content:center;'><div title='$title' style='position:relative; width:30px; height:30px; background:$color; color:#fff; border-radius:50%; flex-shrink:0;'>";
-                echo "    <i class='fa-solid $icon' style='position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.8rem;'></i>";
+                echo "  <td class='text-center fw-bold'>{$row['quantity']}</td>";
+                echo "  <td><div class='small text-muted'><i class='fa-regular fa-calendar me-1'></i>" . date('d M', strtotime($row['reserve_date'])) . " - " . date('d M Y', strtotime($row['return_date'])) . "</div></td>";
+                
+                echo "  <td class='text-center'><div style='display:flex; justify-content:center;'><div title='$title' style='position:relative; width:28px; height:28px; background:$color; color:#fff; border-radius:50%;'>";
+                echo "    <i class='fa-solid $icon' style='position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.75rem;'></i>";
                 echo "  </div></div></td>";
 
-                // Action Buttons
                 echo "  <td class='text-center pe-3'>";
                 if ($status === 'pending') {
-                    echo "<div class='action-group'>";
-                    echo "  <button type='button' class='btn btn-success btn-sm border-0 px-3' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
-                    echo "  <button type='button' class='btn btn-danger btn-sm border-0 px-3' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
+                    echo "<div class='d-flex gap-1 justify-content-center'>";
+                    echo "  <button type='button' class='btn btn-success btn-sm' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
+                    echo "  <button type='button' class='btn btn-danger btn-sm' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
                     echo "</div>";
                 } elseif ($status === 'approved') {
-                    echo "<button type='button' class='btn btn-primary btn-sm rounded-pill px-3' onclick='event.stopPropagation(); checkOutItem($id)'><i class='fa-solid fa-box-open'></i></button>";
-                } elseif ($status === 'on loan' || $status === 'checked out'){
-                    echo "<button type='button' class='btn btn-warning btn-sm rounded-pill px-3 text-dark' onclick='event.stopPropagation(); checkInItem($id)'><i class='fa-solid fa-inbox'></i></button>";
-                } else {
-                    echo "<span class='text-muted small'>—</span>";
+echo "<button type='button' class='btn btn-primary btn-sm rounded-circle' 
+        style='width: 35px; height: 35px; display: inline-flex; align-items: center; justify-content: center;' 
+        onclick='event.stopPropagation(); checkOutItem($id)' 
+        title='Release Asset'>
+        <i class='fa-solid fa-truck-ramp-box'></i>
+      </button>";	  } elseif ($status === 'on loan' || $status === 'checked out'){
+echo "<button type='button' class='btn btn-warning btn-sm px-3 rounded-pill text-dark' 
+        onclick='event.stopPropagation(); checkInItem($id)' 
+        title='Return Asset'>
+        <i class='fa-solid fa-box-open'></i>
+      </button>";
+	  } else {
+                    echo "—";
                 }
                 echo "  </td>";
                 echo "</tr>";
@@ -725,15 +752,52 @@ function create_request_table($requests) {
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
-
 document.addEventListener('DOMContentLoaded', function () {
-    // Aktifkan semua tooltip dlm page
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
-});
+    
+    // 1. Logik Auto-Search dari Dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchId = urlParams.get('search_id');
 
+    if (searchId) {
+        // Guna setTimeout sedikit lebih lama (600ms-800ms) untuk pastikan DataTable sudah 'init'
+        setTimeout(() => {
+            // Cuba cari DataTable yang sedia ada
+            let table;
+            if ($.fn.dataTable.isDataTable('.table')) {
+                table = $('.table').DataTable();
+            }
+
+            if (table) {
+                // Gunakan fungsi search() bawaan DataTables
+                table.search(searchId).draw();
+                
+                // (Opsional) Highlight kotak search
+                const searchInput = document.querySelector('.dataTables_filter input');
+                if (searchInput) {
+                    searchInput.style.backgroundColor = "#e0f2fe"; 
+                    searchInput.style.border = "2px solid #06b6d4";
+                    searchInput.focus();
+                }
+            } else {
+                // Fallback: Jika DataTable belum sedia, guna cara manual kau tadi
+                const searchInput = document.querySelector('input[type="search"]');
+                if (searchInput) {
+                    searchInput.value = searchId;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    searchInput.focus();
+                }
+            }
+        }, 800); 
+    }
+    // 2. Aktifkan semua tooltip (Bootstrap)
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+}); // <--- Satu sahaja penutup DOMContentLoaded di sini
+
+// 3. Data dari PHP
 const availableAssets = <?php echo $availableAssets_json; ?>;
 
 $(document).ready(function() {

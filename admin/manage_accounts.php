@@ -13,8 +13,13 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_r
 }
 
 $person_id = (int)$_SESSION['person_id'];
-$admin_name = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin');
+// Ambil nama penuh, pecahkan kepada perkataan
+$full_name = isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin';
+$name_parts = explode(' ', trim($full_name));
 
+// Ambil 2 perkataan pertama dan gabungkan semula
+$admin_display_name = isset($name_parts[1]) ? $name_parts[0] . ' ' . $name_parts[1] : $name_parts[0];
+$admin_name = htmlspecialchars($admin_display_name);
 $sql = "
     SELECT
         p.person_id AS person_unique_id,
