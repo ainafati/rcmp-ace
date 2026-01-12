@@ -94,6 +94,7 @@ $sql = "SELECT
             ri.id AS reservation_item_id, ri.status, ri.rejection_reason, ri.quantity, 
             r.reserve_date, r.return_date, r.created_at AS apply_date, 
             r.priority, r.reserve_id, r.reason AS reservation_reason,
+            r.location, -- <--- TAMBAH COLUMN INI
             u.name AS user_name, u.phoneNum AS user_phone,
             u.person_id AS user_person_id,
             i.item_name, i.item_id
@@ -105,8 +106,7 @@ $sql = "SELECT
         AND (
             ri.status != 'Approved' 
             OR (ri.status = 'Approved' AND r.reserve_date >= CURDATE())
-        )"; // Logik ini memastikan Rejected/Returned sentiasa keluar walaupun tarikh dah lepas
-		
+        )";		
 		
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
@@ -165,7 +165,6 @@ while ($row = $assetResult->fetch_assoc()) { $availableAssets[$row['item_id']][]
 $availableAssets_json = json_encode($availableAssets);
 
 
-
 function create_request_table($requests) {
     if (empty($requests)) {
         echo '<div class="text-center text-muted py-5"><i class="fa-solid fa-inbox fa-2x mb-2"></i><br>No reservations found matching the criteria.</div>';
@@ -214,7 +213,7 @@ function create_request_table($requests) {
             $reserve_collapse_id = 'collapse_reserve_' . $user_index . '_' . $reserve_index;
             $status_check = strtolower(trim($reservation_items[0]['status']));
 
-            // --- LEVEL 2: RESERVATION ID CARD (INI YANG DIKEKALKAN) ---
+            // --- LEVEL 2: RESERVATION ID CARD ---
             echo '<div class="accordion-item booking-card ' . $priorityClass . ' shadow-sm mb-3 border">';
             echo '  <div class="d-flex align-items-center bg-white py-3 px-3 w-100 justify-content-between rounded-3">';
             
@@ -224,7 +223,6 @@ function create_request_table($requests) {
             echo '        <span class="text-primary fw-bold ms-1">#' . htmlspecialchars($reserve_id) . '</span>';
             echo '      </div>';
             
-            // NI BAHAGIAN "APPLIED ON" YANG JANGAN HILANG TU
             echo '      <div class="d-none d-md-block text-start">';
             echo '        <div class="text-muted small" style="font-size: 0.7rem;">Applied on</div>';
             echo '        <div class="fw-bold small">' . date('d M Y', strtotime($reservation_items[0]['apply_date'])) . '</div>';
@@ -247,7 +245,7 @@ function create_request_table($requests) {
             echo '      <div class="table-responsive"><table class="table mb-0 align-middle">';
             echo '        <thead><tr class="table-light text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">';
             echo '          <th class="ps-3 py-3" style="width: 20%;">Item / Priority</th>';
-            echo '          <th style="width: 25%;">Reason / Note</th>'; // Reason sebaris
+            echo '          <th style="width: 25%;">Location / Purpose</th>'; // Header dikemaskini
             echo '          <th class="text-center" style="width: 10%;">Qty</th>';
             echo '          <th style="width: 20%;">Duration</th>';
             echo '          <th class="text-center" style="width: 10%;">Status</th>';
@@ -277,8 +275,16 @@ function create_request_table($requests) {
                 echo "    <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
                 echo "  </td>";
 
-                // BAHAGIAN REASON SEBARIS TANPA SIMBOL ;;
+                // --- BAHAGIAN LOCATION & PURPOSE (DIKEMASKINI) ---
                 echo "  <td>";
+                // Papar Location dengan Ikon Pin Biru
+                if (!empty($row['location'])) {
+                    echo "    <div class='text-primary small fw-bold mb-1' style='line-height: 1.2;'>";
+                    echo "      <i class='fa-solid fa-location-dot me-1' style='font-size: 0.7rem;'></i>" . htmlspecialchars($row['location']);
+                    echo "    </div>";
+                }
+
+                // Papar Reason atau Rejection Reason
                 if ($status === 'rejected' && !empty($row['rejection_reason'])) {
                     echo "    <div class='text-danger small' style='line-height: 1.2;'>";
                     echo "      <i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']);
@@ -288,7 +294,7 @@ function create_request_table($requests) {
                     echo "      <i class='fa-solid fa-file-lines me-1' style='font-size: 0.7rem; opacity:0.7;'></i>" . htmlspecialchars($row['reservation_reason']);
                     echo "    </div>";
                 } else {
-                    echo "    <span class='text-muted opacity-50 small'>—</span>";
+                    if (empty($row['location'])) echo "    <span class='text-muted opacity-50 small'>—</span>";
                 }
                 echo "  </td>";
                 
@@ -306,18 +312,10 @@ function create_request_table($requests) {
                     echo "  <button type='button' class='btn btn-danger btn-sm' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
                     echo "</div>";
                 } elseif ($status === 'approved') {
-echo "<button type='button' class='btn btn-primary btn-sm rounded-circle' 
-        style='width: 35px; height: 35px; display: inline-flex; align-items: center; justify-content: center;' 
-        onclick='event.stopPropagation(); checkOutItem($id)' 
-        title='Release Asset'>
-        <i class='fa-solid fa-truck-ramp-box'></i>
-      </button>";	  } elseif ($status === 'on loan' || $status === 'checked out'){
-echo "<button type='button' class='btn btn-warning btn-sm px-3 rounded-pill text-dark' 
-        onclick='event.stopPropagation(); checkInItem($id)' 
-        title='Return Asset'>
-        <i class='fa-solid fa-box-open'></i>
-      </button>";
-	  } else {
+                    echo "<button type='button' class='btn btn-primary btn-sm rounded-circle' style='width: 35px; height: 35px; display: inline-flex; align-items: center; justify-content: center;' onclick='event.stopPropagation(); checkOutItem($id)' title='Release Asset'><i class='fa-solid fa-truck-ramp-box'></i></button>";
+                } elseif ($status === 'on loan' || $status === 'checked out'){
+                    echo "<button type='button' class='btn btn-warning btn-sm px-3 rounded-pill text-dark' onclick='event.stopPropagation(); checkInItem($id)' title='Return Asset'><i class='fa-solid fa-box-open'></i></button>";
+                } else {
                     echo "—";
                 }
                 echo "  </td>";
@@ -336,9 +334,8 @@ echo "<button type='button' class='btn btn-warning btn-sm px-3 rounded-pill text
         $user_index++;
     }
     echo '</div>';
-}?>
-
-
+}
+?>
 <!DOCTYPE html>
 
 <html lang="en">

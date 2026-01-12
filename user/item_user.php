@@ -566,9 +566,18 @@ $conn->close();
                                 </div>
 
                                 <div class="mb-1">
-                                    <label class="form-label" for="reason">4. Purpose of Loan</label>
+                                    <label class="form-label" for="reason">4. Intended Use</label>
                                     <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation or Club event" required></textarea>
                                 </div>
+								
+								<div class="mb-3 mt-3">
+    <label class="form-label" for="location">5. Usage Location</label>
+    <div class="input-group">
+        <span class="input-group-text bg-light"><i class="fa-solid fa-location-dot text-primary"></i></span>
+        <input type="text" id="location" name="location" class="form-control" placeholder="e.g., Block A, Level 3, Studio 1" required>
+    </div>
+    <div class="form-text small">Please specify the exact location where this equipment will be used.</div>
+</div>
 
                                 <div class="d-grid mt-4">
                                     <button type="button" class="btn btn-primary" id="confirmContextBtn">
@@ -929,27 +938,28 @@ function unlockContext() {
     });
 
     
-    function checkContextInputs() {
-        return $('#reserveDate').val() && 
-               $('#returnDate').val() && 
-               $('#program_type').val() && 
-               $('#reason').val();
-    }
+function checkContextInputs() {
+    return $('#reserveDate').val() && 
+           $('#returnDate').val() && 
+           $('#program_type').val() && 
+           $('#reason').val() &&
+           $('#location').val(); // TAMBAH INI
+}
 
     
-    $('#confirmContextBtn').on('click', function() {
-        if (checkContextInputs()) {
-            
-            RESERVATION_CONTEXT = {
-                reserve_date: $('#reserveDate').val(),
-                return_date: $('#returnDate').val(),
-                program_type: $('#program_type').val(),
-                program_type_text: $('#program_type option:selected').text().trim(),
-                reason: $('#reason').val(),
-                person_id: $('input[name="person_id"]').val()
-            };
+$('#confirmContextBtn').on('click', function() {
+    if (checkContextInputs()) {
+        
+        RESERVATION_CONTEXT = {
+            reserve_date: $('#reserveDate').val(),
+            return_date: $('#returnDate').val(),
+            program_type: $('#program_type').val(),
+            program_type_text: $('#program_type option:selected').text().trim(),
+            reason: $('#reason').val(),
+            location: $('#location').val(), // TAMBAH INI
+            person_id: $('input[name="person_id"]').val()
+        };
 
-            
             
             $('#ContextCard').find('input, select, textarea').prop('disabled', true).css('opacity', 0.6);
             
@@ -1141,13 +1151,12 @@ function updateReviewTab() {
     const summary = `
         <div class="alert alert-info py-2 small">
             <p class="mb-1"><strong><i class="fa-solid fa-calendar-alt me-1"></i> Loan Duration:</strong> ${RESERVATION_CONTEXT.reserve_date} until ${RESERVATION_CONTEXT.return_date}</p>
-            <p class="mb-1"><strong><i class="fa-solid fa-users me-1"></i> Program Type:</strong> ${RESERVATION_CONTEXT.program_type_text}</p>
+            <p class="mb-1"><strong><i class="fa-solid fa-location-dot me-1"></i> Location:</strong> ${RESERVATION_CONTEXT.location}</p> <p class="mb-1"><strong><i class="fa-solid fa-users me-1"></i> Program Type:</strong> ${RESERVATION_CONTEXT.program_type_text}</p>
             <p class="mb-0"><strong><i class="fa-solid fa-pen-nib me-1"></i> Purpose:</strong> ${RESERVATION_CONTEXT.reason}</p>
         </div>
     `;
     $('#contextSummary').html(summary);
 
-    
     let itemsListHtml_Step2 = '';
     
     
