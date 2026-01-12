@@ -45,8 +45,9 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // Data dari Step 1 & Step 2 (JavaScript Context)
 $items_to_reserve = $submission_data['items'] ?? [];
 $priority = (int)($submission_data['program_type'] ?? 3);
-$request_reason = trim($submission_data['reason'] ?? '');
-$location = trim($submission_data['location'] ?? ''); // <--- DATA LOKASI BARU
+// Di dalam submit_reservation.php (Bahagian 4: READ JSON INPUT)
+$request_reason = ucwords(strtolower(trim($submission_data['reason'] ?? '')));
+$location = ucwords(strtolower(trim($submission_data['location'] ?? '')));
 $reserve_date_context = $submission_data['reserve_date'] ?? null;
 $return_date_context = $submission_data['return_date'] ?? null;
 

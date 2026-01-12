@@ -275,28 +275,32 @@ function create_request_table($requests) {
                 echo "    <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
                 echo "  </td>";
 
-                // --- BAHAGIAN LOCATION & PURPOSE (DIKEMASKINI) ---
-                echo "  <td>";
-                // Papar Location dengan Ikon Pin Biru
+echo "  <td>";
+                // Papar Location dengan Ikon Pin Biru (Standardized Case)
                 if (!empty($row['location'])) {
+                    // Tukar jadi Title Case (Contoh: "Dewan Kuliah")
+                    $formatted_location = ucwords(strtolower($row['location']));
                     echo "    <div class='text-primary small fw-bold mb-1' style='line-height: 1.2;'>";
-                    echo "      <i class='fa-solid fa-location-dot me-1' style='font-size: 0.7rem;'></i>" . htmlspecialchars($row['location']);
+                    echo "      <i class='fa-solid fa-location-dot me-1' style='font-size: 0.7rem;'></i>" . htmlspecialchars($formatted_location);
                     echo "    </div>";
                 }
 
-                // Papar Reason atau Rejection Reason
+                // Papar Reason atau Rejection Reason (Standardized Case)
                 if ($status === 'rejected' && !empty($row['rejection_reason'])) {
                     echo "    <div class='text-danger small' style='line-height: 1.2;'>";
                     echo "      <i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']);
                     echo "    </div>";
                 } elseif (!empty($row['reservation_reason'])) {
+                    // Tukar jadi Title Case (Contoh: "Urusan Rasmi")
+                    $formatted_reason = ucwords(strtolower($row['reservation_reason']));
                     echo "    <div class='text-muted small' style='line-height: 1.2;'>";
-                    echo "      <i class='fa-solid fa-file-lines me-1' style='font-size: 0.7rem; opacity:0.7;'></i>" . htmlspecialchars($row['reservation_reason']);
+                    echo "      <i class='fa-solid fa-file-lines me-1' style='font-size: 0.7rem; opacity:0.7;'></i>" . htmlspecialchars($formatted_reason);
                     echo "    </div>";
                 } else {
                     if (empty($row['location'])) echo "    <span class='text-muted opacity-50 small'>—</span>";
                 }
                 echo "  </td>";
+
                 
                 echo "  <td class='text-center fw-bold'>{$row['quantity']}</td>";
                 echo "  <td><div class='small text-muted'><i class='fa-regular fa-calendar me-1'></i>" . date('d M', strtotime($row['reserve_date'])) . " - " . date('d M Y', strtotime($row['return_date'])) . "</div></td>";
