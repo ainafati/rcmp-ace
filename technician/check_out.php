@@ -1319,83 +1319,70 @@ window.openRejectModal = openRejectModal;
     });
 
     
-    $('#confirmCheckInBtn').on('click', function() {
-        const reservation_item_id = $('#checkin_reservation_item_id').val();
-        let asset_conditions = [];
-        let isValid = true;
-        let firstErrorField = null;
+$('#confirmCheckInBtn').on('click', function() {
+    const reservation_item_id = $('#checkin_reservation_item_id').val();
+    let asset_conditions = [];
+    let isValid = true;
 
-        $('.checkin-asset-card').each(function() {
-            const $card = $(this);
-            const asset_id = $card.data('asset-id');
-            const condition = $(`input[name="condition_${asset_id}"]:checked`).val();
-            const remarks = $(`#remarks_${asset_id}`).val().trim();
+    $('.checkin-asset-card').each(function() {
+        const $card = $(this);
+        const asset_id = $card.data('asset-id');
+        // Ambil value radio (Good / Maintenance / Not_Returned_Yet)
+        const condition = $card.find(`input[name="condition_${asset_id}"]:checked`).val();
+        // Ambil value remarks
+        const remarks = $card.find(`#remarks_${asset_id}`).val().trim();
 
-            if (!condition) {
-                isValid = false;
-                Swal.fire('Input Required', `Please select a condition for asset ${asset_id}.`, 'warning');
-                firstErrorField = $card;
-                return false; 
-            }
+        if (!condition) {
+            isValid = false;
+            Swal.fire('Input Required', `Please select a condition for asset code.`, 'warning');
+            return false; 
+        }
 
-            if (condition === 'Damaged/Incomplete' && !remarks) {
-                isValid = false;
-                Swal.fire('Input Required', `Remarks are required for damaged asset (ID: ${asset_id}).`, 'warning');
-                firstErrorField = $(`#remarks_${asset_id}`);
-                return false; 
-            }
-            
-            asset_conditions.push({
-                asset_id: asset_id,
-                condition: condition,
-                remarks: remarks 
-            });
-        });
-
-        if (!isValid) {
-            if (firstErrorField) firstErrorField.focus();
-            return; 
+        // MESTI guna 'Maintenance' sebab itu value dalam HTML radio kau
+        if (condition === 'Maintenance' && !remarks) {
+            isValid = false;
+            Swal.fire('Input Required', `Please provide remarks for the damaged asset.`, 'warning');
+            $card.find(`#remarks_${asset_id}`).focus();
+            return false; 
         }
         
-        if (asset_conditions.length === 0) {
-            Swal.fire('Error', 'No assets were found to check in.', 'error');
-            return;
-        }
-
-        const $btn = $(this);
-
-        Swal.fire({
-            title: 'Confirm Check-In?',
-            text: `You are about to check in ${asset_conditions.length} asset(s). This action cannot be undone.`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3b82f6',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, confirm check-in!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Confirming...');
-                
-                $.post('checkout_action.php', {
-                    action: 'checkin_multi', 
-                    reservation_item_id: reservation_item_id,
-                    asset_conditions: JSON.stringify(asset_conditions) 
-                }, function(data) {
-                    Swal.fire({ title: 'Checked In!', text: data.message, icon: 'success', timer: 2000, showConfirmButton: false })
-                    .then(() => location.reload());
-                }, 'json').fail(function(xhr) {
-                    let realErrorMessage = xhr.responseText;
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        realErrorMessage = xhr.responseJSON.message;
-                    }
-                    Swal.fire('Error', 'An error occurred during check-in. Details: ' + realErrorMessage, 'error');
-                    $btn.prop('disabled', false).text('Confirm Check-In');
-                });
-            }
+        // Masukkan ke dalam array untuk dihantar ke PHP
+        asset_conditions.push({
+            asset_id: asset_id,
+            condition: condition,
+            remarks: remarks // Ini akan dibaca sebagai $asset['remarks'] di PHP
         });
     });
 
-    
+    if (!isValid) return; 
+
+    const $btn = $(this);
+    Swal.fire({
+        title: 'Confirm Check-In?',
+        text: `Are you sure you want to return ${asset_conditions.length} asset(s)?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Confirm!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...');
+            
+            // HANTAR DATA KE PHP
+            $.post('checkout_action.php', {
+                action: 'checkin_multi', 
+                reservation_item_id: reservation_item_id,
+                asset_conditions: JSON.stringify(asset_conditions) 
+            }, function(data) {
+                if(data.success) {
+                    Swal.fire('Success!', data.message, 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                    $btn.prop('disabled', false).text('Confirm Check-In');
+                }
+            }, 'json');
+        }
+    });
+});    
     
     
     

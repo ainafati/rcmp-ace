@@ -154,7 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     header("Location: manageItem_tech.php"); exit();
 }
 
-// --- 5. LOGIC: EDIT ITEM & ADD UNITS ---
+// --- 5. LOGIC: EDIT ITEM & ADD UNITS (FIXED) ---
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
     $item_id = (int)$_POST['edit_item_id'];
     $item_name = ucwords(trim($_POST['edit_item_name']));
@@ -165,6 +165,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
 
     $conn->begin_transaction();
     try {
+        // 1. Update info item
         $new_img = handleImageUpload('edit_item_image', 'assets/item_images');
         if ($new_img) {
             $upd = $conn->prepare("UPDATE item SET item_name=?, category_id=?, image_url=? WHERE item_id=?");
@@ -176,46 +177,44 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
         $upd->execute();
 
 if ($qty_to_add > 0) {
-            $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
-            $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, status) VALUES (?, ?, 'Available')");
+    $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
+    
+    // TAMBAH brand dan model dalam query INSERT ini
+    $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, 'Available')");
 
-            if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
-                foreach ($_POST['manual_codes'] as $m_code) {
-                    $m_code = trim($m_code);
-                    if (empty($m_code)) continue;
+    if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
+        foreach ($_POST['manual_codes'] as $m_code) {
+            $m_code = trim($m_code);
+            if (empty($m_code)) continue;
 
-                    // SEMAK JIKA KOD DAH ADA DALAM DB
-                    $check_stmt->bind_param("s", $m_code);
-                    $check_stmt->execute();
-                    $result = $check_stmt->get_result();
-                    
-                    if ($result->num_rows > 0) {
-                        // Jika jumpa, batalkan semua proses (rollback) dan lempar error
-                        throw new Exception("Asset Code '$m_code' already exists in database!");
-                    }
-                    
-                    $insert_asset->bind_param("is", $item_id, $m_code);
-                    $insert_asset->execute();
-                }
-            
-            } else {
-                $curr_count = $conn->query("SELECT COUNT(*) FROM assets WHERE item_id=$item_id")->fetch_row()[0];
-                for ($i = 1; $i <= $qty_to_add; $i++) {
-                    $auto_code = date('Y') . str_pad($curr_count + $i, 3, '0', STR_PAD_LEFT);
-                    $insert_asset->bind_param("isss", $item_id, $auto_code, $batch_brand, $batch_model);
-                    $insert_asset->execute();
-                }
+            // Semak duplicate
+            $check_stmt->bind_param("s", $m_code);
+            $check_stmt->execute();
+            if ($check_stmt->get_result()->num_rows > 0) {
+                throw new Exception("Asset Code '$m_code' already exists!");
             }
+            
+            // BIND 4 parameter: isss (integer, string, string, string)
+            $insert_asset->bind_param("isss", $item_id, $m_code, $batch_brand, $batch_model);
+            $insert_asset->execute();
         }
+    } else {
+        // Auto generate logic
+        $curr_count = $conn->query("SELECT COUNT(*) FROM assets WHERE item_id=$item_id")->fetch_row()[0];
+        for ($i = 1; $i <= $qty_to_add; $i++) {
+            $auto_code = date('Y') . str_pad($curr_count + $i, 3, '0', STR_PAD_LEFT);
+            
+            // BIND 4 parameter juga untuk auto-generate
+            $insert_asset->bind_param("isss", $item_id, $auto_code, $batch_brand, $batch_model);
+            $insert_asset->execute();
+        }
+    }
+}
         $conn->commit();
         $_SESSION['message'] = ['type' => 'success', 'title' => 'Updated', 'text' => 'Inventory updated!'];
     } catch (Exception $e) {
-        $conn->rollback(); // Batalkan semua kalau ada satu kod pun yang duplicate
-        $_SESSION['message'] = [
-            'type' => 'error', 
-            'title' => 'Duplicate Entry!', 
-            'text' => $e->getMessage() 
-        ];
+        $conn->rollback();
+        $_SESSION['message'] = ['type' => 'error', 'title' => 'Duplicate Entry!', 'text' => $e->getMessage()];
     }
     header("Location: manageItem_tech.php"); exit();
 }
@@ -501,20 +500,33 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
                         </select>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 mb-3">
-                        <label class="form-label small fw-bold">Add New Units (Quantity)</label>
-                        <input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control mb-2" min="0" value="0">
-                        
-                        <div class="form-check small">
-                            <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
-                            <label class="form-check-label" for="edit_enable_manual_code">Manual asset codes for new units</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Brand</label>
+                            <input type="text" name="batch_brand" class="form-control rounded-3" placeholder="e.g. Epson">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Model/Series</label>
+                            <input type="text" name="batch_model" class="form-control rounded-3" placeholder="e.g. EB-X06">
                         </div>
                     </div>
 
-                    <div id="edit_manual_assets_container" style="display: none;">
-                        <div id="edit_dynamic_asset_inputs"></div>
-                    </div>
+<div class="p-3 bg-light rounded-3 mb-3">
+    <label class="form-label small fw-bold">Add New Units (Quantity)</label>
+    <input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control mb-2 rounded-3" min="0" value="0">
+    
+    <div class="form-check small">
+        <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
+        <label class="form-check-label" for="edit_enable_manual_code">Manual asset codes for new units</label>
+    </div>
+</div>
+
+<div id="edit_manual_assets_container" style="display: none;" class="mt-2 border-top pt-2">
+    <p class="small fw-bold text-primary mb-2">Enter New Asset Codes:</p>
+    <div id="edit_dynamic_asset_inputs" class="row g-2"></div>
+</div>
                 </div>
+
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" name="edit_item_type_btn" class="btn btn-primary rounded-pill px-4">Update Item</button>
@@ -523,17 +535,63 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
         </div>
     </div>
 </div>
-
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+// 1. Letak fungsi ini di paling ATAS (Global Scope)
+function updateEditAssetInputs() {
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+    const editContainer = document.getElementById('edit_manual_assets_container');
+    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
+
+    if (!editQtyInput || !editCheckbox) return; // Guard clause
+
+    const qty = parseInt(editQtyInput.value) || 0;
+
+    if (editCheckbox.checked && qty > 0) {
+        editContainer.style.display = 'block';
+        let html = '';
+        for (let i = 1; i <= Math.min(qty, 50); i++) {
+            html += `
+                <div class="col-6 mb-2">
+                    <input type="text" name="manual_codes[]" class="form-control form-control-sm" placeholder="Code #${i}" required>
+                </div>`;
+        }
+        editDynamicInputs.innerHTML = html;
+    } else {
+        editContainer.style.display = 'none';
+        editDynamicInputs.innerHTML = '';
+    }
+}
+
+// 2. Fungsi Buka Modal (Global Scope)
+function openEditItemModal(item) {
+    document.getElementById('edit_item_id').value = item.item_id;
+    document.getElementById('edit_item_name').value = item.item_name;
+    document.getElementById('edit_category_id_select').value = item.category_id;
+    
+    // Reset inputs
+    const qtyInput = document.getElementById('edit_item_quantity');
+    const checkbox = document.getElementById('edit_enable_manual_code');
+    
+    qtyInput.value = 0; 
+    checkbox.checked = false;
+    
+    // SEKARANG fungsi ni dah boleh dipanggil sbb dua-dua kat luar
+    updateEditAssetInputs(); 
+    
+    var myModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+    myModal.show();
+}
+
+// 3. Logik Sidebar & Event Listeners (Dalam DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. SIDEBAR & OVERLAY LOGIC
+    // Sidebar logic
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('admin-sidebar');
-    const overlay = document.getElementById('overlay');
+    const overlay = document.getElementById('sidebarOverlay'); // Ikut ID kat HTML kau
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
@@ -542,46 +600,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    overlay.addEventListener('click', function() {
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
-    });
-
-    // 2. DYNAMIC INPUTS LOGIC
-    const editQtyInput = document.getElementById('edit_item_quantity');
-    const editCheckbox = document.getElementById('edit_enable_manual_code');
-    const editContainer = document.getElementById('edit_manual_assets_container');
-    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
-
-    function updateEditAssetInputs() {
-        const qty = parseInt(editQtyInput.value) || 0;
-        if (editCheckbox.checked && qty > 0) {
-            editContainer.style.display = 'block';
-            let html = '';
-            for (let i = 1; i <= Math.min(qty, 50); i++) {
-                html += `<div class="mb-2"><input type="text" name="manual_codes[]" class="form-control manual-code-input small" placeholder="Asset Code ${i}" required></div>`;
-            }
-            editDynamicInputs.innerHTML = html;
-        } else {
-            editContainer.style.display = 'none';
-            editDynamicInputs.innerHTML = '';
-        }
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
     }
 
-    editQtyInput.addEventListener('input', updateEditAssetInputs);
-    editCheckbox.addEventListener('change', updateEditAssetInputs);
+    // Pasang listener pada input manual
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+
+    if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
+    if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
 });
 
-// GLOBAL FUNCTIONS
-function openEditItemModal(item) {
-    document.getElementById('edit_item_id').value = item.item_id;
-    document.getElementById('edit_item_name').value = item.item_name;
-    document.getElementById('edit_category_id_select').value = item.category_id;
-    
-    var myModal = new bootstrap.Modal(document.getElementById('editItemModal'));
-    myModal.show();
-}
-
+// 4. Delete logic
 function deleteItem(id, name) {
     Swal.fire({
         title: 'Are you sure?',
@@ -599,3 +633,5 @@ function deleteItem(id, name) {
 </script>
 </body>
 </html>
+
+

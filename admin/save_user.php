@@ -25,13 +25,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     
     
-    $roles_to_find = [$role];
-    if (strtolower($role) === 'technician') {
-        
-        $roles_to_find[] = 'User';
-    }
-    
-    $placeholders = implode(',', array_fill(0, count($roles_to_find), '?'));
+// Kita cari role yang dipilih DAN role 'User' secara tetap
+$roles_to_find = [$role, 'User'];
+
+// Kalau Admin, kita cari juga role 'Technician'
+if (strtolower($role) === 'admin') {
+    $roles_to_find[] = 'Technician';
+}
+
+$placeholders = implode(',', array_fill(0, count($roles_to_find), '?'));
+
 
     $stmt_roles = $conn->prepare("SELECT role_id, role_name FROM roles WHERE role_name IN ($placeholders)");
     
@@ -127,16 +130,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         
         
-        $roles_to_insert = [$role_id_main];
-        $role_message = $role;
+$roles_to_insert = [$role_id_main]; // Role utama (Admin atau Tech)
+$role_message = $role;
 
-        
-        if (strtolower($role) === 'technician') {
-            
-            $roles_to_insert[] = $role_id_user;
-            $role_message = "{$role} (dan User)"; 
-        }
-        
+// SENTIASA tambah role User
+if (isset($roles_map['User'])) {
+    $roles_to_insert[] = $roles_map['User'];
+}
+
+// Jika Admin, tambah role Technician juga
+if (strtolower($role) === 'admin' && isset($roles_map['Technician'])) {
+    $roles_to_insert[] = $roles_map['Technician'];
+    $role_message = "Admin (Full Access)";
+}
+
 
         $sql_role = "INSERT INTO person_roles (person_id, role_id) VALUES (?, ?)";
         $stmt_role_insert = $conn->prepare($sql_role);

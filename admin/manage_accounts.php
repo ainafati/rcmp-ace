@@ -560,9 +560,15 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
                 <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
-                <p class="text-muted small">This form will automatically create a <strong>Technician</strong> account.</p>
-                <input type="hidden" name="role" value="Technician">
-            </div>
+<div class="mb-3">
+    <label class="form-label">Account Role</label>
+    <select name="role" class="form-select" required>
+        <option value="Technician" selected>Technician</option>
+        <option value="Admin">Admin</option>
+    </select>
+    <small class="text-muted">Admin & Technician roles will automatically include User access.</small>
+</div>            
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Account</button>

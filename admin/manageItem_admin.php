@@ -577,18 +577,22 @@ if (isset($_GET['delete_item_id'])) {
 </head>
 <body>
 
-<div class="sidebar-overlay" id="overlay"></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 
 <div class="sidebar" id="admin-sidebar">
-    <div class="sidebar-header">
-        <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
-        <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
+    <div>
+        <div class="sidebar-header">
+            <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
+            <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
+        </div>
+        <a href="manageItem_admin.php"class="active" ><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>
     </div>
-    <a href="manageItem_admin.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-    <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-    <a href="report_admin.php"><i class="fa-solid fa-chart-pie"></i> System Report</a>
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
 </div>
+
+
 
 <div class="main-content">
     <div class="topbar">
@@ -670,7 +674,7 @@ if (isset($_GET['delete_item_id'])) {
             <div class="modal-body">
                 <div class="row">
                     <div class="col-md-5 border-end">
-                        <form method="post" action="manageItem_tech.php">
+                        <form method="post" action="manageItem_admin.php">
                             <input type="hidden" name="add_category" value="1">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">New Category</label>
@@ -705,7 +709,7 @@ if (isset($_GET['delete_item_id'])) {
                 <h5 class="modal-title fw-bold">Edit Item Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="manageItem_tech.php" enctype="multipart/form-data">
+            <form method="post" action="manageItem_admin.php" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="edit_item_type" value="1">
                     <input type="hidden" id="edit_item_id" name="edit_item_id">
@@ -724,20 +728,33 @@ if (isset($_GET['delete_item_id'])) {
                         </select>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 mb-3">
-                        <label class="form-label small fw-bold">Add New Units (Quantity)</label>
-                        <input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control mb-2" min="0" value="0">
-                        
-                        <div class="form-check small">
-                            <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
-                            <label class="form-check-label" for="edit_enable_manual_code">Manual asset codes for new units</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Brand</label>
+                            <input type="text" name="batch_brand" class="form-control rounded-3" placeholder="e.g. Epson">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Model/Series</label>
+                            <input type="text" name="batch_model" class="form-control rounded-3" placeholder="e.g. EB-X06">
                         </div>
                     </div>
 
-                    <div id="edit_manual_assets_container" style="display: none;">
-                        <div id="edit_dynamic_asset_inputs"></div>
-                    </div>
+<div class="p-3 bg-light rounded-3 mb-3">
+    <label class="form-label small fw-bold">Add New Units (Quantity)</label>
+    <input type="number" id="edit_item_quantity" name="edit_item_quantity" class="form-control mb-2 rounded-3" min="0" value="0">
+    
+    <div class="form-check small">
+        <input type="checkbox" class="form-check-input" id="edit_enable_manual_code" name="enable_manual_code">
+        <label class="form-check-label" for="edit_enable_manual_code">Manual asset codes for new units</label>
+    </div>
+</div>
+
+<div id="edit_manual_assets_container" style="display: none;" class="mt-2 border-top pt-2">
+    <p class="small fw-bold text-primary mb-2">Enter New Asset Codes:</p>
+    <div id="edit_dynamic_asset_inputs" class="row g-2"></div>
+</div>
                 </div>
+
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" name="edit_item_type_btn" class="btn btn-primary rounded-pill px-4">Update Item</button>
@@ -746,16 +763,63 @@ if (isset($_GET['delete_item_id'])) {
         </div>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+// 1. Letak fungsi ini di paling ATAS (Global Scope)
+function updateEditAssetInputs() {
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+    const editContainer = document.getElementById('edit_manual_assets_container');
+    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
+
+    if (!editQtyInput || !editCheckbox) return; // Guard clause
+
+    const qty = parseInt(editQtyInput.value) || 0;
+
+    if (editCheckbox.checked && qty > 0) {
+        editContainer.style.display = 'block';
+        let html = '';
+        for (let i = 1; i <= Math.min(qty, 50); i++) {
+            html += `
+                <div class="col-6 mb-2">
+                    <input type="text" name="manual_codes[]" class="form-control form-control-sm" placeholder="Code #${i}" required>
+                </div>`;
+        }
+        editDynamicInputs.innerHTML = html;
+    } else {
+        editContainer.style.display = 'none';
+        editDynamicInputs.innerHTML = '';
+    }
+}
+
+// 2. Fungsi Buka Modal (Global Scope)
+function openEditItemModal(item) {
+    document.getElementById('edit_item_id').value = item.item_id;
+    document.getElementById('edit_item_name').value = item.item_name;
+    document.getElementById('edit_category_id_select').value = item.category_id;
+    
+    // Reset inputs
+    const qtyInput = document.getElementById('edit_item_quantity');
+    const checkbox = document.getElementById('edit_enable_manual_code');
+    
+    qtyInput.value = 0; 
+    checkbox.checked = false;
+    
+    // SEKARANG fungsi ni dah boleh dipanggil sbb dua-dua kat luar
+    updateEditAssetInputs(); 
+    
+    var myModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+    myModal.show();
+}
+
+// 3. Logik Sidebar & Event Listeners (Dalam DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. SIDEBAR & OVERLAY LOGIC
+    // Sidebar logic
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('admin-sidebar');
-    const overlay = document.getElementById('overlay');
+    const overlay = document.getElementById('sidebarOverlay'); // Ikut ID kat HTML kau
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
@@ -764,46 +828,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    overlay.addEventListener('click', function() {
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
-    });
-
-    // 2. DYNAMIC INPUTS LOGIC
-    const editQtyInput = document.getElementById('edit_item_quantity');
-    const editCheckbox = document.getElementById('edit_enable_manual_code');
-    const editContainer = document.getElementById('edit_manual_assets_container');
-    const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
-
-    function updateEditAssetInputs() {
-        const qty = parseInt(editQtyInput.value) || 0;
-        if (editCheckbox.checked && qty > 0) {
-            editContainer.style.display = 'block';
-            let html = '';
-            for (let i = 1; i <= Math.min(qty, 50); i++) {
-                html += `<div class="mb-2"><input type="text" name="manual_codes[]" class="form-control manual-code-input small" placeholder="Asset Code ${i}" required></div>`;
-            }
-            editDynamicInputs.innerHTML = html;
-        } else {
-            editContainer.style.display = 'none';
-            editDynamicInputs.innerHTML = '';
-        }
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
     }
 
-    editQtyInput.addEventListener('input', updateEditAssetInputs);
-    editCheckbox.addEventListener('change', updateEditAssetInputs);
+    // Pasang listener pada input manual
+    const editQtyInput = document.getElementById('edit_item_quantity');
+    const editCheckbox = document.getElementById('edit_enable_manual_code');
+
+    if (editQtyInput) editQtyInput.addEventListener('input', updateEditAssetInputs);
+    if (editCheckbox) editCheckbox.addEventListener('change', updateEditAssetInputs);
 });
 
-// GLOBAL FUNCTIONS
-function openEditItemModal(item) {
-    document.getElementById('edit_item_id').value = item.item_id;
-    document.getElementById('edit_item_name').value = item.item_name;
-    document.getElementById('edit_category_id_select').value = item.category_id;
-    
-    var myModal = new bootstrap.Modal(document.getElementById('editItemModal'));
-    myModal.show();
-}
-
+// 4. Delete logic
 function deleteItem(id, name) {
     Swal.fire({
         title: 'Are you sure?',
@@ -814,10 +854,13 @@ function deleteItem(id, name) {
         confirmButtonText: 'Yes, delete it!'
     }).then((result) => {
         if (result.isConfirmed) {
-            window.location.href = 'manageItem_tech.php?delete_item_id=' + id;
+            window.location.href = 'manageItem_admin.php?delete_item_id=' + id;
         }
     });
 }
 </script>
 </body>
 </html>
+
+
+
