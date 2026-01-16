@@ -20,6 +20,19 @@ $name_parts = explode(' ', trim($full_name));
 // Ambil 2 perkataan pertama dan gabungkan semula
 $admin_display_name = isset($name_parts[1]) ? $name_parts[0] . ' ' . $name_parts[1] : $name_parts[0];
 $admin_name = htmlspecialchars($admin_display_name);
+
+// --- SETUP PAGINATION ---
+$limit = 10; // Jumlah akaun per page
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
+// Ambil jumlah keseluruhan data untuk pengiraan page
+$total_results_sql = "SELECT COUNT(*) FROM person";
+$total_result = $conn->query($total_results_sql);
+$total_rows = $total_result->fetch_row()[0];
+$total_pages = ceil($total_rows / $limit);
+
 $sql = "
     SELECT
         p.person_id AS person_unique_id,
@@ -39,9 +52,9 @@ $sql = "
         roles r ON pr.role_id = r.role_id
     GROUP BY
         p.person_id, p.name, p.email, p.id, p.status, p.suspension_remarks, p.phoneNum, p.created_at
-    ORDER BY
-        p.created_at ASC
-";
+ORDER BY p.created_at ASC
+    LIMIT $limit OFFSET $offset
+	";
 
 $result = $conn->query($sql);
 if (!$result) {
@@ -413,7 +426,78 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             padding: 0.3rem 0.4rem;
             font-size: 0.7rem;
         }
+		
+		/* Gaya untuk Role Blocks */
+.role-indicator {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.role-block {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    background-color: #e2e8f0; /* Warna asal/kelabu (off) */
+    display: inline-block;
+}
+
+/* Warna-warna level */
+.block-user { background-color: #3b82f6 !important; }      /* Biru */
+.block-tech { background-color: #f59e0b !important; }      /* Amber/Oren */
+.block-admin { background-color: #ef4444 !important; }     /* Merah */
+
     }
+	
+	/* Kemaskini pada gaya role-block sedia ada */
+.role-block {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background-color: #e2e8f0; 
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.role-block:hover {
+    transform: scale(1.2);
+}
+
+/* Tooltip custom (opsional) */
+.role-indicator {
+    cursor: help;
+    padding: 5px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    display: inline-flex;
+}
+
+/* Pastikan warna ini ada di luar @media query supaya terpakai pada semua saiz skrin */
+.block-user { background-color: #3b82f6 !important; }   /* Biru */
+.block-tech { background-color: #f59e0b !important; }   /* Oren */
+.block-admin { background-color: #ef4444 !important; }  /* Merah */
+
+/* Pastikan blok mempunyai saiz walaupun kosong */
+.role-block {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background-color: #e2e8f0; /* Warna kelabu jika role tidak aktif */
+    display: inline-block;
+}
+.pagination .page-link {
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.pagination .page-link:hover {
+    background-color: #f1f5f9;
+}
 </style></head>
 <body>
 
@@ -497,12 +581,21 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                                     </span>
                                 </td>
                                 <td>
-                                    <span title="<?= htmlspecialchars($a['roles_list']) ?>">
-                                        <span class="badge rounded-pill text-bg-info">
-                                            <i class="fa-solid fa-user-tag"></i> 
-                                        </span>
-                                    </span>
-                                </td>
+    <?php 
+        $roles = strtolower($a['roles_list']);
+        $isAdmin = (strpos($roles, 'admin') !== false);
+        $isTech = (strpos($roles, 'technician') !== false);
+        // Semua akaun biasanya ada role user
+        $isUser = (strpos($roles, 'user') !== false || $isAdmin || $isTech);
+    ?>
+    <div class="role-indicator" title="<?= htmlspecialchars($a['roles_list']) ?>" data-bs-toggle="tooltip">
+        <span class="role-block <?= $isUser ? 'block-user' : '' ?>"></span>
+        
+        <span class="role-block <?= ($isTech || $isAdmin) ? 'block-tech' : '' ?>"></span>
+        
+        <span class="role-block <?= $isAdmin ? 'block-admin' : '' ?>"></span>
+    </div>
+</td>
                                  <td>
                                      <button class="btn btn-sm btn-outline-warning" title="Edit User"
                                          onclick="editUser(
@@ -531,6 +624,32 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                         <?php endif; ?>
                     </tbody>
                 </table>
+				<div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="text-muted small">
+        Showing <?= $offset + 1 ?> to <?= min($offset + $limit, $total_rows) ?> of <?= $total_rows ?> accounts
+    </div>
+    <nav aria-label="Page navigation">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                <a class="page-link" href="?page=<?= $page - 1 ?>" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+
+            <?php for($i = 1; $i <= $total_pages; $i++): ?>
+                <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
+                    <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                </li>
+            <?php endfor; ?>
+
+            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                <a class="page-link" href="?page=<?= $page + 1 ?>" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>
             </div>
         </div>
     </div>
@@ -686,12 +805,12 @@ function filterTable() {
         const name = row.cells[0].textContent.toLowerCase();
         const emailPhone = row.cells[1].textContent.toLowerCase();
         
-        // Ambil status dan role dari atribut title (tooltip) pada wrapper <span>
-        const statusSpanWrapper = row.cells[2].querySelector('span[title]');
-        const userStatus = statusSpanWrapper ? statusSpanWrapper.getAttribute('title').toLowerCase().trim() : '';
-        const roleSpanWrapper = row.cells[3].querySelector('span[title]');
-        const userRole = roleSpanWrapper ? roleSpanWrapper.getAttribute('title').toLowerCase().trim() : '';
-
+// BETULKAN DI SINI: Ambil title terus dari div role-indicator atau span status
+        const statusSpan = row.cells[2].querySelector('span[title]');
+        const userStatus = statusSpan ? statusSpan.getAttribute('title').toLowerCase() : '';
+        
+        const roleDiv = row.cells[3].querySelector('.role-indicator');
+        const userRole = roleDiv ? roleDiv.getAttribute('title').toLowerCase() : '';
 
         const matchSearch = name.includes(search) || emailPhone.includes(search);
         const matchRole = role === '' || userRole.includes(role); 
@@ -700,7 +819,6 @@ function filterTable() {
         row.style.display = (matchSearch && matchRole && matchStatus) ? '' : 'none';
     });
 }
-
 document.getElementById('addAccountForm').addEventListener('submit', function(e) {
     const emailInput = this.querySelector('input[name="email"]');
     const email = emailInput.value.trim();

@@ -192,7 +192,7 @@ function create_request_table($requests) {
         $inner_accordion_id = 'inner_accordion_' . $user_index;
 
         // --- LEVEL 1: USER ACCORDION ---
-        echo '<div class="accordion-item shadow-sm mb-3 border-0 rounded-3 overflow-hidden">';
+        echo '<div class="accordion-item user-row shadow-sm mb-3 border-0 rounded-3 overflow-hidden">';
         echo '  <h2 class="accordion-header" id="' . $user_header_id . '">';
         echo '    <button class="accordion-button collapsed bg-light text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '">';
         echo '      <div class="d-flex justify-content-between w-100 pe-3 align-items-center">';
@@ -796,7 +796,41 @@ document.addEventListener('DOMContentLoaded', function () {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-}); // <--- Satu sahaja penutup DOMContentLoaded di sini
+// --- 3. BARU: LOGIK PAGINATION UNTUK NAMA USER ---
+    const itemsPerPage = 10; 
+    const userRows = document.querySelectorAll('.user-row'); // Cari class user-row dalam PHP tadi
+    const totalPages = Math.ceil(userRows.length / itemsPerPage);
+    const accordionContainer = document.querySelector('.tab-content'); // Tempat letak butang page
+
+    function showPage(page) {
+        userRows.forEach((row, index) => {
+            row.style.display = 'none'; // Sorok semua
+            if (index >= (page - 1) * itemsPerPage && index < page * itemsPerPage) {
+                row.style.display = 'block'; // Tunjuk 5 sahaja
+            }
+        });
+    }
+
+    if (totalPages > 1) {
+        let paginationHtml = '<div class="d-flex justify-content-center mt-3"><nav><ul class="pagination">';
+        for (let i = 1; i <= totalPages; i++) {
+            paginationHtml += `<li class="page-item"><button class="page-link btn-page" data-page="${i}">${i}</button></li>`;
+        }
+        paginationHtml += '</ul></nav></div>';
+        accordionContainer.insertAdjacentHTML('afterend', paginationHtml);
+
+        // Event listener untuk butang page
+        document.querySelectorAll('.btn-page').forEach(btn => {
+            btn.addEventListener('click', function() {
+                showPage(this.getAttribute('data-page'));
+                window.scrollTo(0, 0); // Scroll ke atas balik bila tukar page
+            });
+        });
+    }
+
+    showPage(1); // Jalankan page 1 masa mula-mula load
+
+}); // Penutup DOMContentLoaded
 
 // 3. Data dari PHP
 const availableAssets = <?php echo $availableAssets_json; ?>;
@@ -1350,7 +1384,7 @@ $('#confirmCheckInBtn').on('click', function() {
         asset_conditions.push({
             asset_id: asset_id,
             condition: condition,
-            remarks: remarks // Ini akan dibaca sebagai $asset['remarks'] di PHP
+            k: remarks // Ini akan dibaca sebagai $asset['remarks'] di PHP
         });
     });
 

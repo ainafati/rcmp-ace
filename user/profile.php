@@ -315,7 +315,7 @@ $user['person_id'] = $person_id;
                                         <div class="info-icon-wrapper id-wrapper"><i class="fa-solid fa-hashtag"></i></div>
                                         <div class="info-details">
                                             <strong>ID</strong>
-                                            <span><?= htmlspecialchars($user['id']) ?></span>
+<span><?= htmlspecialchars($user['id'] ?? '') ?></span>
                                         </div>
                                     </div>
                                     <div class="info-card">
