@@ -113,6 +113,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
     $batch_brand = trim($_POST['batch_brand'] ?? '');
     $batch_model = trim($_POST['batch_model'] ?? '');
     $manual_codes = $_POST['manual_codes'] ?? [];
+    $manual_serials = $_POST['manual_serials'] ?? []; // Tambah ini
     $is_manual = (isset($_POST['enable_manual_code']) && !empty($manual_codes));
 
     $conn->begin_transaction();
@@ -125,23 +126,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
         $stmt->close();
 
         $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
-        $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, 'Available')");
+        
+        // KEMASKINI: Tambah serial_number dalam query (isssss = 5 strings)
+        $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, serial_number, status) VALUES (?, ?, ?, ?, ?, 'Available')");
 
         if ($is_manual) {
-            foreach ($manual_codes as $code) {
+            foreach ($manual_codes as $index => $code) {
                 $code = trim($code);
                 if (empty($code)) continue;
+                
+                $s_no = isset($manual_serials[$index]) ? trim($manual_serials[$index]) : '';
+
                 $check_stmt->bind_param("s", $code);
                 $check_stmt->execute();
                 if ($check_stmt->get_result()->num_rows > 0) throw new Exception("Code '$code' already exists!");
-                $insert_asset->bind_param("isss", $new_item_id, $code, $batch_brand, $batch_model);
+                
+                // Bind 5 parameter
+                $insert_asset->bind_param("issss", $new_item_id, $code, $batch_brand, $batch_model, $s_no);
                 $insert_asset->execute();
             }
         } else {
             $acr = generateItemAcronym($item_name);
             for ($i = 1; $i <= $quantity; $i++) {
                 $a_code = $acr . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-                $insert_asset->bind_param("isss", $new_item_id, $a_code, $batch_brand, $batch_model);
+                // Untuk auto, SN kita samakan dengan Code buat sementara
+                $insert_asset->bind_param("issss", $new_item_id, $a_code, $batch_brand, $batch_model, $a_code);
                 $insert_asset->execute();
             }
         }
@@ -155,17 +164,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['add_item_type_and_uni
 }
 
 // --- 5. LOGIC: EDIT ITEM & ADD UNITS (FIXED) ---
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
+if ($_SERVER["REQUEST_METHOD"] === "POST" && (isset($_POST['edit_item_type']) || isset($_POST['edit_item_type_btn']))) {
     $item_id = (int)$_POST['edit_item_id'];
     $item_name = ucwords(trim($_POST['edit_item_name']));
     $category_id = (int)$_POST['edit_category_id'];
     $qty_to_add = (int)($_POST['edit_item_quantity'] ?? 0);
-    $batch_brand = trim($_POST['batch_brand'] ?? '');
-    $batch_model = trim($_POST['batch_model'] ?? '');
+    
+    // Pastikan input manual codes dan serials ditangkap
+    $manual_codes = $_POST['manual_codes'] ?? [];
+    $manual_serials = $_POST['manual_serials'] ?? [];
 
     $conn->begin_transaction();
     try {
-        // 1. Update info item
+        // 1. Update info item (Sama seperti asal)
         $new_img = handleImageUpload('edit_item_image', 'assets/item_images');
         if ($new_img) {
             $upd = $conn->prepare("UPDATE item SET item_name=?, category_id=?, image_url=? WHERE item_id=?");
@@ -176,49 +187,48 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_item_type'])) {
         }
         $upd->execute();
 
-if ($qty_to_add > 0) {
-    $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
-    
-    // TAMBAH brand dan model dalam query INSERT ini
-    $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, status) VALUES (?, ?, ?, ?, 'Available')");
+        // 2. Tambah Unit Baru jika Qty > 0
+        if ($qty_to_add > 0) {
+            // Ambil brand & model asal untuk unit baru (supaya tak kosong)
+            $orig = $conn->query("SELECT brand, model FROM assets WHERE item_id=$item_id LIMIT 1")->fetch_assoc();
+            $b_brand = $orig['brand'] ?? '';
+            $b_model = $orig['model'] ?? '';
 
-    if (isset($_POST['enable_manual_code']) && !empty($_POST['manual_codes'])) {
-        foreach ($_POST['manual_codes'] as $m_code) {
-            $m_code = trim($m_code);
-            if (empty($m_code)) continue;
+            $check_stmt = $conn->prepare("SELECT asset_code FROM assets WHERE asset_code = ?");
+            $insert_asset = $conn->prepare("INSERT INTO assets (item_id, asset_code, brand, model, serial_number, status) VALUES (?, ?, ?, ?, ?, 'Available')");
 
-            // Semak duplicate
-            $check_stmt->bind_param("s", $m_code);
-            $check_stmt->execute();
-            if ($check_stmt->get_result()->num_rows > 0) {
-                throw new Exception("Asset Code '$m_code' already exists!");
+            if (isset($_POST['enable_manual_code']) && !empty($manual_codes)) {
+                foreach ($manual_codes as $idx => $m_code) {
+                    $m_code = trim($m_code);
+                    if (empty($m_code)) continue;
+                    
+                    $m_sn = isset($manual_serials[$idx]) ? trim($manual_serials[$idx]) : '';
+
+                    $check_stmt->bind_param("s", $m_code);
+                    $check_stmt->execute();
+                    if ($check_stmt->get_result()->num_rows > 0) throw new Exception("Asset Code '$m_code' already exists!");
+                    
+                    $insert_asset->bind_param("issss", $item_id, $m_code, $b_brand, $b_model, $m_sn);
+                    $insert_asset->execute();
+                }
+            } else {
+                // Auto generate logic
+                $curr_count = $conn->query("SELECT COUNT(*) FROM assets WHERE item_id=$item_id")->fetch_row()[0];
+                for ($i = 1; $i <= $qty_to_add; $i++) {
+                    $auto_code = date('Y') . str_pad($curr_count + $i, 3, '0', STR_PAD_LEFT);
+                    $insert_asset->bind_param("issss", $item_id, $auto_code, $b_brand, $b_model, $auto_code);
+                    $insert_asset->execute();
+                }
             }
-            
-            // BIND 4 parameter: isss (integer, string, string, string)
-            $insert_asset->bind_param("isss", $item_id, $m_code, $batch_brand, $batch_model);
-            $insert_asset->execute();
         }
-    } else {
-        // Auto generate logic
-        $curr_count = $conn->query("SELECT COUNT(*) FROM assets WHERE item_id=$item_id")->fetch_row()[0];
-        for ($i = 1; $i <= $qty_to_add; $i++) {
-            $auto_code = date('Y') . str_pad($curr_count + $i, 3, '0', STR_PAD_LEFT);
-            
-            // BIND 4 parameter juga untuk auto-generate
-            $insert_asset->bind_param("isss", $item_id, $auto_code, $batch_brand, $batch_model);
-            $insert_asset->execute();
-        }
-    }
-}
         $conn->commit();
         $_SESSION['message'] = ['type' => 'success', 'title' => 'Updated', 'text' => 'Inventory updated!'];
     } catch (Exception $e) {
         $conn->rollback();
-        $_SESSION['message'] = ['type' => 'error', 'title' => 'Duplicate Entry!', 'text' => $e->getMessage()];
+        $_SESSION['message'] = ['type' => 'error', 'title' => 'Error', 'text' => $e->getMessage()];
     }
     header("Location: manageItem_tech.php"); exit();
 }
-
 // --- 6. LOGIC: DELETE ITEM ---
 if (isset($_GET['delete_item_id'])) {
     $del_id = (int)$_GET['delete_item_id'];
@@ -358,7 +368,11 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
             <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
         </div>
         <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php" ><i class="fa-solid fa-dolly"></i> Manage Requests</a>
+        <a href="check_out.php" ><i class="fa-solid fa-dolly"></i> Manage Requests
+		            <?php if ($pending_count_for_badge > 0): ?>
+                <span class="badge rounded-pill bg-danger"><?= $pending_count_for_badge ?></span>
+            <?php endif; ?>
+</a>
         <a href="manageItem_tech.php" class="active"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
         <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
     </div>
@@ -522,10 +536,12 @@ $pending_count_for_badge = get_reservation_item_count($conn, 'Pending');
 </div>
 
 <div id="edit_manual_assets_container" style="display: none;" class="mt-2 border-top pt-2">
-    <p class="small fw-bold text-primary mb-2">Enter New Asset Codes:</p>
+    <div class="row mb-2">
+        <div class="col-6"><p class="small fw-bold text-primary mb-0">Asset Code:</p></div>
+        <div class="col-6"><p class="small fw-bold text-primary mb-0">Serial Number:</p></div>
+    </div>
     <div id="edit_dynamic_asset_inputs" class="row g-2"></div>
-</div>
-                </div>
+</div>                </div>
 
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
@@ -546,7 +562,7 @@ function updateEditAssetInputs() {
     const editContainer = document.getElementById('edit_manual_assets_container');
     const editDynamicInputs = document.getElementById('edit_dynamic_asset_inputs');
 
-    if (!editQtyInput || !editCheckbox) return; // Guard clause
+    if (!editQtyInput || !editCheckbox) return;
 
     const qty = parseInt(editQtyInput.value) || 0;
 
@@ -557,6 +573,9 @@ function updateEditAssetInputs() {
             html += `
                 <div class="col-6 mb-2">
                     <input type="text" name="manual_codes[]" class="form-control form-control-sm" placeholder="Code #${i}" required>
+                </div>
+                <div class="col-6 mb-2">
+                    <input type="text" name="manual_serials[]" class="form-control form-control-sm" placeholder="Serial #${i}">
                 </div>`;
         }
         editDynamicInputs.innerHTML = html;
@@ -565,7 +584,6 @@ function updateEditAssetInputs() {
         editDynamicInputs.innerHTML = '';
     }
 }
-
 // 2. Fungsi Buka Modal (Global Scope)
 function openEditItemModal(item) {
     document.getElementById('edit_item_id').value = item.item_id;
