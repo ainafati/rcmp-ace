@@ -151,8 +151,9 @@ $on_loan_requests = fetch_reservations_by_status($conn, ['Checked Out'], $filter
 $completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected', 'Cancelled'], $filter_date);
 
 
+// --- KEMASKINI BAHAGIAN INI ---
 $assetSql = "
-    SELECT asset_id, item_id, asset_code, brand, model 
+    SELECT asset_id, item_id, asset_code, brand, model, serial_number 
     FROM assets 
     WHERE status = 'Available'
 ";
@@ -161,7 +162,10 @@ if (!$assetResult) {
     die("Error fetching available assets: " . $conn->error);
 }
 $availableAssets = [];
-while ($row = $assetResult->fetch_assoc()) { $availableAssets[$row['item_id']][] = $row; }
+while ($row = $assetResult->fetch_assoc()) { 
+    // Kita simpan semua data termasuk serial_number ke dalam array
+    $availableAssets[$row['item_id']][] = $row; 
+}
 $availableAssets_json = json_encode($availableAssets);
 
 
@@ -1104,6 +1108,27 @@ function buildAssetCheckboxes() {
                     <tbody>`;
 
         assets.forEach(a => {
+            // --- LOGIC POTONG NAMA MODEL (JS VERSION) ---
+            let fullModel = a.model || '';
+            let shortModel = fullModel;
+
+            // Jika ada (MIC 2), kita cari kedudukan '(' yang pertama
+            // Tapi kalau nak ambil bermula dari (MIC 2) dan seterusnya:
+            let firstBracket = fullModel.indexOf('('); 
+            if (firstBracket !== -1) {
+                shortModel = fullModel.substring(firstBracket); 
+                // Hasil: "(Digital UHF...)(MIC 2)(AL FARABI)"
+                
+                // JIKA AWAK NAK BUANG "Digital UHF" tu dan ambil (MIC 2) sahaja:
+                // Kita cari perkataan "(MIC"
+                let micIndex = fullModel.indexOf('(MIC');
+                if (micIndex !== -1) {
+                    shortModel = fullModel.substring(micIndex);
+                }
+            }
+
+            let serialNum = a.serial_number ? a.serial_number : 'No S/N';
+
             html += `
                 <tr style="font-size: 0.85rem;">
                     <td class="text-center">
@@ -1111,8 +1136,10 @@ function buildAssetCheckboxes() {
                     </td>
                     <td>
                         <label for="asset-${a.asset_id}" class="d-block" style="cursor: pointer;">
-                            <span class="fw-bold text-primary">${a.asset_code}</span><br>
-                            <small class="text-muted">${a.brand || ''} ${a.model || ''}</small>
+                            <span class="fw-bold text-primary">${a.asset_code}</span> 
+                            <span class="badge bg-light text-dark border ms-1" style="font-size: 0.7rem;">SN: ${serialNum}</span>
+                            <br>
+                            <small class="text-muted">${a.brand || ''} <span class="text-dark fw-bold">${shortModel}</span></small>
                         </label>
                     </td>
                 </tr>`;
@@ -1121,14 +1148,12 @@ function buildAssetCheckboxes() {
         html += `</tbody></table></div>`;
         $assetContainer.html(html);
 
-        // RE-BIND EVENT: Ini penting supaya checkbox baru ni boleh dikesan
         $('.asset-checkbox').on('change', function() {
             validateApproveButton();
         });
     }
     validateApproveButton();
 }
-
     $approveQtyInput.off('change keyup');
     $assetContainer.off('change.assetcheck');
     $partialRejectReason.off('change keyup'); 
