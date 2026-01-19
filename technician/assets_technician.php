@@ -26,17 +26,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['edit_asset'])) {
     $asset_id = (int)$_POST['asset_id'];
     $brand = trim($_POST['brand']);
     $model = trim($_POST['model']);
+    $serial_number = trim($_POST['serial_number']); // Tambah ini
     $status = trim($_POST['status']);
     
-    $stmt = $conn->prepare("UPDATE assets SET brand = ?, model = ?, status = ? WHERE asset_id = ?");
-    $stmt->bind_param("sssi", $brand, $model, $status, $asset_id);
+    // Kemaskini query UPDATE untuk masukkan serial_number
+    $stmt = $conn->prepare("UPDATE assets SET brand = ?, model = ?, serial_number = ?, status = ? WHERE asset_id = ?");
+    $stmt->bind_param("ssssi", $brand, $model, $serial_number, $status, $asset_id);
     $stmt->execute();
     $stmt->close();
     
-    header("Location: assets.php?item_id=" . $item_id_filter);
+    header("Location: assets_technician.php?item_id=" . $item_id_filter);
     exit();
 }
-
 // Logic Delete Asset
 if (isset($_GET['delete_asset_id'])) {
     $asset_id_to_delete = (int)$_GET['delete_asset_id'];
@@ -47,7 +48,7 @@ if (isset($_GET['delete_asset_id'])) {
     $stmt->execute();
     $stmt->close();
     
-    header("Location: assets.php?item_id=" . $item_id_return);
+    header("Location: assets_technician.php?item_id=" . $item_id_return);
     exit();
 }
 
@@ -80,7 +81,7 @@ $stmt_item->close();
 // Query Assets
 $sql_assets = "
     SELECT 
-        a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name,
+        a.asset_id, a.asset_code, a.status, a.brand, a.model, a.serial_number, i.item_name, -- Tambah a.serial_number di sini
         MAX(CASE 
             WHEN a.status IN ('Checked Out') THEN u.name 
             ELSE NULL 
@@ -92,7 +93,7 @@ $sql_assets = "
     LEFT JOIN reservations r ON ri.reserve_id = r.reserve_id
     LEFT JOIN person u ON r.person_id = u.person_id
     WHERE " . implode(' AND ', $where_clauses) . "
-    GROUP BY a.asset_id, a.asset_code, a.status, a.brand, a.model, i.item_name
+    GROUP BY a.asset_id, a.asset_code, a.status, a.brand, a.model, a.serial_number, i.item_name -- Tambah a.serial_number di sini juga
     ORDER BY a.asset_code ASC
 ";
 
@@ -300,11 +301,13 @@ if ($result_pending) {
                     ?>
                     <tr>
                         <td data-label="Asset Code" class="ps-md-3"><span class="asset-code-pill"><?= htmlspecialchars($asset['asset_code']) ?></span></td>
-                        <td data-label="Info Unit">
-                            <div class="fw-bold text-dark"><?= htmlspecialchars($asset['brand'] ?: '-') ?></div>
-                            <div class="text-muted small"><?= htmlspecialchars($asset['model'] ?: '-') ?></div>
-                        </td>
-                        <td data-label="Status" class="text-center">
+<td data-label="Info Unit">
+    <div class="fw-bold text-dark"><?= htmlspecialchars($asset['brand'] ?: '-') ?></div>
+    <div class="text-muted small">
+        Model: <?= htmlspecialchars($asset['model'] ?: '-') ?><br>
+        <span class="text-primary">Serial Number: <?= htmlspecialchars($asset['serial_number'] ?: '-') ?></span>
+    </div>
+</td>                        <td data-label="Status" class="text-center">
                             <div class="status-indicator mx-md-auto" 
                                  style="background: <?= $info['bg'] ?>; border-color: <?= $info['color'] ?>40;"
                                  data-bs-toggle="tooltip" data-bs-placement="top" title="<?= $info['label'] ?>">
@@ -335,7 +338,11 @@ if ($result_pending) {
                     <input type="hidden" name="edit_asset" value="1"><input type="hidden" id="edit_id" name="asset_id"><input type="hidden" name="item_id_return" value="<?= $item_id_filter ?>">
                     <div class="mb-3"><label class="small fw-bold mb-1">Brand</label><input type="text" id="edit_brand" name="brand" class="form-control"></div>
                     <div class="mb-3"><label class="small fw-bold mb-1">Model</label><input type="text" id="edit_model" name="model" class="form-control"></div>
-                    <div><label class="small fw-bold mb-1">Status</label>
+                    <div class="mb-3">
+    <label class="small fw-bold mb-1">Serial Number</label>
+    <input type="text" id="edit_serial" name="serial_number" class="form-control">
+</div>
+					<div><label class="small fw-bold mb-1">Status</label>
                         <select name="status" id="edit_status" class="form-select">
                             <?php foreach($status_data as $key => $val): ?><option value="<?= $key ?>"><?= $key ?></option><?php endforeach; ?>
                         </select>
@@ -358,15 +365,16 @@ if ($result_pending) {
     });
 
     function toggleSidebar() { document.getElementById('admin-sidebar').classList.toggle('active'); }
-    function openEditModal(asset) {
-        document.getElementById('edit_id').value = asset.asset_id;
-        document.getElementById('edit_brand').value = asset.brand;
-        document.getElementById('edit_model').value = asset.model;
-        document.getElementById('edit_status').value = asset.status;
-        new bootstrap.Modal(document.getElementById('editModal')).show();
-    }
+function openEditModal(asset) {
+    document.getElementById('edit_id').value = asset.asset_id;
+    document.getElementById('edit_brand').value = asset.brand;
+    document.getElementById('edit_model').value = asset.model;
+    document.getElementById('edit_serial').value = asset.serial_number; // Tambah ini
+    document.getElementById('edit_status').value = asset.status;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
     function confirmDel(id, code) {
-        if(confirm("Delete " + code + "?")) { window.location.href = 'assets.php?delete_asset_id=' + id + '&item_id_return=<?= $item_id_filter ?>'; }
+        if(confirm("Delete " + code + "?")) { window.location.href = 'assets_technician.php?delete_asset_id=' + id + '&item_id_return=<?= $item_id_filter ?>'; }
     }
 </script>
 </body>
