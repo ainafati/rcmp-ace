@@ -355,13 +355,13 @@ function sendNewReservationNotification($technician_email, $reserve_id, $user_na
 		$mail->addBCC('it.rcmp@unikl.edu.my','IT Monitoring');
 
         $mail->isHTML(true);
-        $mail->Subject = "NEW RESERVATION: Item - {$item_name} by {$user_name}";
+        $mail->Subject = "TESTING NEW RESERVATION: Item - {$item_name} by {$user_name}";
         
         $mail->Body = "
             <html>
             <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
                 <div style='max-width: 600px; margin: 0 auto; border: 1px solid #ffcc00; padding: 20px; background-color: #fffacd;'>
-                    <h3 style='color: #ff9900;'>New Reservation Request Requires Action</h3>
+                    <h3 style='color: #ff9900;'>Testing New Reservation Request Requires Action</h3>
                     <p>A user has submitted a new asset reservation request that requires your approval.</p>
                     
                     <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; margin: 15px 0; border-collapse: collapse; border: 1px solid #ccc;'>

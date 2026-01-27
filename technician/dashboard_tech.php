@@ -265,6 +265,38 @@ $maintenance_assets_details_json = json_encode($maintenance_assets_details);
 $events_json = json_encode($events);
 $new_notifications_json = json_encode($new_notifications);
 
+// --- SQL UNTUK PENDING ACTIONS DASHBOARD ---
+
+// 1. Ambil 3 Permohonan Pinjaman Baru (Pending)
+$sql_new_req = "
+    SELECT i.item_name, u.name as user_name, r.created_at 
+    FROM reservation_items ri
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    JOIN person u ON r.person_id = u.person_id
+    JOIN item i ON ri.item_id = i.item_id
+    WHERE ri.status = 'Pending'
+    ORDER BY r.created_at DESC LIMIT 3";
+$res_new_req = $conn->query($sql_new_req);
+$new_requests_data = $res_new_req ? $res_new_req->fetch_all(MYSQLI_ASSOC) : [];
+
+// 2. Ambil 3 Pulangan Aset Yang Dijadualkan Hari Ini
+$today = date('Y-m-d');
+$sql_returns = "
+    SELECT a.asset_code, u.name as user_name, r.return_date as return_time
+    FROM reservation_assets ra
+    JOIN assets a ON ra.asset_id = a.asset_id
+    JOIN reservation_items ri ON ra.reservation_item_id = ri.id
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    JOIN person u ON r.person_id = u.person_id
+    WHERE r.return_date = '$today' AND ri.status = 'Checked Out'
+    LIMIT 3";
+$res_returns = $conn->query($sql_returns);
+$returns_today_data = $res_returns ? $res_returns->fetch_all(MYSQLI_ASSOC) : [];
+
+// 3. Ambil 3 Item Paling Lama Overdue (Gunakan data yang sedia ada)
+// Memandangkan kau dah ada $overdue_details kat atas, kita cuma perlu tapis sikit:
+$top_overdue_data = array_slice($overdue_details, 0, 3);
+
 $conn->close(); 
 ?>
 
@@ -711,18 +743,13 @@ $conn->close();
                     <div id="taskSummary">
                         
                         <?php
-                        // !!! Sila pastikan pemboleh ubah ini didefinisikan dalam PHP anda sebelum outputting !!!
-                        // Contoh data dummy untuk demonstrasi:
-                        // $new_requests_data = [['item_name' => 'Laptop HP i7', 'user_name' => 'Badrul', 'time_ago' => '1 hour ago']];
-                        // $returns_today_data = [['asset_code' => 'PJT-004', 'return_time' => '14:00', 'user_name' => 'Sara']];
-                        // $top_overdue_data = [['item_name' => 'Camera Nikon D5000', 'days_overdue' => 15]];
                         
                         if (!empty($new_requests_data)): ?>
                             <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Loan Requests (<?= count($new_requests_data) ?>)</h6>
                             <ul class="list-unstyled small mb-3 border-bottom pb-2">
                             <?php foreach (array_slice($new_requests_data, 0, 3) as $req): ?>
                                 <li class="d-flex justify-content-between">
-                                    <span>**<?= htmlspecialchars($req['item_name']) ?>** by <?= htmlspecialchars($req['user_name']) ?></span>
+                                    <span><?= htmlspecialchars($req['item_name']) ?> by <?= htmlspecialchars($req['user_name']) ?></span>
                                     <span class="text-muted"><?= htmlspecialchars($req['time_ago']) ?></span>
                                 </li>
                             <?php endforeach; ?>
@@ -737,7 +764,7 @@ $conn->close();
                             <ul class="list-unstyled small mb-3 border-bottom pb-2">
                             <?php foreach (array_slice($returns_today_data, 0, 3) as $ret): ?>
                                 <li class="d-flex justify-content-between">
-                                    <span>**<?= htmlspecialchars($ret['asset_code']) ?>** (<?= htmlspecialchars($ret['user_name']) ?>)</span>
+                                    <span><?= htmlspecialchars($ret['asset_code']) ?> (<?= htmlspecialchars($ret['user_name']) ?>)</span>
                                     <span class="text-green fw-bold"><?= htmlspecialchars($ret['return_time']) ?></span>
                                 </li>
                             <?php endforeach; ?>
@@ -752,7 +779,7 @@ $conn->close();
                             <ul class="list-unstyled small mb-1">
                             <?php foreach (array_slice($top_overdue_data, 0, 3) as $overdue): ?>
                                 <li class="d-flex justify-content-between">
-                                    <span>**<?= htmlspecialchars($overdue['item_name']) ?>**</span>
+                                    <span><?= htmlspecialchars($overdue['item_name']) ?></span>
                                     <span class="badge rounded-pill bg-danger"><?= htmlspecialchars($overdue['days_overdue']) ?> days</span>
                                 </li>
                             <?php endforeach; ?>
