@@ -708,7 +708,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 <input type="hidden" name="role" id="editRole">
                 <div class="mb-3">
                     <label class="form-label">Name</label>
-                    <input type="text" id="editName" name="username" class="form-control bg-light" readonly>
+<input type="text" name="username" class="form-control" required oninput="this.value = this.value.toUpperCase()">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Email</label>

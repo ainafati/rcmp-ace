@@ -333,9 +333,9 @@
                 <div class="footer-col">
                     <h4>Follow Us</h4>
                     <div class="social-links">
-                        <a href="#"><i class="fab fa-facebook"></i></a>
-                        <a href="#"><i class="fab fa-instagram"></i></a>
-                        <a href="#"><i class="fab fa-youtube"></i></a>
+                        <a href="https://www.facebook.com/UniKLRoyalCollegeofMedicinePerak/"><i class="fab fa-facebook"></i></a>
+                        <a href="https://www.instagram.com/uniklrcmp/"><i class="fab fa-instagram"></i></a>
+                        <a href="https://www.youtube.com/channel/UCugrLnQZro3__D4R3x-bqRg"><i class="fab fa-youtube"></i></a>
                     </div>
                 </div>
                 <div class="footer-col footer-logos">

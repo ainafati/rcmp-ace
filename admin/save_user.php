@@ -15,7 +15,8 @@ $admin_name_session = htmlspecialchars(isset($_SESSION['name']) ? $_SESSION['nam
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    $username = trim(isset($_POST['username']) ? $_POST['username'] : '');
+// trim untuk buang space, strtoupper untuk tukar ke huruf besar
+$username = strtoupper(trim(isset($_POST['username']) ? $_POST['username'] : ''));
     $email = trim(isset($_POST['email']) ? $_POST['email'] : '');
     $id = trim(isset($_POST['id']) ? $_POST['id'] : '');
     $phoneNumber = trim(isset($_POST['phoneNumber']) ? $_POST['phoneNumber'] : '');

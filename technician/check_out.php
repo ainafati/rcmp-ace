@@ -89,15 +89,23 @@ $filter_date = isset($_GET['filter_date']) && !empty($_GET['filter_date']) ? $_G
 function fetch_reservations_by_status($conn, $statuses, $filter_date) {
     $status_placeholders = implode(',', array_fill(0, count($statuses), '?'));
 
+// Cari bahagian ni dalam function fetch_reservations_by_status
 $sql = "SELECT
             ri.id AS reservation_item_id, ri.status, ri.rejection_reason, ri.quantity, 
+            ri.approved_by, ri.checked_out_by, ri.checked_in_by,
+            ri.approved_on, ri.checked_out_on,   -- Tambah ni
+            ri.checked_in_on,  -- <--- TAMBAH COLUMN INI DI SINI
             r.reserve_date, r.return_date, r.created_at AS apply_date, 
             r.priority, r.reserve_id, r.reason AS reservation_reason,
             r.location, 
             u.name AS user_name, u.phoneNum AS user_phone,
             u.person_id AS user_person_id,
-            i.item_name, i.item_id,
-            -- TAMBAH LINE DI BAWAH NI --
+            i.item_name, i.item_id,            
+            -- TARIK NAMA ADMIN (Audit Trail) --
+            adm1.name AS approved_by_name,
+            adm2.name AS checked_out_by_name,
+            adm3.name AS checked_in_by_name,
+
             (SELECT GROUP_CONCAT(CONCAT(a.asset_code, ' (', a.brand, ')') SEPARATOR ', ') 
              FROM reservation_assets ra 
              JOIN assets a ON ra.asset_id = a.asset_id 
@@ -106,11 +114,16 @@ $sql = "SELECT
         JOIN reservations r ON ri.reserve_id = r.reserve_id
         JOIN person u ON r.person_id = u.person_id 
         JOIN item i ON ri.item_id = i.item_id 
+        -- JOIN UNTUK NAMA ADMIN --
+        LEFT JOIN person adm1 ON ri.approved_by = adm1.person_id
+        LEFT JOIN person adm2 ON ri.checked_out_by = adm2.person_id
+        LEFT JOIN person adm3 ON ri.checked_in_by = adm3.person_id
         WHERE ri.status IN ($status_placeholders)
         AND (
             ri.status != 'Approved' 
             OR (ri.status = 'Approved' AND r.reserve_date >= CURDATE())
         )";
+
 		
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
@@ -195,9 +208,10 @@ function create_request_table($requests) {
             $grouped_by_reserve[$item['reserve_id']][] = $item;
         }
 
-        $user_collapse_id = 'collapse_user_' . $user_index;
-        $user_header_id = 'header_user_' . $user_index;
-        $inner_accordion_id = 'inner_accordion_' . $user_index;
+$user_safe_id = preg_replace('/[^A-Za-z0-9]/', '', $user_name);
+        $user_collapse_id = 'collapse_user_' . $user_safe_id;
+        $user_header_id = 'header_user_' . $user_safe_id;
+        $inner_accordion_id = 'inner_accordion_' . $user_safe_id;
 
         // --- LEVEL 1: USER ACCORDION ---
         echo '<div class="accordion-item user-row shadow-sm mb-3 border-0 rounded-3 overflow-hidden">';
@@ -260,88 +274,126 @@ function create_request_table($requests) {
             echo '          <th class="text-center pe-3" style="width: 15%;">Actions</th>';
             echo '        </tr></thead><tbody>';
 foreach ($reservation_items as $row) {
-                $status = strtolower(trim($row['status']));
-                $id = $row['reservation_item_id'];
-                $p_class = ($row['priority'] == 1) ? 'bg-danger' : (($row['priority'] == 2) ? 'bg-warning text-dark' : 'bg-info text-dark');
-                $p_text = ($row['priority'] == 1) ? 'High' : (($row['priority'] == 2) ? 'Moderate' : 'Low');
+    $status = strtolower(trim($row['status']));
+    $id = $row['reservation_item_id'];
+    $p_class = ($row['priority'] == 1) ? 'bg-danger' : (($row['priority'] == 2) ? 'bg-warning text-dark' : 'bg-info text-dark');
+    $p_text = ($row['priority'] == 1) ? 'High' : (($row['priority'] == 2) ? 'Moderate' : 'Low');
 
-                $icon = 'fa-clock'; $color = '#ffc107'; $title = 'Pending';
-                if($status == 'approved'){ $icon = 'fa-check-circle'; $color = '#198754'; $title = 'Approved'; }
-                elseif($status == 'checked out' || $status == 'on loan'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
-                elseif($status == 'returned'){ $icon = 'fa-hand-holding-heart'; $color = '#0dcaf0'; $title = 'Returned'; }
-                elseif($status == 'rejected'){ $icon = 'fa-times-circle'; $color = '#dc3545'; $title = 'Rejected'; }
+    $icon = 'fa-clock'; $color = '#ffc107'; $title = 'Pending';
+    if($status == 'approved'){ $icon = 'fa-check-circle'; $color = '#198754'; $title = 'Approved'; }
+    elseif($status == 'checked out' || $status == 'on loan'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
+    elseif($status == 'returned'){ $icon = 'fa-hand-holding-heart'; $color = '#0dcaf0'; $title = 'Returned'; }
+    elseif($status == 'rejected'){ $icon = 'fa-times-circle'; $color = '#dc3545'; $title = 'Rejected'; }
 
-                echo "<tr id='row-{$id}' 
-                        data-qty='{$row['quantity']}' 
-                        data-item-id='{$row['item_id']}' 
-                        data-user-name='" . htmlspecialchars($user_name) . "' 
-                        data-itemname='" . htmlspecialchars($row['item_name']) . "'>";
-                
-                // KOLOM 1: ITEM / PRIORITY / ASSETS
-                echo "  <td class='ps-3 py-3'>";
-                echo "    <div class='fw-bold text-dark'>" . htmlspecialchars($row['item_name']) . "</div>";
-                echo "    <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
+    echo "<tr id='row-{$id}' 
+            data-qty='{$row['quantity']}' 
+            data-item-id='{$row['item_id']}' 
+            data-user-name='" . htmlspecialchars($user_name) . "' 
+            data-itemname='" . htmlspecialchars($row['item_name']) . "'
+            data-approved-by='" . htmlspecialchars($row['approved_by_name'] ?? 'N/A') . "'
+            data-checked-out-by='" . htmlspecialchars($row['checked_out_by_name'] ?? 'N/A') . "'
+            data-checked-in-by='" . htmlspecialchars($row['checked_in_by_name'] ?? 'N/A') . "'>";
 
-                if (!empty($row['assigned_assets'])) {
-                    echo "<div class='assigned-assets mt-2'>";
-                    $assets_list = explode(', ', $row['assigned_assets']);
-                    foreach ($assets_list as $asset_info) {
-                        echo "<div class='badge border text-dark bg-light d-inline-block p-2 me-1 mb-1' style='font-size: 0.7rem; font-weight: 500;'>";
-                        echo "<i class='fa-solid fa-barcode me-1 text-primary'></i>";
-                        echo htmlspecialchars($asset_info);
-                        echo "</div>";
-                    }
-                    echo "</div>";
-                }
-                echo "  </td>";
+    // 1. KOLOM ITEM / PRIORITY
+    echo "<td class='ps-3 py-3'>";
+    echo "  <div class='fw-bold text-dark'>" . htmlspecialchars($row['item_name']) . "</div>";
+    echo "  <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
+    if (!empty($row['assigned_assets'])) {
+        echo "<div class='assigned-assets mt-2'>";
+        $assets_list = explode(', ', $row['assigned_assets']);
+        foreach ($assets_list as $asset_info) {
+            echo "<div class='badge border text-dark bg-light d-inline-block p-1 me-1 mb-1' style='font-size: 0.65rem; font-weight: 500;'>";
+            echo "<i class='fa-solid fa-barcode me-1 text-primary'></i>" . htmlspecialchars($asset_info);
+            echo "</div>";
+        }
+        echo "</div>";
+    }
+    echo "</td>";
 
-                // KOLOM 2: LOCATION / PURPOSE (Ini yang buat pening tadi)
-                echo "  <td>"; // <--- Kena ada buka tag td kat sini!
-                if (!empty($row['location'])) {
-                    $formatted_location = ucwords(strtolower($row['location']));
-                    echo "    <div class='text-primary small fw-bold mb-1' style='line-height: 1.2;'>";
-                    echo "      <i class='fa-solid fa-location-dot me-1' style='font-size: 0.7rem;'></i>" . htmlspecialchars($formatted_location);
-                    echo "    </div>";
-                }
+    // 2. KOLOM LOCATION / PURPOSE
+    echo "<td>";
+    if (!empty($row['location'])) {
+        echo "<div class='text-primary small fw-bold mb-1'><i class='fa-solid fa-location-dot me-1'></i>" . htmlspecialchars(ucwords(strtolower($row['location']))) . "</div>";
+    }
+    if ($status === 'rejected' && !empty($row['rejection_reason'])) {
+        echo "<div class='text-danger small'><i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']) . "</div>";
+    } elseif (!empty($row['reservation_reason'])) {
+        echo "<div class='text-muted small'><i class='fa-solid fa-file-lines me-1'></i>" . htmlspecialchars(ucwords(strtolower($row['reservation_reason']))) . "</div>";
+    } else {
+        echo "<span class='text-muted opacity-50 small'>—</span>";
+    }
+    echo "</td>";
 
-                if ($status === 'rejected' && !empty($row['rejection_reason'])) {
-                    echo "    <div class='text-danger small' style='line-height: 1.2;'>";
-                    echo "      <i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']);
-                    echo "    </div>";
-                } elseif (!empty($row['reservation_reason'])) {
-                    $formatted_reason = ucwords(strtolower($row['reservation_reason']));
-                    echo "    <div class='text-muted small' style='line-height: 1.2;'>";
-                    echo "      <i class='fa-solid fa-file-lines me-1' style='font-size: 0.7rem; opacity:0.7;'></i>" . htmlspecialchars($formatted_reason);
-                    echo "    </div>";
-                } else {
-                    if (empty($row['location'])) echo "    <span class='text-muted opacity-50 small'>—</span>";
-                }
-                echo "  </td>"; // <--- Tutup tag td
+    // 3. KOLOM QTY
+    echo "<td class='text-center fw-bold'>" . htmlspecialchars($row['quantity']) . "</td>";
 
-                // KOLOM SETERUSNYA
-                echo "  <td class='text-center fw-bold'>{$row['quantity']}</td>";
-                echo "  <td><div class='small text-muted'><i class='fa-regular fa-calendar me-1'></i>" . date('d M', strtotime($row['reserve_date'])) . " - " . date('d M Y', strtotime($row['return_date'])) . "</div></td>";
-                
-                echo "  <td class='text-center'><div style='display:flex; justify-content:center;'><div title='$title' style='position:relative; width:28px; height:28px; background:$color; color:#fff; border-radius:50%;'>";
-                echo "    <i class='fa-solid $icon' style='position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.75rem;'></i>";
-                echo "  </div></div></td>";
+    // 4. KOLOM DURATION
+    $start = date('d M', strtotime($row['reserve_date']));
+    $end = date('d M Y', strtotime($row['return_date']));
+    echo "<td><div class='small fw-medium'><i class='fa-solid fa-calendar-days me-1 text-muted'></i> $start - $end</div></td>";
 
-                echo "  <td class='text-center pe-3'>";
-                if ($status === 'pending') {
-                    echo "<div class='d-flex gap-1 justify-content-center'>";
-                    echo "  <button type='button' class='btn btn-success btn-sm' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
-                    echo "  <button type='button' class='btn btn-danger btn-sm' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
-                    echo "</div>";
-                } elseif ($status === 'approved') {
-                    echo "<button type='button' class='btn btn-primary btn-sm rounded-circle' style='width: 35px; height: 35px; display: inline-flex; align-items: center; justify-content: center;' onclick='event.stopPropagation(); checkOutItem($id)' title='Release Asset'><i class='fa-solid fa-truck-ramp-box'></i></button>";
-                } elseif ($status === 'on loan' || $status === 'checked out'){
-                    echo "<button type='button' class='btn btn-warning btn-sm px-3 rounded-pill text-dark' onclick='event.stopPropagation(); checkInItem($id)' title='Return Asset'><i class='fa-solid fa-box-open'></i></button>";
-                } else {
-                    echo "—";
-                }
-                echo "  </td>";
-                echo "</tr>";
-            }
+// 5. KOLOM STATUS (Dynamic Audit Trail)
+echo "<td class='text-center'>";
+echo "  <div class='d-flex flex-column align-items-center justify-content-center' style='min-height: 50px;'>";
+echo "    <div title='$title' style='width:28px; height:28px; background:$color; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center;'>";
+echo "      <i class='fa-solid $icon' style='font-size:0.75rem;'></i>";
+echo "    </div>";
+
+if ($status !== 'pending') {
+    // Collect Data
+    $app_by = htmlspecialchars($row['approved_by_name'] ?? 'System');
+    $app_on = !empty($row['approved_on']) ? date('d M Y', strtotime($row['approved_on'])) : '-';
+    
+    $out_by = htmlspecialchars($row['checked_out_by_name'] ?? 'N/A');
+    $out_on = !empty($row['checked_out_on']) ? date('d M Y', strtotime($row['checked_out_on'])) : '-';
+    
+    $in_by  = htmlspecialchars($row['checked_in_by_name'] ?? 'N/A');
+    $in_on  = !empty($row['checked_in_on']) ? date('d M Y', strtotime($row['checked_in_on'])) : '-';
+
+    // Bina Content Popover secara dinamik
+    $popContent = "<b>1. Approved</b><br>By: $app_by<br>Date: $app_on";
+    
+    if ($status == 'checked out' || $status == 'on loan' || $status == 'returned') {
+        $popContent .= "<hr class='my-1'><b>2. Checked Out</b><br>By: $out_by<br>Date: $out_on";
+    }
+    
+    if ($status == 'returned') {
+        $popContent .= "<hr class='my-1'><b>3. Returned</b><br>By: $in_by<br>Date: $in_on";
+    }
+
+    echo "<button type='button' class='btn btn-link p-0 mt-1 text-muted info-popover' 
+            style='font-size: 0.65rem; text-decoration: none;'
+            data-bs-toggle='popover' 
+            data-bs-trigger='focus'
+            title='Transaction History' 
+            data-bs-content=\"$popContent\"
+            data-bs-html='true'>
+            <i class='fa-solid fa-circle-info me-1'></i>Details
+          </button>";
+}
+echo "  </div>";
+echo "</td>";
+
+
+// 6. KOLOM ACTIONS
+echo "<td class='text-center pe-3'>";
+if ($status === 'pending') {
+    echo "<div class='d-flex gap-1 justify-content-center'>";
+    echo "  <button class='btn btn-success btn-sm' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
+    echo "  <button class='btn btn-danger btn-sm' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
+    echo "</div>";
+} elseif ($status === 'approved') {
+    echo "<button class='btn btn-primary btn-sm rounded-circle' onclick='event.stopPropagation(); checkOutItem($id)' title='Release Asset'><i class='fa-solid fa-truck-ramp-box'></i></button>";
+} elseif ($status === 'on loan' || $status === 'checked out'){
+    // SINI: Aku dah buang button info biru yang buat dia nampak double tu
+    echo "<button class='btn btn-warning btn-sm px-3 rounded-pill text-dark' onclick='event.stopPropagation(); checkInItem($id)' title='Return Asset'><i class='fa-solid fa-box-open me-1'></i>Return</button>";
+} else {
+    echo "<button class='btn btn-outline-secondary btn-sm rounded-pill px-3' onclick='openAuditModal($id)'><i class='fa-solid fa-clock-rotate-left me-1'></i> History</button>";
+}
+echo "</td>";
+
+    echo "</tr>";
+}
             echo '</tbody></table></div>';
             echo '    </div>'; 
             echo '  </div>';
@@ -665,12 +717,12 @@ foreach ($reservation_items as $row) {
                         </h6>
                     </div>
                     <div class="col-md-8">
-                        <form class="d-flex justify-content-md-end align-items-center gap-2">
-                            <label for="applyDate" class="small text-muted mb-0 d-none d-lg-block">Select Date:</label>
-                            <input type="date" id="applyDate" class="form-control form-control-sm" style="width: 180px; border-radius: 8px;">
-                            <button type="submit" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">Filter</button>
-                            <button type="reset" class="btn btn-outline-secondary btn-sm px-3" style="border-radius: 8px;">Reset</button>
-                        </form>
+                       <form method="GET" action="check_out.php" class="d-flex justify-content-md-end align-items-center gap-2">
+    <label for="applyDate" class="small text-muted mb-0 d-none d-lg-block">Select Date:</label>
+    <input type="date" id="applyDate" name="filter_date" value="<?= htmlspecialchars($filter_date ?? '') ?>" class="form-control form-control-sm" style="width: 180px; border-radius: 8px;">
+    <button type="submit" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">Filter</button>
+    <a href="check_out.php" class="btn btn-outline-secondary btn-sm px-3" style="border-radius: 8px;">Reset</a>
+</form>
                     </div>
                 </div>
             </div>
@@ -780,6 +832,51 @@ foreach ($reservation_items as $row) {
     </div>
 </div>
 
+<div class="modal fade" id="auditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title"><i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i>Reservation History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="timeline-audit">
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-center" style="width: 30px;">
+                            <i class="fa-solid fa-check-circle text-success fs-4"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold">Approved By</h6>
+                            <p class="text-muted small mb-0" id="audit_approved_name">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-center" style="width: 30px;">
+                            <i class="fa-solid fa-truck-ramp-box text-primary fs-4"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold">Checked Out By</h6>
+                            <p class="text-muted small mb-0" id="audit_checked_out_name">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <div class="me-3 text-center" style="width: 30px;">
+                            <i class="fa-solid fa-box-open text-warning fs-4"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold">Returned / Checked In By</h6>
+                            <p class="text-muted small mb-0" id="audit_checked_in_name">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -789,6 +886,11 @@ foreach ($reservation_items as $row) {
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl)
+    })
+	
     // 1. Logik Auto-Search dari Dashboard
     const urlParams = new URLSearchParams(window.location.search);
     const searchId = urlParams.get('search_id');
@@ -884,19 +986,26 @@ $(document).ready(function() {
         tabTrigger.show();
     }
     
-    $('#userSearchInput').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        
-        // Kita tapis accordion-item dalam tab yang sedang aktif sahaja
-        // supaya tak kacau tab lain (lebih ringan)
-        $('.tab-pane.active .accordion-item').filter(function() {
-            // Dia akan cari nama user (header) dan juga content dalam baris tu
+$('#userSearchInput').on('keyup', function() {
+    var value = $(this).val().toLowerCase();
+    var $activeAccordionItems = $('.tab-pane.active .user-row');
+
+    if (value === "") {
+        // Kalau kotak search kosong, jalankan balik pagination page 1
+        showPage(1);
+        $('.pagination').show(); 
+    } else {
+        // Kalau user tengah menaip, sorok pagination & tapis semua
+        $('.pagination').hide(); 
+        $activeAccordionItems.each(function() {
             var textToSearch = $(this).find('.accordion-header').text().toLowerCase();
-            
-            // Toggle: Kalau jumpa tunjuk, kalau tak jumpa sorok
             $(this).toggle(textToSearch.indexOf(value) > -1);
         });
-    });
+    }
+    
+    // PENTING: Refresh popover supaya butang 'Details' berfungsi pada hasil search
+    refreshBootstrapComponents();
+});
 
     // Reset kotak search bila user tukar tab (New Request -> On Loan etc)
     $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
@@ -904,6 +1013,19 @@ $(document).ready(function() {
         $('.accordion-item').show();   // Tunjukkan balik semua item
     });
     // ==========================================
+
+$.ajaxSetup({
+    error: function(xhr, status, error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'System Error',
+            text: 'Something went wrong! Please contact your admin or check the console.',
+            footer: 'Error Details: ' + error
+        });
+        // Enable-kan balik semua button yang sangkut "Processing..."
+        $('.btn').prop('disabled', false); 
+    }
+});
 
     function handleBulkAction(action, reserveId, title, text, confirmText, confirmColor) {
         
@@ -962,8 +1084,42 @@ $(document).ready(function() {
         );
     });
 
+// Panggil semula komponen Bootstrap selepas filter
+function refreshBootstrapComponents() {
+    // 1. Hidupkan balik Accordion
+    var accordions = document.querySelectorAll('.accordion-collapse');
+    accordions.forEach(acc => new bootstrap.Collapse(acc, { toggle: false }));
 
+    // 2. Hidupkan balik Popover (Details)
+    var popovers = document.querySelectorAll('[data-bs-toggle="popover"]');
+    popovers.forEach(pop => new bootstrap.Popover(pop));
+}
 
+// Letakkan ini di luar atau di dalam $(document).ready()
+function openAuditModal(id) {
+    // 1. Dapatkan row berdasarkan ID
+    const row = document.getElementById('row-' + id);
+    
+    if (row) {
+        // 2. Ambil data admin yang disimpan dalam data-attributes (Pastikan PHP kau output data ni)
+        const approvedBy = row.getAttribute('data-approved-by') || 'Not available';
+        const checkedOutBy = row.getAttribute('data-checked-out-by') || 'Not available';
+        const checkedInBy = row.getAttribute('data-checked-in-by') || 'Not available';
+        
+        // 3. Masukkan ke dalam modal history
+        $('#audit_approved_name').text(approvedBy);
+        $('#audit_checked_out_name').text(checkedOutBy);
+        $('#audit_checked_in_name').text(checkedInBy);
+
+        // 4. Paparkan modal
+        const auditModal = new bootstrap.Modal(document.getElementById('auditModal'));
+        auditModal.show();
+    } else {
+        Swal.fire('Error', 'Audit data not found for this row.', 'error');
+    }
+}
+// Jadikan fungsi ni global supaya boleh dipanggil oleh onclick dalam HTML
+window.openAuditModal = openAuditModal;
 
 
 
@@ -1515,7 +1671,9 @@ $('#confirmCheckInBtn').on('click', function() {
         }
     });
     
+	
 });
+
 </script>
 </body>
 </html>

@@ -265,11 +265,9 @@ $maintenance_assets_details_json = json_encode($maintenance_assets_details);
 $events_json = json_encode($events);
 $new_notifications_json = json_encode($new_notifications);
 
-// --- SQL UNTUK PENDING ACTIONS DASHBOARD ---
-
-// 1. Ambil 3 Permohonan Pinjaman Baru (Pending)
+// 1. Ambil 3 Permohonan Pinjaman Baru (Ganti yang tadi)
 $sql_new_req = "
-    SELECT i.item_name, u.name as user_name, r.created_at 
+    SELECT i.item_name, u.name as user_name, r.created_at as time_ago 
     FROM reservation_items ri
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     JOIN person u ON r.person_id = u.person_id
@@ -278,6 +276,7 @@ $sql_new_req = "
     ORDER BY r.created_at DESC LIMIT 3";
 $res_new_req = $conn->query($sql_new_req);
 $new_requests_data = $res_new_req ? $res_new_req->fetch_all(MYSQLI_ASSOC) : [];
+
 
 // 2. Ambil 3 Pulangan Aset Yang Dijadualkan Hari Ini
 $today = date('Y-m-d');

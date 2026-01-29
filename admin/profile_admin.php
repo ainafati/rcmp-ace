@@ -11,7 +11,7 @@ if (!isset($_SESSION['person_id'])) {
 $person_id = (int)$_SESSION['person_id'];
 
 // AMBIL DATA PENGGUNA
-$stmt = $conn->prepare("SELECT name, email, phoneNum FROM person WHERE person_id = ?");
+$stmt = $conn->prepare("SELECT name, email, phoneNum, id FROM person WHERE person_id = ?");
 if ($stmt === false) {
     die("SQL Error: " . htmlspecialchars($conn->error));
 }
@@ -163,62 +163,81 @@ $current_page = 'profile_admin.php';
                         </div>
                     <?php endif; ?>
 
-                    <div id="viewMode">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-id-card me-2 text-info"></i> Personal Info</h5>
-                            <button id="editBtn" class="btn btn-primary px-4 rounded-pill"><i class="fa-solid fa-pen-to-square me-2"></i>Edit</button>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-sm-6">
-                                <label class="small text-muted">Full Name</label>
-                                <div class="fw-bold"><?= htmlspecialchars($admin['name']) ?></div>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="small text-muted">Phone Number</label>
-                                <div class="fw-bold"><?= htmlspecialchars($admin['phoneNum']) ?></div>
-                            </div>
-                            <div class="col-12">
-                                <label class="small text-muted">Email Address</label>
-                                <div class="fw-bold"><?= htmlspecialchars($admin['email']) ?></div>
-                            </div>
-                        </div>
-                    </div>
+<div id="viewMode">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0 fw-bold"><i class="fa-solid fa-id-card me-2 text-info"></i> Personal Info</h5>
+        <button id="editBtn" class="btn btn-primary px-4 rounded-pill"><i class="fa-solid fa-pen-to-square me-2"></i>Edit</button>
+    </div>
+    <div class="row g-3">
+        <div class="col-sm-6">
+            <label class="small text-muted">System ID (Display ID)</label>
+            <div class="fw-bold text-primary"><?= htmlspecialchars($admin['id'] ?? 'N/A') ?></div>
+        </div>
+        <div class="col-sm-6">
+            <label class="small text-muted">Full Name</label>
+            <div class="fw-bold"><?= htmlspecialchars($admin['name'] ?? '') ?></div>
+        </div>
+        <div class="col-sm-6">
+            <label class="small text-muted">Email Address</label>
+            <div class="fw-bold text-muted"><?= htmlspecialchars($admin['email'] ?? '') ?></div>
+        </div>
+        <div class="col-sm-6">
+            <label class="small text-muted">Phone Number</label>
+            <div class="fw-bold"><?= htmlspecialchars($admin['phoneNum'] ?? '') ?></div>
+        </div>
+    </div>
+</div>
 
-                    <div id="editMode" style="display: none;">
-                        <h5 class="mb-4 fw-bold">Update Profile</h5>
-                        <form action="update_profile_admin.php" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold">Full Name</label>
-                                <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($admin['name']) ?>" required>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label small fw-bold">Email</label>
-                                    <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($admin['email']) ?>" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label small fw-bold">Phone</label>
-                                    <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum']) ?>" required>
-                                </div>
-                            </div>
-                            <hr class="my-4">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label small fw-bold">New Password (Optional)</label>
-                                    <input type="password" class="form-control" name="new_password">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label small fw-bold">Confirm Password</label>
-                                    <input type="password" class="form-control" name="confirm_password">
-                                </div>
-                            </div>
-                            <div class="mt-4">
-                                <button type="submit" class="btn btn-primary px-4">Save Changes</button>
-                                <button type="button" id="cancelBtn" class="btn btn-light px-4 ms-2">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
+<div id="editMode" style="display: none;">
+    <h5 class="mb-4 fw-bold">Update Profile</h5>
+    <form action="update_profile_admin.php" method="POST" id="profileForm">
+        <div class="row g-3">
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold">Display ID (Read Only)</label>
+                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($admin['id'] ?? '') ?>" readonly>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold">Email (Read Only)</label>
+                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($admin['email'] ?? '') ?>" readonly>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold">Full Name</label>
+                <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($admin['name'] ?? '') ?>" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold">Phone</label>
+                <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum'] ?? '') ?>" required>
+            </div>
+        </div>
+        <hr class="my-4">
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold text-danger">New Password (Optional)</label>
+                <input type="password" class="form-control shadow-sm" name="new_password" id="new_password">
+                
+                <div class="password-requirements mt-3 p-3 border rounded bg-white small">
+                    <p class="mb-2 fw-bold text-muted">Password must contain:</p>
+                    <div id="req-length" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>At least 8 characters</div>
+                    <div id="req-upper" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One uppercase letter (A-Z)</div>
+                    <div id="req-lower" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One lowercase letter (a-z)</div>
+                    <div id="req-number" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One number (0-9)</div>
+                    <div id="req-special" class="text-danger"><i class="fa-solid fa-circle-xmark me-2"></i>One special character (@, #, $, etc.)</div>
                 </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label small fw-bold">Confirm New Password</label>
+                <input type="password" class="form-control shadow-sm" name="confirm_password" id="confirm_password">
+                <div id="match-msg" class="small mt-2"></div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary px-4 shadow-sm" id="submitBtn">Save Changes</button>
+            <button type="button" id="cancelBtn" class="btn btn-light px-4 ms-2">Cancel</button>
+        </div>
+    </form>
+</div>                </div>
             </div>
         </div>
     </div>
@@ -226,42 +245,85 @@ $current_page = 'profile_admin.php';
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('admin-sidebar');
-        const toggleBtn = document.getElementById('sidebar-toggle-btn');
-        const overlay = document.getElementById('sidebar-overlay');
-        
-        // Toggle Sidebar Function
-        function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Sidebar Logic
+    const sidebar = document.getElementById('admin-sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const overlay = document.getElementById('sidebar-overlay');
 
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                toggleSidebar();
-            });
-        }
+    function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
 
-        overlay.addEventListener('click', toggleSidebar);
-
-        // Edit/View Toggle
-        const viewMode = document.getElementById('viewMode');
-        const editMode = document.getElementById('editMode');
-        const editBtn = document.getElementById('editBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
-
-        editBtn.addEventListener('click', () => {
-            viewMode.style.display = 'none';
-            editMode.style.display = 'block';
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSidebar();
         });
+    }
+    overlay.addEventListener('click', toggleSidebar);
 
-        cancelBtn.addEventListener('click', () => {
-            editMode.style.display = 'none';
-            viewMode.style.display = 'block';
-        });
+    // 2. View/Edit Toggle Logic
+    const viewMode = document.getElementById('viewMode');
+    const editMode = document.getElementById('editMode');
+    const editBtn = document.getElementById('editBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    editBtn.addEventListener('click', () => {
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
     });
+
+    cancelBtn.addEventListener('click', () => {
+        editMode.style.display = 'none';
+        viewMode.style.display = 'block';
+    });
+
+    // 3. Password Validation Logic
+    const newPass = document.getElementById('new_password');
+    const confirmPass = document.getElementById('confirm_password');
+
+    function updateUI(el, isValid) {
+        if (isValid) {
+            el.classList.replace('text-danger', 'text-success');
+            el.querySelector('i').classList.replace('fa-circle-xmark', 'fa-circle-check');
+        } else {
+            el.classList.replace('text-success', 'text-danger');
+            el.querySelector('i').classList.replace('fa-circle-check', 'fa-circle-xmark');
+        }
+    }
+
+    newPass.addEventListener('keyup', function() {
+        const val = this.value;
+        if (val === "") {
+            document.querySelectorAll('.password-requirements div').forEach(div => {
+                div.className = "text-danger mb-1";
+                div.querySelector('i').className = "fa-solid fa-circle-xmark me-2";
+            });
+            return;
+        }
+
+        updateUI(document.getElementById('req-length'), val.length >= 8);
+        updateUI(document.getElementById('req-upper'), /[A-Z]/.test(val));
+        updateUI(document.getElementById('req-lower'), /[a-z]/.test(val));
+        updateUI(document.getElementById('req-number'), /[0-9]/.test(val));
+        updateUI(document.getElementById('req-special'), /[!@#$%^&*(),.?":{}|<> ]/.test(val));
+    });
+
+    confirmPass.addEventListener('keyup', function() {
+        const msg = document.getElementById('match-msg');
+        if (this.value === "") {
+            msg.textContent = "";
+        } else if (this.value === newPass.value) {
+            msg.textContent = "Passwords match!";
+            msg.className = "small mt-2 text-success";
+        } else {
+            msg.textContent = "Passwords do not match.";
+            msg.className = "small mt-2 text-danger";
+        }
+    });
+});
 </script>
 </body>
 </html>
