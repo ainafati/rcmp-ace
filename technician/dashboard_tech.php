@@ -201,69 +201,92 @@ $historyResult = $conn->query($historySql);
 if ($historyResult) {
     while ($h = $historyResult->fetch_assoc()) {
         
-        // Acara Tempahan
+        $returnDate = date('Y-m-d', strtotime($h['return_date']));
+
+        // --- 1. Acara Tempahan (HIJAU) ---
         $events[] = [
             'title' => "{$h['item_name']} ({$h['quantity']}) - {$h['username']}",
             'start' => date('Y-m-d', strtotime($h['reserve_date'])),
-            'end' => date('Y-m-d', strtotime($h['return_date'] . ' +1 day')), 
-            'color' => '#10b981', 
-            'description' => 'Reservation'
+            // End +1 supaya petak hari terakhir (14hb/17hb) penuh dengan warna hijau
+            'end' => date('Y-m-d', strtotime($returnDate . ' +1 day')), 
+            'backgroundColor' => '#10b981', 
+            'borderColor' => '#10b981',
+            'description' => 'Reservation',
+            'allDay' => true
         ];
 
-        // Tempoh Buffer
+        // --- 2. Tempoh Buffer (OREN) ---
         if ($h['status'] === 'Checked Out' && !empty($h['return_date'])) {
-            $bufferStartDate = date('Y-m-d', strtotime($h['return_date'] . ' +1 day'));
-            $bufferEndDate = date('Y-m-d', strtotime($h['return_date'] . ' +2 days')); 
+            // PAKSA BUFFER BERMULA HARI SETERUSNYA (15hb atau 18hb)
+            $bufferStart = date('Y-m-d', strtotime($returnDate . ' +1 day'));
+            // END +2 SUPAYA DIA MENGISI PENUH HARI TERSEBUT
+            $bufferEnd = date('Y-m-d', strtotime($returnDate . ' +2 days')); 
 
             $events[] = [
                 'title' => "Buffer: {$h['item_name']}",
-                'start' => $bufferStartDate,
-                'end' => $bufferEndDate,
-                'color' => '#f59e0b', 
-                'textColor' => '#854d0e',
-                'description' => 'Buffer Period - Pending Check-in'
+                'start' => $bufferStart,
+                'end' => $bufferEnd,
+                'backgroundColor' => '#f59e0b', 
+                'borderColor' => '#f59e0b',
+                'textColor' => '#ffffff',
+                'description' => 'Buffer - Pending Check-in',
+                'allDay' => true // Wajib untuk elakkan jadi titik
             ];
         }
     }
-} else {
-    error_log("Error fetching reservation history for calendar: " . $conn->error);
 }
-
-// --- Pemberitahuan (Tiada perubahan) ---
+// --- Pemberitahuan (Notification History & New) ---
+// --- Pemberitahuan (Notification History & New) ---
 $tech_id = (int) $_SESSION['person_id']; 
-$tech_role_id = 2; // Anda menetapkan ID peranan Juruteknik kepada 2
+$tech_role_id = 2; 
 
-$sql_notif = "SELECT n.*
-              FROM notifications n
-              WHERE n.person_id = ? 
-              AND n.recipient_role_id = ? 
-              AND n.is_read = 0 
-              ORDER BY n.created_at DESC 
-              LIMIT 10";
-              
-$stmt_notif = $conn->prepare($sql_notif);
+// Selesaikan isu GROUP BY
+$conn->query("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))");
 
-if (!$stmt_notif) {
-    error_log("Notification Prepare failed: (" . $conn->errno . ") " . $conn->error);
-    $new_notifications = [];
+// Ambil 10 notifikasi unik (tak berulang)
+$sql_all_notif = "SELECT * FROM notifications 
+                  WHERE person_id = ? OR recipient_role_id = ? 
+                  GROUP BY message, related_id 
+                  ORDER BY created_at DESC 
+                  LIMIT 10";
+
+$stmt_all = $conn->prepare($sql_all_notif);
+if ($stmt_all) {
+    $stmt_all->bind_param("ii", $tech_id, $tech_role_id);
+    $stmt_all->execute();
+    $all_notifications = $stmt_all->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt_all->close();
 } else {
-    $stmt_notif->bind_param("ii", $tech_id, $tech_role_id);
-    $stmt_notif->execute();
-    $result_notif = $stmt_notif->get_result();
-    $new_notifications = $result_notif ? $result_notif->fetch_all(MYSQLI_ASSOC) : [];
-    $stmt_notif->close();
+    $all_notifications = [];
 }
 
-$new_notif_count = count($new_notifications);
+// Kira jumlah UNREAD yang sebenar untuk badge merah
+$sql_unread = "SELECT COUNT(*) as unread FROM notifications 
+               WHERE (person_id = ? OR recipient_role_id = ?) AND is_read = 0";
+$stmt_u = $conn->prepare($sql_unread);
+$stmt_u->bind_param("ii", $tech_id, $tech_role_id);
+$stmt_u->execute();
+$new_notif_count = $stmt_u->get_result()->fetch_assoc()['unread'] ?? 0;
+$stmt_u->close();
 
-// --- Pengekodan JSON (Tiada perubahan) ---
+
+// Gantikan line 271 yang error tu dengan ini:
+$new_notif_count = isset($all_notifications) ? count(array_filter($all_notifications, function($n) { 
+    return $n['is_read'] == 0; 
+})) : 0;
+
+
+// --- Pengekodan JSON ---
 $total_assets_details_json = json_encode($total_assets_details);
 $available_assets_details_json = json_encode($available_assets_details);
 $checked_out_details_json = json_encode($checked_out_details);
 $overdue_details_json = json_encode($overdue_details);
 $maintenance_assets_details_json = json_encode($maintenance_assets_details);
 $events_json = json_encode($events);
-$new_notifications_json = json_encode($new_notifications);
+
+// TUKAR LINE INI: Guna $all_notifications supaya variable ni wujud dlm JSON
+$new_notifications_json = json_encode($all_notifications ?? []);
+
 
 // 1. Ambil 3 Permohonan Pinjaman Baru (Ganti yang tadi)
 $sql_new_req = "
@@ -302,293 +325,202 @@ $conn->close();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>Technician Dashboard | UniKL ACE</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<title>Technician Dashboard | UniKL ACE</title>
 
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<link rel="stylesheet" href="../css/style.css">
 <style>
-    /* KEKALKAN SEMUA STYLES LAMA */
-    :root {
-        /* Warna Utama (Cyan/Teal) */
-        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
-        --primary-light: #f0f9ff; /* Biru Sangat Muda untuk Latar Belakang Aktif */
-        --primary-hover: #0891b2; /* Cyan 700 */
-        --danger-color: #ef4444; /* Merah untuk Logout */
-        
-        /* Warna Sedia Ada (Kekal Sama) */
-        --bg-light-gray: #f8fafc;
-        --text-dark: #1e293b; 
-        --text-muted: #64748b;
-    }
-    
-    /* BASE & TYPOGRAPHY */
-    body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
-    h3, h5, .modal-title { font-weight: 600; color: var(--text-dark); }
-    .card { border-radius: 12px; border: 1px solid #e5e7eb; }
-    
-    /* UTILITY COLORS (Diselaraskan) */
-    .bg-primary-blue { background-color: var(--primary-color); } /* Diganti dengan Cyan */
-    .text-primary-blue { color: var(--primary-color); } /* Diganti dengan Cyan */
-    .text-green { color: #10b981; }
-    .text-orange { color: #f97316; }
-    .text-red { color: #ef4444; }
-    .text-amber { color: #f59e0b; }
 
-    /* DEFINISI SIDEBAR (MOBILE & DESKTOP) */
-    .sidebar { 
-        width: 250px; 
-        position: fixed; 
-        top: 0; 
-        bottom: 0; 
-        left: 0; 
-        background: #ffffff; 
-        padding: 20px 0; 
-        border-right: 1px solid #e5e7eb; 
-        display: flex; 
-        flex-direction: column; 
-        z-index: 1050; /* Naikkan Z-index sedikit untuk overlay/toggle */
-        transition: transform 0.3s ease; /* Tambah Transisi */
-    }
-    .sidebar-header { padding: 0 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
     
-    /* LOGO ICON: KOTAK CYAN/TEAL */
-    .logo-icon { 
-        width: 40px; height: 40px; 
-        background-color: var(--primary-color); /* Menggunakan Cyan */
-        color: white; 
-        border-radius: 10px; 
-        display: flex; align-items: center; justify-content: center; 
-        font-size: 20px; 
-    }
-
-    /* Logo Text Styles */
-    .logo-text strong { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); }
-    .logo-text span { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
     
-    /* Sidebar Links Container */
-    .sidebar-nav { margin-top: 30px; padding: 0 15px; flex-grow: 1; } 
-    .sidebar-footer { padding: 0 15px; margin-top: auto; }
-
-    .sidebar a { 
-        display: flex; align-items: center; gap: 12px; 
-        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
-        margin-bottom: 8px; border-radius: 8px; 
-        font-weight: 500; 
-        transition: all 0.2s ease-in-out; 
-        position: relative; 
-    }
-
-    /* ACTIVE & HOVER STYLE (Menggunakan Cyan) */
-    .sidebar a.active, .sidebar a:hover:not(.logout-link) { 
-        background: var(--primary-color); /* Cyan Penuh */
-        color: #fff; 
-    }
-
-    /* BADGE STYLES */
-    .sidebar a .badge { margin-left: auto; background-color: var(--danger-color); color: white; }
-    .sidebar a.active .badge { background-color: #ffffff; color: var(--danger-color); }
-
-
-    /* LOGOUT BUTTON: MERAH TEKS SAHAJA */
-    .sidebar-footer a.logout-link {
-        background: transparent !important; 
-        color: var(--danger-color) !important; /* Warna Merah */
-        border-radius: 8px;
-        font-weight: 500 !important; 
-        padding: 12px 15px;
-        margin-top: 25px; 
-        justify-content: flex-start; 
-    }
-    .sidebar-footer a.logout-link:hover {
-        background: #fee2e2 !important; /* Latar belakang hover Merah Pudar */
-        color: var(--danger-color) !important;
-    }
-
-    /* MAIN LAYOUT & TOPBAR (Kekal Sama, guna primary-color baru) */
-    .main-content { margin-left: 250px; min-height: 100vh; /* Pastikan ia meliputi seluruh ketinggian */ }
-    .topbar { background: #ffffff; padding: 15px 30px; display: flex; justify-content: flex-end; align-items: center; border-bottom: 1px solid #e5e7eb; z-index: 1020; }
-    .container-fluid { padding: 30px; }
-    .topbar h3 { margin-right: auto; font-weight: 700; color: var(--text-dark); }
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
     
-    /* ... (CSS Summary Card, FullCalendar, Chart, Badge kekal sama) ... */
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
     
-    .card-summary {
-        background-color: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        border: 1px solid #e5e7eb;
-        cursor: pointer;
-        padding: 20px;
-        text-align: left;
-        height: 100%;
-        transition: transform 0.2s, box-shadow 0.2s;
-        position: relative;
-    }
-    .card-summary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-    }
-    .card-summary .icon-wrapper {
-        position: absolute; top: 20px; right: 20px;
-        width: 35px; height: 35px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.1rem;
-    }
-
-    .card-summary .count { font-size: 2.5rem; font-weight: 700; line-height: 1.1; margin-bottom: 5px; }
-    .card-summary .label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; }
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
     
-    /* Specific Card Styling (Menggunakan primary-color baru) */
-    .card-total-assets .icon-wrapper { background-color: var(--primary-light); color: var(--primary-color); }
-    .card-available .icon-wrapper { background-color: #d1fae5; color: #10b981; }
-    .card-checked-out .icon-wrapper { background-color: #fff7ed; color: #f97316; }
-    .card-overdue .icon-wrapper { background-color: #fee2e2; color: #ef4444; }
-    .card-maintenance .icon-wrapper { background-color: #fefce8; color: #f59e0b; } 
-    
-    /* FullCalendar Customization */
-    #calendar-container { padding: 20px; }
-
-    
-    /* Chart Bar Styling */
-    .loan-chart-item { margin-bottom: 15px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
-    .loan-chart-item .label { width: 30%; font-weight: 500; }
-    .loan-chart-item .bar-wrapper { flex-grow: 1; margin: 0 10px; position: relative; }
-    .loan-chart-bar { background-color: #e5e7eb; height: 10px; border-radius: 5px; overflow: hidden; }
-    .loan-chart-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
-    .loan-chart-item .value { font-weight: 600; color: var(--text-dark); width: 10%; text-align: right; }
-    .loan-chart-footer { border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; font-weight: 600; font-size: 1rem; }
-    .loan-chart-total { color: var(--text-dark); font-size: 1.2rem; }
-    
-    /* Chart colors (Menggunakan primary-color baru) */
-    .bg-blue-fill { background-color: var(--primary-color); }
-    .bg-green-fill { background-color: #10b981; }
-    .bg-orange-fill { background-color: #f97316; }
-    .bg-red-fill { background-color: #ef4444; }
-    
-    /* FullCalendar event colors */
-    .fc-event-main-frame { color: white !important; }
-
-    /* Custom badge styles for modal tables */
-    .badge-status-available { background-color: #d1fae5; color: #065f46; }
-    .badge-status-checked-out { background-color: #fff7ed; color: #b45309; }
-    .badge-status-maintenance { background-color: #fefce8; color: #a16207; }
-    .badge-status-danger { background-color: #fee2e2; color: #991b1b; }
-    .badge-status-default { background-color: #e5e7eb; color: #4b5563; }
-    
-.fc-toolbar-chunk .fc-button {
-    text-transform: capitalize !important;
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
 }
 
-.dropdown-menu-end {
-    left: auto !important; 
-    right: 0 !important;
+/* --- FIX FULLCALENDAR MOBILE RESPONSIVE --- */
+
+/* 1. Pastikan container tak melimpah keluar */
+#calendar, .fc {
+    max-width: 100% !important;
+    overflow-x: hidden;
 }
 
-#notificationList {
-    width: 320px; 
-    max-height: 400px; 
-    overflow-y: auto; 
-    overflow-x: hidden; 
-}
-
-/* Force wrap for the notification message */
-.dropdown-item p {
-    white-space: normal;
-}
-
-/* START: New Styles for Compact Layout */
-.h-100 {
-    height: 100% !important;
-}
-#taskSummary h6 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-dark);
-}
-#taskSummary ul li {
-    padding-top: 5px;
-    padding-bottom: 5px;
-    font-size: 0.85rem; /* Make the list items slightly smaller */
-}
-/* END: New Styles for Compact Layout */
-
-
-@media (max-width: 991.98px) {
-    
-	#calendar-container {
-        padding: 10px; /* Kurangkan padding kalendar */
-        width: 100%;
-        overflow-x: auto; /* Benarkan scroll jika FullCalendar itu sendiri terlalu lebar */
-    }
-	
-    /* Sidebar mesti tersembunyi secara default, dan muncul apabila kelas .toggled dikeluarkan */
-    .sidebar {
-        /* Pindahkan sidebar ke luar skrin secara default pada skrin kecil */
-        transform: translateX(-250px); 
-        transition: transform 0.3s ease;
-        z-index: 1050; /* Pastikan ia berada di atas segala-galanya apabila dibuka */
+/* 2. Susun balik Header (Bulan, Haribulan & Butang) supaya tak bertindih */
+@media (max-width: 768px) {
+    .fc .fc-toolbar {
+        display: flex;
+        flex-direction: column; /* Susun menegak dlm mobile */
+        gap: 10px;
+        align-items: center;
     }
 
-    /* Keadaan apabila toggle diklik (sidebar tersembunyi) */
-    .sidebar.toggled {
-        /* Kembali ke kedudukan asal (tersembunyi) */
-        transform: translateX(-250px); 
+    .fc-toolbar-title {
+        font-size: 1.1rem !important; /* Kecilkan tajuk bulan */
+        text-align: center;
+    }
+
+    /* Kecilkan butang prev, next, today */
+    .fc .fc-button {
+        padding: 5px 8px !important;
+        font-size: 0.8rem !important;
+    }
+
+    /* 3. Kecilkan font hari (Sun, Mon, Tue...) supaya muat satu baris */
+    .fc-col-header-cell-cushion {
+        font-size: 0.7rem !important;
+        padding: 2px !important;
+    }
+
+    /* 4. Kecilkan nombor tarikh dlm kotak */
+    .fc-daygrid-day-number {
+        font-size: 0.75rem !important;
+        padding: 4px !important;
+    }
+
+    /* 5. Set height kotak tarikh supaya tak terlalu panjang ke bawah */
+    .fc .fc-daygrid-body {
+        width: 100% !important;
     }
     
-    /* Keadaan apabila toggle diklik (sidebar dipaparkan) */
-    .sidebar:not(.toggled) {
-        transform: translateX(0); /* Alihkan ke skrin */
+    .fc .fc-daygrid-day {
+        height: 60px !important; /* Paksa height kotak jadi kecil */
     }
 
-    /* 2. Main Content mesti mengambil lebar penuh pada Mobile */
-    .main-content {
-        /* Buang margin kiri yang digunakan pada desktop */
-        margin-left: 0; 
-        width: 100%; /* Lebar penuh */
+    /* 6. Hilangkan atau kecilkan dot/event dlm mobile supaya tak serabut */
+    .fc-event-main {
+        font-size: 0.6rem !important;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+}
+
+/* Extra: Bagikan card calendar tu nampak lebih "clean" */
+.fc-view-harness {
+    background: #ffffff;
+    border-radius: 12px;
+}
+/* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
+    body {
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
     }
 
-    /* 3. Sidebar Overlay (Jika anda mempunyai elemen overlay) */
-    #sidebarOverlay {
+    .mobile-bottom-nav {
+        display: flex !important;
         position: fixed;
-        top: 0;
+        bottom: 0;
         left: 0;
         width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1040; /* Di bawah sidebar, di atas main-content */
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-    }
-    
-    #sidebarOverlay.active {
-        opacity: 1;
-        pointer-events: auto;
-    }
-    
-    /* 4. Topbar Button & Heading Adjustment */
-    .topbar {
-        padding-left: 15px; /* Kurangkan padding pada mobile */
-        padding-right: 15px;
-        z-index: 1030; /* Pastikan topbar berada di atas main content */
-    }
-    
-    .topbar h3 {
-        font-size: 1.2rem; /* Kecilkan tajuk */
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
     }
 
-    /* 5. Kurangkan padding container-fluid */
-    .container-fluid {
-        padding: 15px;
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
+    }
+
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
+    }
+
+    .mobile-bottom-nav a i {
+        font-size: 20px;
+    }
+
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
     }
 }
 
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
+        }
+    }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
+}
+
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+
+    /* Hilangkan focus ring & hover grey yang buruk */
+    .notif-item-wrapper .dropdown-item:hover {
+        filter: brightness(0.98);
+        background-color: inherit;
+    }
+
+    /* Scrollbar yang nipis (Modern look) */
+    #notificationList::-webkit-scrollbar {
+        width: 5px;
+    }
+    #notificationList::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+    }
+
+    /* Hover effect untuk butang Mark As Read */
+    .btn-mark-read:hover {
+        background-color: #bae6fd !important;
+        color: #0369a1 !important;
+    }
 </style>
+
 </head>
 <body>
 
@@ -617,72 +549,74 @@ $conn->close();
     <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
 </div> 	
 </div>
+
+
+
+
 <div class="main-content">
 <div class="topbar">
-    <button id="sidebarToggle" class="btn btn-link d-lg-none" type="button">
-        <i class="fas fa-bars fa-lg"></i>
-    </button>
-
-    <h3>Dashboard</h3> 
-
-    <div class="topbar-right">
-        </div>
-
-        <div class="technician-profile d-flex align-items-center">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
-			
-			<div class="dropdown me-3" style="position: relative;">
-                <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fa-solid fa-bell fa-xl"></i>
-                    <?php if (($new_notif_count ?? 0) > 0): ?>
-                        <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;" id="notif-count-badge">
-                                    <?= $new_notif_count ?>
-                        </span>
-                    <?php endif; ?>
-                </button>
-							<ul class="dropdown-menu dropdown-menu-end" 
-                            style="width: 320px; max-height: 400px; overflow-y: auto; overflow-x: hidden;" 
-                            id="notificationList">
-							<h6 class="dropdown-header">Notifications (<span id="notif-count-header"><?= $new_notif_count ?? 0 ?></span> New)</h6>
-                    <?php if (($new_notif_count ?? 0) > 0): ?>
-                        <?php foreach(($new_notifications ?? []) as $notif): 
-                            $icon = ($notif['type'] == 'reject' || $notif['type'] == 'reservation_rejected') ? 'fa-times-circle text-danger' : 'fa-check-circle text-success';
-                        ?>
-                            <li class="notif-item" data-id="<?= $notif['id'] ?>">
-                                <a class="dropdown-item" href="#">
-                                    <div class="d-flex align-items-start">
-                                        <i class="fa-solid <?= $icon ?> me-2 mt-1 fa-lg"></i>
-                                        <div>
-                                            <p class="mb-0 small fw-bold text-wrap"><?= htmlspecialchars($notif['message']) ?></p>
-                                            <small class="text-muted"><?= date('H:i, d M', strtotime($notif['created_at'])) ?></small>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider my-1"></li>
-                        <?php endforeach; ?>
-                        <li><a class="dropdown-item text-center small text-primary" href="#" id="markAllRead">Mark all as read</a></li>
-                    <?php else: ?>
-                        <li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>
-                    <?php endif; ?>
-                </ul>
-            </div>
-            <a href="profile_tech.php" title="My Profile" class="text-secondary" style="text-decoration: none;">
-                <i class="fa-solid fa-circle-user fa-2x text-primary-blue"></i>
-            </a>
-        </div>
+    <div class="topbar-left">
+        <button id="sidebarToggle" class="btn d-none">
+            <i class="fas fa-bars"></i>
+        </button>
+        <h3>Dashboard</h3> 
     </div>
+
+<div class="topbar-right">
+    <div class="dropdown me-3">
+        <div class="notification-wrapper" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; position: relative;">
+            <i class="fa-solid fa-bell"></i>
+            <?php if (($new_notif_count ?? 0) > 0): ?>
+                <span class="notification-dot"></span>
+            <?php endif; ?>
+        </div>
+        
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0" id="notificationList">
+    <div class="p-3 d-flex justify-content-between align-items-center border-bottom bg-light">
+        <h6 class="mb-0 fw-bold text-dark">Notifications</h6>
+        <button id="markAllReadBtn" class="btn btn-sm">Mark As Read</button>
+    </div>
+
+    <div id="notifItemsContainer" style="max-height: 350px; overflow-y: auto;">
+        <?php if (!empty($all_notifications)): ?>
+            <?php foreach($all_notifications as $notif): ?>
+                <?php endforeach; ?>
+        <?php else: ?>
+            <li class="p-4 text-center text-muted small">No notifications</li>
+        <?php endif; ?>
+    </div>
+
+    <li class="mark-all-container">
+        <a href="notifications_history.php" class="dropdown-item text-center small py-3 fw-bold text-primary" style="border-top: 1px solid #eee; background-color: #f8f9fa;">
+            View All Notifications <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </li>
+</ul>
+    </div>
+
+    <a href="profile_tech.php" class="user-pill text-decoration-none">
+        <div class="text-end me-2 d-none d-md-block">
+            <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
+                <?= htmlspecialchars($displayName) ?>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Technician</small>
+        </div>
+        <div class="profile-avatar">
+            <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
+        </div>
+    </a>
+</div>
+</div>
+
     <div class="container-fluid">
-        <div class="row g-3">
+        <div class="row g-3 justify-content-center">
             
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
-                <div class="card card-summary card-total-assets" id="totalAssetsCard" data-bs-toggle="modal" data-bs-target="#totalAssetsModal">
-                    <div class="icon-wrapper"><i class="fa-solid fa-desktop"></i></div>
-                    <div class="count text-primary-blue"><?= $totalAssetsCount ?></div> 
-                    <div class="label">Total Assets</div>
-                </div>
+                <div class="card card-summary card-total-assets" id="totalAssetsCard" style="cursor:pointer;">
+    <div class="icon-wrapper"><i class="fa-solid fa-desktop"></i></div>
+    <div class="count text-primary-blue"><?= $totalAssetsCount ?></div> 
+    <div class="label">Total Assets</div>
+</div>
             </div>
 
             <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
@@ -718,119 +652,127 @@ $conn->close();
             </div>
             
         </div> 
-        <div class="row mt-4 g-4">
-            
-            <div class="col-12">
-                <div class="card p-4">
-                    <h5 class="mb-3"><i class="fa-solid fa-calendar-days text-primary-blue me-2"></i> Reservation Calendar</h5>
-                    <div id="calendar-container">
-                        <div id="calendar"></div>
-                    </div>
-                    <div class="calendar-legend mt-3">
-                        <div class="d-flex">
-                            <div class="me-3"><span class="badge" style="background-color: #10b981;">&nbsp;</span> Reservations</div>
-                            <div><span class="badge" style="background-color: #f59e0b;">&nbsp;</span> Buffer Timeline</div>
-                        </div>
-                    </div>
-                </div>
+<div class="row mt-4">
+    <div class="col-12 mb-4"> <div class="card shadow-sm border-0 h-100">
+	<div class="card-body">
+                <h5 class="mb-3"><i class="fa-solid fa-calendar-days text-primary-blue me-2"></i> Reservation Calendar</h5>
+                <div id="calendar"></div>
+                <div class="d-flex justify-content-center gap-4 mt-3 py-2 bg-light rounded-pill shadow-sm mx-auto" style="max-width: 400px;">
+    <div class="small"><span class="badge rounded-circle p-1 me-1" style="background:#10b981;">&nbsp;</span> Reservation</div>
+    <div class="small"><span class="badge rounded-circle p-1 me-1" style="background:#f59e0b;">&nbsp;</span> Buffer Period</div>
+</div>
             </div>
+			
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2 g-4">
+    <div class="col-lg-6 col-12">
+        <div class="card p-4 h-100 shadow-sm border-0">
+            <h5 class="mb-3"><i class="fa-solid fa-clipboard-list text-primary-blue me-2"></i> Pending Actions</h5>
             
-            <div class="col-lg-6 col-12">
-                <div class="card p-4 h-100" id="pendingActionsCard">
-                    <h5 class="mb-4"><i class="fa-solid fa-list-check text-red me-2"></i> Pending Actions</h5>
-                    
-                    <div id="taskSummary">
-                        
-                        <?php
-                        
-                        if (!empty($new_requests_data)): ?>
-                            <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Loan Requests (<?= count($new_requests_data) ?>)</h6>
-                            <ul class="list-unstyled small mb-3 border-bottom pb-2">
-                            <?php foreach (array_slice($new_requests_data, 0, 3) as $req): ?>
-                                <li class="d-flex justify-content-between">
-                                    <span><?= htmlspecialchars($req['item_name']) ?> by <?= htmlspecialchars($req['user_name']) ?></span>
-                                    <span class="text-muted"><?= htmlspecialchars($req['time_ago']) ?></span>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Loan Requests (0)</h6>
-                            <p class="small text-muted mb-4 border-bottom pb-2">No new requests pending approval.</p>
-                        <?php endif; ?>
-
-                        <?php if (!empty($returns_today_data)): ?>
-                            <h6><i class="fa-solid fa-rotate-left text-green me-1"></i> Scheduled Returns Today (<?= count($returns_today_data) ?>)</h6>
-                            <ul class="list-unstyled small mb-3 border-bottom pb-2">
-                            <?php foreach (array_slice($returns_today_data, 0, 3) as $ret): ?>
-                                <li class="d-flex justify-content-between">
-                                    <span><?= htmlspecialchars($ret['asset_code']) ?> (<?= htmlspecialchars($ret['user_name']) ?>)</span>
-                                    <span class="text-green fw-bold"><?= htmlspecialchars($ret['return_time']) ?></span>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <h6><i class="fa-solid fa-rotate-left text-green me-1"></i> Scheduled Returns Today (0)</h6>
-                            <p class="small text-muted mb-4 border-bottom pb-2">No returns scheduled for today.</p>
-                        <?php endif; ?>
-
-                        <?php if (!empty($top_overdue_data)): ?>
-                            <h6><i class="fa-solid fa-clock-rotate-left text-red me-1"></i> Top Overdue Items</h6>
-                            <ul class="list-unstyled small mb-1">
-                            <?php foreach (array_slice($top_overdue_data, 0, 3) as $overdue): ?>
-                                <li class="d-flex justify-content-between">
-                                    <span><?= htmlspecialchars($overdue['item_name']) ?></span>
-                                    <span class="badge rounded-pill bg-danger"><?= htmlspecialchars($overdue['days_overdue']) ?> days</span>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <h6><i class="fa-solid fa-clock-rotate-left text-red me-1"></i> Top Overdue Items (0)</h6>
-                            <p class="small text-muted mb-1">No critically overdue items.</p>
-                        <?php endif; ?>
-
-                    </div>
-                </div>
+            <div class="action-item mb-3">
+                <?php if (!empty($new_requests_data)): ?>
+                    <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Requests (<?= count($new_requests_data) ?>)</h6>
+                    <ul class="list-unstyled small border-bottom pb-2">
+                        <?php foreach (array_slice($new_requests_data, 0, 3) as $req): ?>
+                            <li class="d-flex justify-content-between py-1">
+                                <span><?= htmlspecialchars($req['item_name']) ?> by <strong><?= htmlspecialchars($req['user_name']) ?></strong></span>
+                                <span class="text-muted"><?= htmlspecialchars($req['time_ago']) ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <h6><i class="fa-solid fa-bell-concierge text-primary-blue me-1"></i> New Requests (0)</h6>
+                    <p class="small text-muted border-bottom pb-2">No new requests pending.</p>
+                <?php endif; ?>
             </div>
-            
-            <div class="col-lg-6 col-12">
-                <div class="card p-4 h-100">
-                    <h5 class="mb-4"><i class="fa-solid fa-chart-pie text-primary-blue me-2"></i> Loan Distribution</h5>
-                    
-                    <div id="loanChartContainer">
-                        <?php 
-                        // KEKALKAN KOD PHP BAR CHART ANDA DI SINI
-                        $colors_fill = ['bg-blue-fill', 'bg-green-fill', 'bg-orange-fill', 'bg-red-fill'];
-                        $chart_index = 0;
-                        if ($totalLoans == 0): ?>
-                            <div class="text-center p-4 text-muted">No items have been checked out yet.</div>
-                        <?php else:
-                            foreach ($chartLabels as $index => $label):
-                                $value = $chartValues[$index];
-                                $percentage = round(($value / $totalLoans) * 100);
-                                $colorClass = $colors_fill[$chart_index % count($colors_fill)];
-                                $chart_index++;
-                        ?>
-                        <div class="loan-chart-item">
-                            <div class="label"><?= htmlspecialchars($label) ?></div>
-                            <div class="bar-wrapper">
-                                <div class="loan-chart-bar">
-                                    <div class="loan-chart-bar-fill <?= $colorClass ?>" style="width: <?= $percentage ?>%;"></div>
-                                </div>
-                            </div>
-                            <div class="value"><?= $value ?></div>
-                        </div>
-                        <?php endforeach; 
-                        endif; ?>
-                    </div>
-                    
-                    <div class="loan-chart-footer">
-                        <span>Total Loans</span>
-                        <span class="loan-chart-total"><?= $totalLoans ?></span>
-                    </div>
-                </div>
+
+            <div class="action-item mb-3">
+                <?php if (!empty($returns_today_data)): ?>
+                    <h6><i class="fa-solid fa-rotate-left text-success me-1"></i> Scheduled Returns (<?= count($returns_today_data) ?>)</h6>
+                    <ul class="list-unstyled small border-bottom pb-2">
+                        <?php foreach (array_slice($returns_today_data, 0, 3) as $ret): ?>
+                            <li class="d-flex justify-content-between py-1">
+                                <span><?= htmlspecialchars($ret['asset_code']) ?> (<?= htmlspecialchars($ret['user_name']) ?>)</span>
+                                <span class="text-success fw-bold"><?= htmlspecialchars($ret['return_time']) ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <h6><i class="fa-solid fa-rotate-left text-success me-1"></i> Scheduled Returns (0)</h6>
+                    <p class="small text-muted border-bottom pb-2">No returns today.</p>
+                <?php endif; ?>
+            </div>
+
+            <div class="action-item">
+                <?php if (!empty($top_overdue_data)): ?>
+                    <h6><i class="fa-solid fa-clock-rotate-left text-danger me-1"></i> Top Overdue Items</h6>
+                    <ul class="list-unstyled small mb-1">
+                        <?php foreach (array_slice($top_overdue_data, 0, 3) as $overdue): ?>
+                            <li class="d-flex justify-content-between py-1">
+                                <span><?= htmlspecialchars($overdue['item_name']) ?></span>
+                                <span class="badge rounded-pill bg-danger"><?= htmlspecialchars($overdue['days_overdue']) ?> days</span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <h6><i class="fa-solid fa-clock-rotate-left text-danger me-1"></i> Overdue (0)</h6>
+                    <p class="small text-muted">No critically overdue items.</p>
+                <?php endif; ?>
             </div>
         </div>
+    </div>
+
+    <div class="col-lg-6 col-12">
+        <div class="card p-4 h-100 shadow-sm border-0">
+            <h5 class="mb-4"><i class="fa-solid fa-chart-pie text-primary-blue me-2"></i> Loan Distribution</h5>
+            <div id="loanChartContainer">
+                <?php 
+                $colors_fill = ['bg-blue-fill', 'bg-green-fill', 'bg-orange-fill', 'bg-red-fill'];
+                $chart_index = 0;
+                if ($totalLoans == 0): ?>
+                    <div class="text-center p-4 text-muted">No items checked out.</div>
+                <?php else:
+                    foreach ($chartLabels as $index => $label):
+                        $value = $chartValues[$index];
+                        $percentage = round(($value / $totalLoans) * 100);
+                        $colorClass = $colors_fill[$chart_index % count($colors_fill)];
+                        $chart_index++;
+                ?>
+                <div class="loan-chart-item mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="small fw-bold"><?= htmlspecialchars($label) ?></span>
+                        <span class="small fw-bold"><?= $value ?></span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar <?= $colorClass ?>" style="width: <?= $percentage ?>%;"></div>
+                    </div>
+                </div>
+                <?php endforeach; endif; ?>
+            </div>
+            <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Total Loans</span>
+                <h4 class="mb-0 fw-bold"><?= $totalLoans ?></h4>
+            </div>
         </div>
+    </div>
+</div>
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
+            <div class="modal-header" style="background: #f8fafc; border-bottom: 1px solid #eee;">
+                <h5 class="modal-title" id="modalDateLabel">Date Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalEventList" style="max-height: 400px; overflow-y: auto; padding: 20px;">
+                </div>
+            <div class="modal-footer" style="border-top: none; background: #f8fafc;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 10px;">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="totalAssetsModal" tabindex="-1" aria-labelledby="totalAssetsModalLabel" aria-hidden="true">
@@ -918,18 +860,21 @@ $conn->close();
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
-<script>
 
-    // KEKALKAN SEMUA DATA PHP JSON DARI PART 3
-    const totalAssetsDetails = <?php echo $total_assets_details_json; ?>;
+<script>
+const totalAssetsDetails = <?php echo $total_assets_details_json; ?>;
     const availableAssetsDetails = <?php echo $available_assets_details_json; ?>;
-    const checkedOutAssetsDetails = <?php echo $checked_out_details_json; ?>;
+   // Tambah || [] supaya kalau PHP kosong, dia jadi array kosong, bukan undefined
+const checkedOutAssetsDetails = <?php echo $checked_out_details_json ?: '[]'; ?>;
     const overdueDetails = <?php echo $overdue_details_json; ?>;
     const maintenanceAssetsDetails = <?php echo $maintenance_assets_details_json; ?>;
     const eventsData = <?php echo $events_json; ?>;
@@ -943,192 +888,117 @@ $conn->close();
     // --- END: PENAMBAHAN UNTUK CHART.JS ---
 
 
-    document.addEventListener('DOMContentLoaded', function() {
+        // --- NOTIFICATION FUNCTIONS (KEMAS KINI) ---
+function renderNotifications(notifications) {
+    $notifList.empty();
 
+    // Gunakan <button type="button"> supaya dia tak bertindak macam link
+    const header = `
+    <div class="p-3 d-flex justify-content-between align-items-center border-bottom bg-light" style="border-radius: 15px 15px 0 0;">
+        <h6 class="mb-0 fw-bold text-dark">Notifications</h6>
+        <button type="button" id="markAllReadBtn" class="btn btn-sm fw-bold" style="font-size: 0.7rem; background-color: #e0f2fe; color: #0369a1; border-radius: 8px; padding: 4px 10px; border: none;">
+            Mark As Read
+        </button>
+    </div>
+    <div id="notifItemsContainer"></div>`; // Tambah container khas untuk item
+    
+    $notifList.append(header);
+    const $itemsContainer = $('#notifItemsContainer');
+
+    if (!notifications || notifications.length === 0) {
+        $itemsContainer.append('<li class="p-4 text-center text-muted small">No new notifications.</li>');
+    } else {
+        notifications.forEach((notif, index) => {
+            const createdDate = new Date(notif.created_at);
+            const timeStr = createdDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            const isUnread = notif.is_read == 0;
+            const bgStyle = isUnread ? 'background-color: #f0f9ff;' : '';
+            const textClass = isUnread ? 'fw-bold text-dark' : 'text-muted';
+
+            const item = `
+                <div class="notif-item-wrapper">
+                    <a class="dropdown-item p-3" href="view_reservation.php?id=${notif.related_id}" style="${bgStyle}">
+                        <div class="d-flex align-items-start">
+                            <i class="fa-solid fa-bell me-3 mt-1 text-primary"></i>
+                            <div class="flex-grow-1">
+                                <p class="mb-0 small ${textClass}" style="line-height: 1.2; white-space: normal;">
+                                    ${notif.message}
+                                </p>
+                                <small class="text-muted" style="font-size: 0.65rem;">${timeStr}</small>
+                            </div>
+                        </div>
+                    </a>
+                    <hr class="dropdown-divider my-0 opacity-50">
+                </div>`;
+            $itemsContainer.append(item);
+        });
+    }
+}
+    document.addEventListener('DOMContentLoaded', function() {
         
+		
+        // Cek jQuery
         if (typeof jQuery === 'undefined') {
-            console.error("jQuery is not loaded. Notification and DataTables functions will fail.");
+            console.error("jQuery is not loaded!");
             return;
         }
 
-        
-        // --- NOTIFICATION HANDLERS ---
         const $notifBadge = $('#notif-count-badge');
         const $notifHeaderCount = $('#notif-count-header');
         const $notifList = $('#notificationList');
-        
-        updateNotificationCount(currentNewCount, false); 
-
-        
-        function renderNotifications(notifications) {
-            $notifList.empty();
-            if (notifications.length === 0) {
-                $notifList.append('<li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>');
-                return;
-            }
-            
-            
-            $('#no-notif-message').parent().remove();
-
-            notifications.forEach((notif, index) => {
-                
-                const createdDate = new Date(notif.created_at);
-                const timeStr = createdDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-                const item = `<li class="notif-item dropdown-item dropdown-item-unread" data-id="${notif.id}">
-                    <div class="d-flex align-items-center">
-                        <i class="fa-solid fa-bell me-3 text-primary"></i>
-                        <div class="flex-grow-1">
-                            <h6 class="mb-0 fw-bold">${notif.type.replace('_', ' ')}</h6>
-                            <p class="text-truncate mb-0">${notif.message}</p>
-                            <small class="text-muted">${timeStr}</small>
-                        </div>
-                    </div>
-                </li>`;
-                $notifList.append(item);
-                
-                
-                if (index < notifications.length - 1) {
-                    $notifList.append('<li class="dropdown-divider"></li>');
-                }
-            });
-            
-            
-             $notifList.append('<li><hr class="dropdown-divider"></li>');
-             $notifList.append('<li><a class="dropdown-item text-center text-success" href="#" id="markAllRead"><i class="fa-solid fa-check-double me-1"></i> Mark all as read</a></li>');
-        }
-
-        
-        function updateNotificationCount(newCount, redraw = true) {
-            currentNewCount = newCount;
-            
-            
-            if (newCount > 0) {
-                $notifBadge.text(newCount).removeClass('d-none').addClass('position-absolute');
-            } else {
-                $notifBadge.addClass('d-none').removeClass('position-absolute');
-            }
-
-            
-            $notifHeaderCount.text(newCount);
-            
-            
-            if (newCount === 0 && redraw) {
-                
-                $notifList.empty();
-                $notifList.append('<li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>');
-            }
-        }
-
-        
-        function markNotificationAsRead(id, successCallback) {
-            const url = 'update_notification_status.php'; 
-            
-            $.ajax({
-                url: url,
-                type: 'POST',
-                dataType: 'json',
-                data: { id: id },
-                success: function(response) {
-                    if (response.status === 'success') {
-                        
-                        if (successCallback) {
-                            successCallback();
-                        }
-                    } else {
-                        console.error("Error updating status:", response.message);
-                        Swal.fire('Error', 'Failed to update notification status on server.', 'error');
+		
+$(document).on('click', '#markAllReadBtn', function() {
+    const $btn = $(this);
+    
+    $.ajax({
+        url: 'mark_all_read.php',
+        type: 'POST',
+        dataType: 'json', // Beritahu jQuery kita jangka JSON
+        success: function(data) {
+            if (data.status === 'success') {
+                // Hanya padam di skrin jika database berjaya diupdate
+                $('#notifItemsContainer .notif-item-wrapper').slideUp(300, function() {
+                    $(this).remove();
+                    if ($('#notifItemsContainer').children().length === 0) {
+                        $('#notifItemsContainer').html('<li class="p-4 text-center text-muted small">No new notifications.</li>');
                     }
-                },
-                error: function(xhr, status, error) {
-                    console.error("AJAX Error:", status, error);
-                    Swal.fire('Error', 'Server communication error. Please try again.', 'error');
-                }
-            });
-        }
-        
-        
-        renderNotifications(newNotifications);
-
-
-        
-        
-        
-        $notifList.on('click', 'li.notif-item', function(e) {
-            e.preventDefault();
-            const notifId = $(this).data('id');
-            const $item = $(this);
-
-            if ($item.hasClass('dropdown-item-unread')) {
-                markNotificationAsRead(notifId, function() {
-                    $item.removeClass('dropdown-item-unread').addClass('dropdown-item-read');
-                    
-                    
-                    $item.next('.dropdown-divider').remove(); 
-                    $item.remove();
-                    updateNotificationCount(currentNewCount - 1); 
                 });
+                
+                $('.notification-dot, #notif-count-badge').fadeOut();
+                $btn.text('All Cleared').prop('disabled', true).css('opacity', '0.5');
+                
+                // Reset counter global kalau ada
+                currentNewCount = 0; 
+            } else {
+                alert("Ralat: " + data.message);
             }
-        });
-
-        
-        $notifList.on('click', '#markAllRead', function(e) {
-            e.preventDefault();
-            
-            if (currentNewCount === 0) {
-                Swal.fire('No New Notifications', 'There are no new notifications to mark as read.', 'info');
-                return;
-            }
-
-            Swal.fire({
-                title: 'Confirm',
-                text: "Mark all " + currentNewCount + " notifications as read?",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Mark All'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    markNotificationAsRead('all', function() {
-                        updateNotificationCount(0, true); 
-                        Swal.fire('Done!', 'All notifications marked as read.', 'success');
-                    });
-                }
-            });
-        });
-        
-        
-        // --- SIDEBAR TOGGLE (KEMASKINI DENGAN LOGIK MOBILE) ---
+        },
+        error: function(xhr, status, error) {
+            console.error("AJAX Error Details:", xhr.responseText);
+            alert("Gagal menghubungi server. Sila semak console log.");
+        }
+    });
+});
+// --- SIDEBAR LOGIC UNTUK MOBILE ---
         const sidebar = document.getElementById('admin-sidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
         const overlay = document.getElementById('sidebarOverlay');
 
-        function toggleSidebar() {
-            sidebar.classList.toggle('toggled');
-            overlay.classList.toggle('active');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('show'); // Guna .show
+                if (overlay) overlay.classList.toggle('active');
+            });
         }
-        if (toggleBtn) { toggleBtn.addEventListener('click', toggleSidebar); }
-        if (overlay) { overlay.addEventListener('click', toggleSidebar); }
 
-function checkScreenSize() {
-     const sidebar = document.getElementById('admin-sidebar'); // Pastikan elemen didefinisikan atau diakses di sini
-     const overlay = document.getElementById('sidebarOverlay'); // Pastikan elemen didefinisikan atau diakses di sini
-     
-     if (window.innerWidth > 991.98) {
-         // Desktop: Pastikan sidebar kelihatan (default)
-         sidebar.classList.remove('toggled');
-         overlay.classList.remove('active');
-     } else {
-         // Mobile: Pastikan sidebar tersembunyi
-         // KELAS 'toggled' MESTI MENGANDUNGI CSS UNTUK MENYEMBUNYIKAN SIDEBAR
-         sidebar.classList.add('toggled'); 
-         overlay.classList.remove('active');
-     }
-}
-
-window.addEventListener('resize', checkScreenSize);
-checkScreenSize(); // Ini MESTI dijalankan semasa muatan
-
-        // --- FULLCALENDAR INITIALIZATION ---
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('show');
+                overlay.classList.remove('active');
+            });
+        }
+		
+        // --- FULLCALENDAR LOGIC ---
         const calendarEl = document.getElementById('calendar');
         if (calendarEl) {
             const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -1136,36 +1006,64 @@ checkScreenSize(); // Ini MESTI dijalankan semasa muatan
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-                },
-                events: eventsData,
+ right: 'dayGridMonth,listWeek'
+ },
+ 
+ // TAMBAH INI: Tukar tulisan button jadi emoji
+    buttonText: {
+        today: 'Today',     // Kalau nak tukar tulisan 'Today'
+        month: '📅 ',     // Letak emoji depan atau pakai emoji saja
+        list: '📋'        // Ini untuk button listWeek kau
+    },
+                displayEventTime: false,
+                eventDisplay: 'block',
                 height: 'auto',
-                firstDay: 1,
-
+                events: eventsData,
                 eventDidMount: function(info) {
-                    if (info.event.extendedProps.description === 'Reservation') {
-                        info.el.style.backgroundColor = '#10b981';
-                        info.el.style.borderColor = '#059669';
-                        info.el.style.color = 'white';
-                    } else if (info.event.extendedProps.description === 'Buffer Timeline - Pending Check-in') {
-                        info.el.style.backgroundColor = '#f59e0b';
-                        info.el.style.borderColor = '#d97706';
-                        info.el.style.color = 'white';
+                    info.el.style.backgroundColor = info.event.backgroundColor;
+                    info.el.style.borderColor = info.event.backgroundColor;
+                    info.el.style.borderRadius = '6px';
+                    info.el.style.color = 'white';
+                    info.el.style.padding = '2px 5px';
+                    
+                    if (info.event.extendedProps.description && info.event.extendedProps.description.includes('Buffer')) {
+                        info.el.style.backgroundImage = 'linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)';
+                        info.el.style.backgroundSize = '10px 10px';
                     }
                 },
-                eventContent: function(arg) {
-
-                    return { html: '<div class="fc-event-main-frame">' + arg.event.title + '</div>' };
+dateClick: function(info) {
+                    const selectedDate = info.dateStr;
+                    const modalBody = document.getElementById('modalEventList');
+                    const modalTitle = document.getElementById('modalDateLabel');
+                    const displayDate = new Date(selectedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                    modalTitle.innerHTML = `<i class="fa-regular fa-calendar-days me-2"></i> Details for ${displayDate}`;
+                    const filtered = eventsData.filter(ev => selectedDate >= ev.start && selectedDate < ev.end);
+                    if (filtered.length === 0) {
+                        modalBody.innerHTML = '<div class="text-center py-4 text-muted">No activities for this date.</div>';
+                    } else {
+                        modalBody.innerHTML = filtered.map(ev => {
+                            const isBuffer = ev.description && ev.description.includes('Buffer');
+                            const themeColor = isBuffer ? '#f59e0b' : '#10b981';
+                            const badgeClass = isBuffer ? 'bg-warning-light text-warning' : 'bg-success-light text-success';
+                            return `<div class="detail-card mb-3" style="border-left: 5px solid ${themeColor}; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="fw-bold mb-0">${ev.title}</h6>
+                                    <span class="badge ${badgeClass}">${isBuffer ? 'Buffer' : 'Reservation'}</span>
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="fa-regular fa-clock me-1"></i> Start: ${ev.start}<br>
+                                    <i class="fa-solid fa-hourglass-end me-1"></i> End: ${ev.end}
+                                </div>
+                            </div>`;
+                        }).join('');
+                    }
+                    new bootstrap.Modal(document.getElementById('eventModal')).show();
                 }
-
             });
             calendar.render();
-        } else { console.error("Calendar element #calendar not found."); }
-
-
-        
-        // --- DATATABLES & MODAL SETUP FUNCTIONS (Sertakan responsive: true) ---
-        function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
+        }
+		
+       function createAssetTableHTML(assetList, includeUserAndReturnDate = false) {
             if (!assetList || assetList.length === 0) {
                 return '<div class="text-center p-4 text-muted"><i class="fa-solid fa-check-circle fa-2x mb-2" style="color: #10b981;"></i><br>No matching assets found.</div>';
             }
@@ -1183,12 +1081,20 @@ checkScreenSize(); // Ini MESTI dijalankan semasa muatan
                 const itemName = asset.item_name || '<em class="text-muted">N/A</em>';
                 const categoryName = asset.category_name || '<em class="text-muted">N/A</em>';
                 const statusValue = asset.status || 'Unknown';
-                let statusBadgeClass = 'badge-status-default';
+// Ganti bahagian if-else lama kau dengan yang ini:
+let statusBadgeClass = 'badge-status-default'; // Default jadi kelabu
 
-                if (statusValue === 'Available') statusBadgeClass = 'badge-status-available';
-                else if (statusValue === 'Checked Out') statusBadgeClass = 'badge-status-checked-out';
-                else if (statusValue === 'Maintenance') statusBadgeClass = 'badge-status-maintenance';
-                else if (statusValue === 'Broken' || statusValue === 'Decommissioned' || statusValue === 'Missing') statusBadgeClass = 'badge-status-danger';
+if (statusValue === 'Available') {
+    statusBadgeClass = 'badge-status-available';
+} else if (statusValue === 'Checked Out') {
+    statusBadgeClass = 'badge-status-checked-out';
+} else if (statusValue === 'Maintenance') {
+    statusBadgeClass = 'badge-status-maintenance';
+} else if (statusValue === 'Reserved') {
+    statusBadgeClass = 'badge-status-default '; // Kita guna oren lembut untuk Reserved
+} else if (statusValue === 'Damaged' || statusValue === 'Broken' || statusValue === 'Missing') {
+    statusBadgeClass = 'badge-status-danger'; // Kita guna merah untuk Damaged
+}
 
                 const statusBadge = `<span class="badge rounded-pill ${statusBadgeClass}">${statusValue}</span>`;
 
@@ -1222,48 +1128,52 @@ tableHTML += `<tr>
         
         
         
-        function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
-            const card = document.getElementById(cardId);
-            const modalElement = document.getElementById(modalElementId);
-            const listContainer = document.getElementById(listContainerId);
+       function setupModalTrigger(cardId, modalElementId, listContainerId, dataList, includeUser = false) {
+    const card = document.getElementById(cardId);
+    const modalElement = document.getElementById(modalElementId);
+    const listContainer = document.getElementById(listContainerId);
 
-            if (card && modalElement && listContainer) {
-                
-                const $modal = $(modalElement);
-                
-                $modal.on('hidden.bs.modal', function () {
-                    const existingTable = listContainer.querySelector('.asset-detail-table');
-                    if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { $(existingTable).DataTable().destroy(); }
-                    listContainer.innerHTML = '';
-                    });
-
-                $(card).on('click', function() {
-                    const tableData = createAssetTableHTML(dataList, includeUser);
-                    listContainer.innerHTML = tableData.html;
-                    $modal.modal('show');
-
-                    setTimeout(() => {
-                        const newTable = $(`#${tableData.id}`);
-                        if (newTable.length) {
-                            newTable.DataTable({
-                                "pageLength": 10, 
-                                "order": [], 
-                                "destroy": true,
-                                "responsive": true, // <-- PENAMBAHAN UNTUK MOBILE
-                                "language": {
-                                    "search": "Search:", "lengthMenu": "Show _MENU_ assets",
-                                    "info": "Showing _START_ to _END_ of _TOTAL_ assets", "infoEmpty": "No assets found",
-                                    "infoFiltered": "(filtered from _MAX_ total assets)", "zeroRecords": "No matching assets found",
-                                    "paginate": { "first": "First", "last": "Last", "next": "Next", "previous": "Previous" }
-                                }
-                            });
-                        }
-                    }, 200);
-
-                    });
+    if (card && modalElement && listContainer) {
+        const $modal = $(modalElement);
+        
+        // Bersihkan modal bila tutup
+        $modal.on('hidden.bs.modal', function () {
+            const existingTable = listContainer.querySelector('.asset-detail-table');
+            if (existingTable && $.fn.DataTable.isDataTable(existingTable)) { 
+                $(existingTable).DataTable().destroy(); 
             }
-        }
+            listContainer.innerHTML = '';
+        });
 
+       $(card).on('click', function() {
+    // 1. Generate data (dia return object {html, id})
+    const tableData = createAssetTableHTML(dataList, includeUser);
+    
+    // 2. MASUKKAN HTML SAHAJA. 
+    // Tadi kau letak 'tableData' saja, sebab tu dia keluar [object Object] atau undefined
+    listContainer.innerHTML = tableData.html; 
+
+    $modal.modal('show');
+
+    // 3. Initialize DataTable pakai ID yang kita generate tadi
+    setTimeout(() => {
+        const newTable = $(`#${tableData.id}`);
+        if (newTable.length) {
+            newTable.DataTable({
+                "pageLength": 10,
+                "order": [],
+                "destroy": true,
+                "responsive": true,
+                "language": {
+                    "search": "Search:",
+                    "zeroRecords": "No matching assets found"
+                }
+            });
+        }
+    }, 200);
+});
+    }
+}
 
         
         
@@ -1427,5 +1337,23 @@ tableHTML += `<tr>
 
     });
 </script>
-</body>
+
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_tech.php" class="nav-item active">
+        <i class="fa-solid fa-table-columns"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="check_out.php" class="nav-item">
+        <i class="fa-solid fa-dolly"></i>
+        <span> Manage Requests</span>
+    </a>
+    <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+            <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+    <a href="profile_tech.php" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav></body>
 </html>
+
+

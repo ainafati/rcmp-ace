@@ -21,6 +21,34 @@ $name_parts = explode(' ', trim($full_name));
 $admin_display_name = isset($name_parts[1]) ? $name_parts[0] . ' ' . $name_parts[1] : $name_parts[0];
 $admin_name = htmlspecialchars($admin_display_name);
 
+// 1. Ambil nama dari Session (sebab session dah ada nama masa login)
+$fullName = $_SESSION['name'] ?? 'Admin'; 
+
+// 2. Logik buang Bin / Binti / A/L / A/P
+$lowerName = strtolower($fullName);
+$shortName = $fullName; // Default
+
+// Senarai pemisah yang biasa digunakan di Malaysia
+$separators = [' binti ', ' bin ', ' a/l ', ' a/p '];
+
+foreach ($separators as $sep) {
+    $pos = strpos($lowerName, $sep);
+    if ($pos !== false) {
+        $shortName = substr($fullName, 0, $pos);
+        break; // Berhenti bila dah jumpa satu
+    }
+}
+
+// 3. Jika masih panjang (tiada bin/binti), ambil 2 perkataan pertama sahaja
+$parts = explode(' ', trim($shortName));
+if (count($parts) > 2) {
+    $displayName = $parts[0] . ' ' . $parts[1];
+} else {
+    $displayName = $shortName;
+}
+
+// Pastikan displayName bersih untuk display
+$displayName = htmlspecialchars(trim($displayName));
 // --- SETUP PAGINATION ---
 $limit = 10; // Jumlah akaun per page
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -53,7 +81,6 @@ $sql = "
     GROUP BY
         p.person_id, p.name, p.email, p.id, p.status, p.suspension_remarks, p.phoneNum, p.created_at
 ORDER BY p.created_at ASC
-    LIMIT $limit OFFSET $offset
 	";
 
 $result = $conn->query($sql);
@@ -67,162 +94,80 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Manage User Accounts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	    <link rel="stylesheet" href="../css/style.css">
+
 <style>
-    /* Definisi Pembolehubah CSS */
-    :root {
-        --primary-color: #06b6d4;
-        --primary-hover: #0891b2;
-        --danger-color: #ef4444;
+/* Pastikan cell jadual tidak memotong dropdown */
+#userTable td {
+    overflow: visible !important;
+    position: static !important; /* Membolehkan dropdown 'keluar' dari cell */
+}
 
-        --bg-light-gray: #f8fafc;
-        --card-bg: #ffffff;
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --border-color: #e5e7eb;
-    }
+/* Tambah ruang bawah pada dropdown supaya tidak rapat sangat dengan tepi */
+.dropdown-menu {
+    margin-top: 10px !important;
+    transform: translateX(-10%) !important; /* Adjust posisi ke kiri sikit jika perlu */
+}
 
-    body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        background-color: var(--bg-light-gray);
-        color: #334155;
-        min-height: 100vh;
-        overflow-x: hidden;
-    }
+/* Fix Dropdown Tenggelam */
+.table-responsive {
+    overflow: visible !important; 
+    padding-bottom: 50px; /* Tambah ruang supaya dropdown tak kena potong kat bawah */
+}
 
-    /* DESKTOP STYLES */
-    .sidebar {
-        width: 250px;
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        background: var(--card-bg);
-        padding: 20px;
-        border-right: 1px solid var(--border-color);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        transition: transform 0.3s ease;
-    }
+#userTable td {
+    overflow: visible !important;
+    position: relative; 
+}
 
-    .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1040;
-    }
+/* Pastikan Dropdown sentiasa di depan */
+.dropdown-menu {
+    z-index: 1060 !important; 
+    position: absolute !important;
+}
 
-    .sidebar-overlay.active {
-        display: block;
-    }
+/* Supaya row tak lari bila dropdown buka */
+.dropdown {
+    position: static !important; 
+}
 
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 30px;
-    }
+/* Gaya untuk badge yang boleh diklik */
+.role-label {
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+}
 
-    /* THEME: Corporate Blue -> Cyan */
-    .logo-icon {
-        width: 40px;
-        height: 40px;
-        background-color: var(--primary-color);
-        color: white;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-    }
+/* Bila checkbox ditanda, tukar warna label secara automatik */
+input[value="Technician"]:checked + .tech-label {
+    background-color: #f59e0b !important; /* Oren */
+    color: white !important;
+    border-color: transparent !important;
+}
 
-    .logo-text strong {
-        display: block;
-        font-size: 16px;
-        color: var(--text-dark);
-    }
+input[value="Admin"]:checked + .admin-label {
+    background-color: #ef4444 !important; /* Merah */
+    color: white !important;
+    border-color: transparent !important;
+}
 
-    .logo-text span {
-        font-size: 12px;
-        color: #94a3b8;
-    }
-
-    .sidebar a {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--text-muted);
-        text-decoration: none;
-        padding: 12px 15px;
-        margin-bottom: 8px;
-        border-radius: 8px;
-        font-weight: 500;
-        font-size: 15px;
-        transition: all 0.2s ease-in-out;
-    }
-
-    .sidebar a.active, .sidebar a:hover {
-        background: var(--primary-color);
-        color: #fff;
-    }
-
-    .sidebar a.logout-link {
-        color: var(--danger-color);
-        font-weight: 600;
-        margin-top: auto;
-    }
-
-    .sidebar a.logout-link:hover {
-        color: #fff;
-        background: var(--danger-color);
-    }
-
-    .main-content {
-        margin-left: 250px;
-        transition: margin-left 0.3s ease;
-    }
-
-    .topbar {
-        background: var(--card-bg);
-        padding: 15px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .topbar h3 {
-        font-weight: 600;
-        margin: 0;
-        color: var(--text-dark);
-        font-size: 22px;
-    }
-
+/* Hover effect */
+.role-label:hover {
+    transform: translateY(-2px);
+    filter: brightness(0.9);
+}
     .topbar .user-profile {
         display: flex;
         align-items: center;
         gap: 12px;
-    }
-
-    .topbar .user-name {
-        font-weight: 600;
-        font-size: 15px;
-        color: #334155;
-    }
-
-    .container-fluid {
-        padding: 30px;
     }
 
     .card {
@@ -239,66 +184,12 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         color: var(--text-dark);
     }
 
-    .table thead th {
-        background: var(--bg-light-gray);
-        color: var(--text-muted);
-        border: none;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 12px;
-    }
-
-    .table tbody td {
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
-    }
-
-    .table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    /* KEMASKINI: Gaya untuk ikon dalam badge (RINGKAS) */
-    .badge.rounded-pill {
-        padding: .4em .8em;
-        font-weight: 500;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: 30px;
-        gap: 0;
-    }
-
-    /* KEMASKINI: Status (Active/Suspended) - Saiz tetap */
-    .badge.text-bg-success, .badge.text-bg-danger {
-        width: 30px; 
-    }
-
-    /* KEMASKINI: Role - Saiz auto untuk tooltip */
-    .badge.text-bg-info { 
-        background-color: #64748b !important; 
-        color: white !important; 
-        width: auto; 
-        padding: .4em .8em;
-    } 
-    
-    /* Warna badge menggunakan pembolehubah */
-    .badge.text-bg-success { background-color: var(--primary-color) !important; color: white !important; }
-    .badge.text-bg-danger { background-color: var(--danger-color) !important; color: white !important; }
-
     .btn {
         border-radius: 8px;
         padding: 10px 20px;
         font-weight: 500;
     }
 
-    .btn-primary {
-        background-color: var(--primary-color);
-        border: none;
-    }
-
-    .btn-primary:hover {
-        background-color: var(--primary-hover);
-    }
 
     .search-bar {
         display: flex;
@@ -306,173 +197,103 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
         margin-bottom: 20px;
     }
 
-    .search-bar input, .search-bar select {
-        border-radius: 8px;
-    }
 
-    #editRemarksContainer {
-        margin-top: 1rem;
-    }
-
-    /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
-    #sidebar-toggle-btn {
-        display: none;
-        background: none;
-        border: none;
-        color: #334155;
-        font-size: 20px;
-        padding: 0;
-        margin-right: 15px;
-    }
-
-    @media (max-width: 768px) {
-        /* GENERAL LAYOUT */
-        #sidebar-toggle-btn {
-            display: block;
-        }
-
-        .sidebar {
-            transform: translateX(-100%);
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
-            z-index: 1050;
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .main-content {
-            margin-left: 0;
-            width: 100%;
-        }
-
-        .topbar {
-            padding: 10px 15px;
-            justify-content: flex-start;
-        }
-
-        .topbar h3 {
-            font-size: 16px;
-            flex-grow: 1;
-        }
-
-        .topbar .d-flex {
-            display: flex;
-            align-items: center;
-        }
-
-        .topbar .btn {
-            font-size: 12px;
-            padding: .4rem .6rem;
-            white-space: nowrap;
-        }
-
-        .topbar .user-name {
-            display: none;
-        }
-
-        .container-fluid {
-            padding: 10px 5px;
-        }
-
-        .card {
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        /* FILTER & SEARCH BAR */
-        .search-bar {
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .search-bar input, .search-bar select {
-            font-size: 14px;
-        }
-
-        /* TABLE STYLES */
-        .table-responsive {
-            overflow-x: auto;
-            display: block;
-            width: 100%;
-        }
-
-        .table {
-            width: 100%;
-            min-width: 650px;
-        }
-
-        .table thead th {
-            font-size: 10px;
-            padding: 0.5rem 0.3rem;
-            white-space: nowrap;
-        }
-
-        .table tbody td {
-            padding: 0.4rem 0.3rem;
-            font-size: 14px;
-        }
-
-        .table tbody td:nth-child(2) {
-            white-space: normal;
-        }
-
-        .table tbody td:nth-child(5) {
-            white-space: nowrap;
-            min-width: 100px;
-        }
-
-        .table tbody td .btn-sm {
-            padding: 0.3rem 0.4rem;
-            font-size: 0.7rem;
-        }
-		
-		/* Gaya untuk Role Blocks */
-.role-indicator {
-    display: flex;
-    gap: 4px;
-    align-items: center;
+   
+      
+#addUserModal .modal-body {
+    padding: 1.5rem 2rem !important;
 }
 
-.role-block {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background-color: #e2e8f0; /* Warna asal/kelabu (off) */
-    display: inline-block;
+/* Kurangkan jarak antara label dan input */
+#addUserModal .mb-3, #addUserModal .mb-4 {
+    margin-bottom: 1rem !important;
 }
 
-/* Warna-warna level */
-.block-user { background-color: #3b82f6 !important; }      /* Biru */
-.block-tech { background-color: #f59e0b !important; }      /* Amber/Oren */
-.block-admin { background-color: #ef4444 !important; }     /* Merah */
-
-    }
-	
-	/* Kemaskini pada gaya role-block sedia ada */
-.role-block {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    background-color: #e2e8f0; 
-    display: inline-block;
-    transition: transform 0.2s ease;
+/* Pastikan input tak nampak terlalu tinggi */
+#addUserModal .form-control, #addUserModal .form-select {
+    padding: 10px 12px;
 }
 
-.role-block:hover {
-    transform: scale(1.2);
+/* Button eye adjustment */
+#togglePassword {
+    border: 2px solid #f1f5f9;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+}		.text-success { color: #10b981 !important; } /* Hijau yang lebih moden */
+.password-hints i { transition: all 0.2s ease; }
+#togglePassword:focus { box-shadow: none; }
+
+.role-pills .btn-check:checked + .btn, 
+.status-pills .btn-check:checked + .btn {
+    background-color: white !important;
+    color: #0d6efd !important;
+    border-color: transparent !important;
+    font-weight: bold;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
 }
 
-/* Tooltip custom (opsional) */
-.role-indicator {
-    cursor: help;
-    padding: 5px;
-    background: #f1f5f9;
-    border-radius: 6px;
+.role-pills .btn, .status-pills .btn {
+    border: none;
+    color: #6c757d;
+    background-color: #f1f3f5; /* Warna background container filter */
+    margin: 0 2px;
+    border-radius: 8px !important;
+    transition: all 0.2s;
+}
+
+.btn-group {
+    background-color: #f1f3f5;
+    padding: 4px;
+    border-radius: 12px;
+}		
+/* Container Luar */
+.role-exclusive-pill {
     display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background: #ffffff;
+    border: 1px solid #eef2f6;
+    border-radius: 30px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
-/* Pastikan warna ini ada di luar @media query supaya terpakai pada semua saiz skrin */
+.role-exclusive-pill:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+}
+
+/* Dot Styling */
+.dot-group { display: flex; gap: 4px; }
+.dot-static { width: 8px; height: 8px; border-radius: 50%; }
+.dot-user { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.4); }
+.dot-tech { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+.dot-admin { background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+.dot-dim { background: #e2e8f0; }
+
+/* Role Item inside Dropdown */
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    cursor: pointer;
+    margin: 0;
+}
+
+.role-item:hover { background: #f8fafc; }
+
+/* Custom Checkbox */
+.custom-check {
+    width: 16px !important;
+    height: 16px !important;
+    margin: 0 !important;
+    cursor: pointer;
+}/* Pastikan warna ini ada di luar @media query supaya terpakai pada semua saiz skrin */
 .block-user { background-color: #3b82f6 !important; }   /* Biru */
 .block-tech { background-color: #f59e0b !important; }   /* Oren */
 .block-admin { background-color: #ef4444 !important; }  /* Merah */
@@ -498,38 +319,456 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 .pagination .page-link:hover {
     background-color: #f1f5f9;
 }
-</style></head>
+
+/* 1. Paksa SweetAlert duduk paling depan */
+.swal2-container {
+    z-index: 100001 !important; 
+}
+
+/* 2. Pastikan teks input warna gelap supaya nampak apa kita taip */
+.swal2-input {
+    color: #1e293b !important;
+}
+	/* Container styling */
+.main-content {
+    background-color: #f8fafc !important; /* Warna background grey lembut */
+}
+
+/* Card table styling */
+.inventory-card {
+    background: white;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Icon box styling (Macam dalam gambar) */
+.item-icon-box {
+    width: 45px;
+    height: 45px;
+    background-color: #eef2ff; /* Biru cair lembut */
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6366f1;
+    font-size: 1.2rem;
+}
+
+/* Category Pill Styling */
+.category-pill {
+    background: white;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Stock Pill Styling */
+.stock-badge {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-width: 40px;
+    display: inline-block;
+}
+.bg-stock-total { background-color: #f1f5f9; color: #475569; }
+.bg-stock-avail { background-color: #f0fdf4; color: #16a34a; }
+
+/* Action buttons styling */
+.btn-action {
+    color: #94a3b8;
+    transition: all 0.2s;
+    font-size: 1.1rem;
+}
+.btn-action:hover { color: #1e293b; transform: translateY(-1px); }
+.btn-delete:hover { color: #ef4444; }
+
+
+/* Gaya asas untuk status dot */
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    cursor: help;
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.status-dot:hover {
+    transform: scale(1.3); /* Besar sikit bila cursor lalu */
+}
+
+/* Warna ikut status */
+.dot-active {
+    background-color: #10b981; /* Hijau */
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.dot-suspended {
+    background-color: #ef4444; /* Merah */
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+.avatar-circle {
+    width: 45px;          /* Saiz bulatan */
+    height: 45px;         /* Mesti sama dengan width untuk jadi bulat */
+    background-color: #f1f3f5; /* Warna background bulatan */
+    color: #495057;       /* Warna huruf */
+    display: flex;
+    align-items: center;  /* Center huruf secara vertical */
+    justify-content: center; /* Center huruf secara horizontal */
+    border-radius: 50%;   /* Ini yang buat dia jadi BULAT */
+    font-weight: bold;
+    font-size: 1.2rem;
+    border: 1px solid #dee2e6; /* Border nipis bagi nampak shape */
+}
+/* Action Buttons Styling */
+.action-btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-edit, .btn-delete {
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+}
+
+/* Edit Button (Warning/Gold) */
+.btn-edit {
+    background-color: #fefce8;
+    color: #ca8a04;
+}
+.btn-edit:hover {
+    background-color: #fef08a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(202, 138, 4, 0.15);
+}
+
+/* Delete Button (Danger/Red) */
+.btn-delete {
+    background-color: #fef2f2;
+    color: #dc2626;
+}
+.btn-delete:hover {
+    background-color: #fee2e2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}
+
+/* Dropdown Card Styling */
+.dropdown-menu.role-card {
+    border: none;
+    border-radius: 18px;
+    padding: 1.25rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    min-width: 250px;
+}
+
+/* Butang Add Account supaya sama dengan sidebar */
+.btn-primary, .btn-add-account {
+    background-color: #3b82f6 !important; /* Biru sidebar */
+    border: none !important;
+    padding: 10px 24px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); /* Shadow biru lembut */
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover, .btn-add-account:hover {
+    background-color: #2563eb !important; /* Biru gelap sikit bila hover */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+/* Kotak Filter supaya lebih 'Pop Up' */
+.d-flex.align-items-center.justify-content-between.mb-4.p-3.bg-white {
+    border-radius: 16px !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 
+                0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+    background-color: #ffffff !important;
+}
+
+/* Cantikkan sikit input search kat dalam tu */
+#searchInput {
+    background-color: #f8fafc !important;
+    border: 1px solid #f1f5f9 !important;
+    transition: all 0.2s ease;
+}
+
+#searchInput:focus {
+    background-color: #ffffff !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
+}
+/* Butang Add Account - Tema Cyan */
+.btn-add-account {
+    background-color: #06b6d4 !important; /* Warna Cyan/Turquoise */
+    color: white !important;
+    border: none !important;
+    padding: 10px 24px !important;
+    border-radius: 12px !important; /* Bagi round sikit macam dalam gambar */
+    font-weight: 600 !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-add-account:hover {
+    background-color: #0891b2 !important; /* Gelap sikit bila hover */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4) !important;
+}
+
+.btn-add-account i {
+    font-size: 1rem;
+}
+
+/* 1. Paksa SweetAlert duduk paling depan */
+.swal2-container {
+    z-index: 100001 !important; 
+}
+
+/* 2. Pastikan teks input warna gelap supaya nampak apa kita taip */
+.swal2-input {
+    color: #1e293b !important;
+}
+	/* Container styling */
+.main-content {
+    background-color: #f8fafc !important; /* Warna background grey lembut */
+}
+
+/* Card table styling */
+.inventory-card {
+    background: white;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Header table styling */
+.table thead th {
+    background: transparent;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* Row styling */
+.table tbody tr td {
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+}
+
+/* Icon box styling (Macam dalam gambar) */
+.item-icon-box {
+    width: 45px;
+    height: 45px;
+    background-color: #eef2ff; /* Biru cair lembut */
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6366f1;
+    font-size: 1.2rem;
+}
+
+/* Category Pill Styling */
+.category-pill {
+    background: white;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Stock Pill Styling */
+.stock-badge {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-width: 40px;
+    display: inline-block;
+}
+.bg-stock-total { background-color: #f1f5f9; color: #475569; }
+.bg-stock-avail { background-color: #f0fdf4; color: #16a34a; }
+
+/* Action buttons styling */
+.btn-action {
+    color: #94a3b8;
+    transition: all 0.2s;
+    font-size: 1.1rem;
+}
+.btn-action:hover { color: #1e293b; transform: translateY(-1px); }
+.btn-delete:hover { color: #ef4444; }
+
+.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
+    
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
+    
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
+    
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
+    
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
+
+/* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
+    body {
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
+    }
+
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
+    }
+
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
+    }
+
+    .mobile-bottom-nav a i {
+        font-size: 20px;
+    }
+
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
+    }
+}
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
+        }
+    }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
+}
+
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+
+</style>
+	
+</head>
 <body>
-
-<div class="sidebar-overlay" id="sidebar-overlay"></div>
-
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
 <div class="sidebar" id="admin-sidebar">
-    <div>
-        <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
-            <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
-        </div>
-        <a href="manageItem_admin.php" ><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="manage_accounts.php" class="active"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>
+    <div> <div class="sidebar-header">
+    <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
+    <div class="logo-text">
+        <strong>UniKL Admin</strong>
+        <span class="d-block">System Control</span> </div>
+</div>
+        
+        <div class="sidebar-nav"> 
+<a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" class="active"  ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>        </div>
     </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    
+    <div class="sidebar-footer">
+        <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+    </div>
+</div>
+<div class="main-content">
+ 
+	
+<div class="topbar d-flex justify-content-between align-items-center">
+    <div>
+        <h3 class="mb-0 fw-bold">Manage User Account</h3>
+        <p class="text-muted small mb-0" id="totalAccountCount"><?= count($accounts) ?> accounts found</p>
+    </div>
+    
+    <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-add-account btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="fa-solid fa-circle-plus"></i> Add Account
+        </button>            
+
+         <a href="profile_admin.php" class="user-pill text-decoration-none shadow-sm">
+                    <div class="text-end me-2 d-none d-md-block">
+                        <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
+                            <?= htmlspecialchars($displayName) ?>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Administrator</small>
+                    </div>
+                    <div class="profile-avatar">
+                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
+                    </div>
+                </a>
+    </div>
 </div>
 
-<div class="main-content">
-    <div class="topbar">
-        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
-        <h3>Manage User Account</h3>
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="fa fa-user-plus me-2"></i> Add Account</button>
-            <div class="user-profile">
-<span class="user-name"><?= $admin_name ?></span>
-                <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
-                </a>
-            </div>
-        </div>
-    </div>
     <div class="container-fluid">
         <?php if (isset($_SESSION['success_message'])): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -544,16 +783,46 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
             </div>
         <?php endif; ?>
 
-        <div class="card">
-            <div class="search-bar">
-                <input type="text" id="searchInput" class="form-control" placeholder="Search by name or email..." onkeyup="filterTable()">
-                <select id="roleFilter" class="form-select" onchange="filterTable()">
-                    <option value="">All Roles</option><option value="User">User</option><option value="Technician">Technician</option>
-                </select>
-                <select id="statusFilter" class="form-select" onchange="filterTable()">
-                    <option value="">All Status</option><option value="Active">Active</option><option value="Suspended">Suspended</option>
-                </select>
+        <div class="d-flex align-items-center justify-content-between mb-4 p-3 bg-white shadow-sm" style="border-radius: 15px; gap: 20px;">
+    <div class="position-relative flex-grow-1" style="max-width: 350px;">
+        <i class="fa-solid fa-magnifying-glass position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+        <input type="text" id="searchInput" class="form-control ps-5 py-2 border-0 bg-light" 
+               style="border-radius: 10px;" placeholder="Search by name, email..." onkeyup="filterTable()">
+    </div>
+
+    <div class="d-flex align-items-center gap-4">
+        <div class="d-flex align-items-center gap-2">
+            <span class="small fw-bold text-muted">ROLE:</span>
+            <div class="p-1 bg-light d-flex gap-1" style="border-radius: 12px;">
+                <input type="radio" class="btn-check" name="roleFilter" id="roleAll" value="" checked onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="roleAll">All</label>
+
+                <input type="radio" class="btn-check" name="roleFilter" id="roleUser" value="User" onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="roleUser">User</label>
+
+                <input type="radio" class="btn-check" name="roleFilter" id="roleTech" value="Technician" onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="roleTech">Technician</label>
+
+                <input type="radio" class="btn-check" name="roleFilter" id="roleAdmin" value="Admin" onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="roleAdmin">Admin</label>
             </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="small fw-bold text-muted">STATUS:</span>
+            <div class="p-1 bg-light d-flex gap-1" style="border-radius: 12px;">
+                <input type="radio" class="btn-check" name="statusFilter" id="statusAll" value="" checked onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="statusAll">All</label>
+
+                <input type="radio" class="btn-check" name="statusFilter" id="statusActive" value="Active" onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="statusActive">Active</label>
+
+                <input type="radio" class="btn-check" name="statusFilter" id="statusSuspended" value="Suspended" onchange="filterTable()">
+                <label class="btn btn-sm filter-pill" for="statusSuspended">Suspended</label>
+            </div>
+        </div>
+    </div>
+</div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle" id="userTable">
                     <thead>
@@ -561,75 +830,142 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                             <th>Name</th><th>Email & Phone</th><th>Status</th><th>Role</th><th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php if (count($accounts) > 0): foreach ($accounts as $a): ?>
-                            <tr>
-                                <td><strong><?= htmlspecialchars($a['name']) ?></strong></td>
-                                <td>
-                                    <?= htmlspecialchars($a['email']) ?><br>
-                                    <small class="text-muted"><?= htmlspecialchars(isset($a['phoneNum']) ? $a['phoneNum'] : 'N/A') ?></small>
-                                </td>
-                                <td>
-                                    <?php 
-                                        $status_class = strtolower($a['status']) === 'active' ? 'text-bg-success' : 'text-bg-danger';
-                                        $status_icon = strtolower($a['status']) === 'active' ? 'fa-check-circle' : 'fa-times-circle';
-                                    ?>
-                                    <span title="<?= htmlspecialchars($a['status']) ?>">
-                                        <span class="badge rounded-pill <?= $status_class ?>">
-                                            <i class="fa-solid <?= $status_icon ?>"></i> 
-                                        </span>
-                                    </span>
-                                </td>
-                                <td>
+<tbody>
+    <?php if (count($accounts) > 0): ?>
+        <?php foreach ($accounts as $a): ?>
+            <?php 
+                // --- BETULKAN DI SINI: Takrifkan variable untuk setiap baris ---
+                $roles_list = strtolower($a['roles_list']);
+                $isTech = str_contains($roles_list, 'technician');
+                $isAdmin = str_contains($roles_list, 'admin');
+            ?>
+<tr data-role="<?= strtolower(trim($a['roles_list'])) ?>" 
+    data-status="<?= strtolower(trim($a['status'])) ?>">
+
+	<td>
+                    <div class="d-flex align-items-center">
+                        <div class="avatar-circle me-3">
+                            <?= strtoupper(substr($a['name'], 0, 1)) ?>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark" style="font-size: 1.05rem;"><?= htmlspecialchars($a['name']) ?></div>
+                            <div class="text-muted small">ID: <?= htmlspecialchars(isset($a['id']) ? $a['id'] : 'N/A') ?></div>
+                        </div>
+                    </div>
+                </td>
+
+                <td>
+                    <div class="mb-1">
+                        <i class="fa-regular fa-envelope text-muted me-2"></i>
+                        <span class="text-secondary"><?= htmlspecialchars($a['email']) ?></span>
+                    </div>
+                    <div>
+                        <i class="fa-solid fa-phone text-muted me-2"></i>
+                        <span class="text-secondary"><?= htmlspecialchars(isset($a['phoneNum']) ? $a['phoneNum'] : 'N/A') ?></span>
+                    </div>
+                </td>
+
+                <td>
+                    <?php 
+                        $status = strtolower($a['status']);
+                        $dotClass = ($status === 'active') ? 'dot-active' : 'dot-suspended';
+                        $statusText = ucfirst($a['status']);
+                    ?>
+                    <span class="status-dot <?= $dotClass ?>" title="<?= $statusText ?>"></span>
+                </td>
+
+<td class="text-center align-middle">
     <?php 
-        $roles = strtolower($a['roles_list']);
-        $isAdmin = (strpos($roles, 'admin') !== false);
-        $isTech = (strpos($roles, 'technician') !== false);
-        // Semua akaun biasanya ada role user
-        $isUser = (strpos($roles, 'user') !== false || $isAdmin || $isTech);
+        // Logic pengesanan role tetap kena ada dalam loop
+        $roles_raw = strtolower($a['roles_list']);
+        $isTech = str_contains($roles_raw, 'technician');
+        $isAdmin = str_contains($roles_raw, 'admin');
     ?>
-    <div class="role-indicator" title="<?= htmlspecialchars($a['roles_list']) ?>" data-bs-toggle="tooltip">
-        <span class="role-block <?= $isUser ? 'block-user' : '' ?>"></span>
-        
-        <span class="role-block <?= ($isTech || $isAdmin) ? 'block-tech' : '' ?>"></span>
-        
-        <span class="role-block <?= $isAdmin ? 'block-admin' : '' ?>"></span>
+
+    <div class="dropdown">
+        <div class="role-exclusive-pill" data-bs-toggle="dropdown" aria-expanded="false">
+            <div class="dot-group">
+                <span class="dot-static dot-user"></span>
+                <span class="dot-static <?= $isTech ? 'dot-tech' : 'dot-dim' ?>"></span>
+                <span class="dot-static <?= $isAdmin ? 'dot-admin' : 'dot-dim' ?>"></span>
+            </div>
+            <i class="fa-solid fa-chevron-down ms-2 opacity-50" style="font-size: 0.7rem;"></i>
+        </div>
+
+        <div class="dropdown-menu dropdown-menu-end shadow-lg" style="border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); min-width: 200px; padding: 15px;">
+            <div class="text-uppercase mb-3 opacity-50 fw-bold" style="font-size: 0.65rem; letter-spacing: 1.2px;">Access Control</div>
+            
+          <form class="role-update-form">
+    <input type="hidden" name="user_id" value="<?= $a['person_unique_id'] ?>">
+    
+    <div class="role-item mb-2">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-circle-user me-3 text-success opacity-75"></i>
+            <span class="small fw-semibold text-secondary">Standard User</span>
+        </div>
+        <i class="fa-solid fa-lock text-muted" style="font-size: 0.7rem;"></i>
+    </div>
+
+    <label class="role-item mb-2" for="t<?= $a['person_unique_id'] ?>">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-screwdriver-wrench me-3 text-warning"></i>
+            <span class="small fw-semibold">Technician Mode</span>
+        </div>
+        <input type="checkbox" name="roles[]" value="Technician" 
+               id="t<?= $a['person_unique_id'] ?>" 
+               class="form-check-input custom-check tech-checkbox" 
+               <?= $isTech ? 'checked' : '' ?>>
+    </label>
+
+    <label class="role-item mb-3" for="a<?= $a['person_unique_id'] ?>">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-shield-halved me-3 text-danger"></i>
+            <span class="small fw-semibold">Full Administrator</span>
+        </div>
+        <input type="checkbox" name="roles[]" value="Admin" 
+               id="a<?= $a['person_unique_id'] ?>" 
+               class="form-check-input custom-check admin-checkbox" 
+               <?= $isAdmin ? 'checked' : '' ?>>
+    </label>
+
+   <button type="button" 
+        class="btn btn-dark w-100 btn-sm py-2 fw-bold" 
+        style="border-radius: 8px;"
+        onclick="saveRoleChanges(this, '<?= $a['person_unique_id'] ?>')">
+    UPDATE PERMISSIONS
+</button>
+</form>
+        </div>
     </div>
 </td>
-                                 <td>
-                                     <button class="btn btn-sm btn-outline-warning" title="Edit User"
-                                         onclick="editUser(
-                                             '<?= $a['person_unique_id'] ?>',
-                                             '<?= htmlspecialchars(addslashes($a['name'])) ?>',
-                                             '<?= htmlspecialchars(addslashes($a['email'])) ?>',
-                                             '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>', '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>',
-                                             '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>',
-                                             '<?= htmlspecialchars(addslashes($a['status'])) ?>',
-                                             '<?= htmlspecialchars(addslashes(isset($a['suspension_remarks']) ? $a['suspension_remarks'] : '')) ?>'
-                                         )">
-                                         <i class="fa-solid fa-pen"></i>
-                                     </button>
-                                     
-                                     <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this account? This action cannot be undone.');">
-                                         <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
-                                         <input type="hidden" name="role" value="<?= htmlspecialchars($a['roles_list']) ?>">
-                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
-                                             <i class="fa-solid fa-trash"></i>
-                                         </button>
-                                     </form>
-                                 </td>
-                            </tr>
-                        <?php endforeach; else: ?>
-                            <tr><td colspan="5" class="text-center text-muted py-5"><i class="fa-solid fa-users-slash fa-2x mb-2"></i><br>No accounts found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                <td>
+                    <div class="action-btn-group">
+                        <button class="btn-edit" title="Edit Profile"
+                            onclick="editUser('<?= $a['person_unique_id'] ?>', '<?= htmlspecialchars(addslashes($a['name'])) ?>', '<?= htmlspecialchars(addslashes($a['email'])) ?>', '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>', '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>', '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>', '<?= htmlspecialchars(addslashes($a['status'])) ?>')">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Padam akaun ni?');">
+                            <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
+                            <button type="submit" class="btn-delete" title="Remove Account">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr><td colspan="5" class="text-center py-5">No accounts found.</td></tr>
+    <?php endif; ?>
+</tbody>                </table>
+				
+				
 				<div class="d-flex justify-content-between align-items-center mt-3">
     <div class="text-muted small">
         Showing <?= $offset + 1 ?> to <?= min($offset + $limit, $total_rows) ?> of <?= $total_rows ?> accounts
     </div>
     <nav aria-label="Page navigation">
-        <ul class="pagination pagination-sm mb-0">
+        <ul class="pagination pagination-sm mb-0" id="pagination-links">
             <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
                 <a class="page-link" href="?page=<?= $page - 1 ?>" aria-label="Previous">
                     <span aria-hidden="true">&laquo;</span>
@@ -656,46 +992,80 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 </div>
 
 <div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-centered"> 
         <form action="save_user.php" method="POST" class="modal-content" id="addAccountForm">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Add New Account</h5>
+            <div class="modal-header text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-user-plus me-2"></i>Add New Account</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="mb-3"><label class="form-label">Name</label><input type="text" name="username" class="form-control" required></div>
-                
-                <div class="mb-3"><label class="form-label">Email (UniKL)</label>
-                    <input type="email" name="email" class="form-control" required
-                            pattern="[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my"
-                            title="Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)">
+            
+            <div class="modal-body p-4">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="username" class="form-control" placeholder="Nama penuh" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">UniKL Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="name@unikl.edu.my" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Staff / Student ID</label>
+                        <input type="text" name="id" class="form-control" placeholder="6-12 digit" required>
+                    </div>
                 </div>
-                
-                <div class="mb-3"><label class="form-label">Staff ID</label>
-                    <input type="text" name="id" class="form-control" required        
-                        pattern="\d{6,12}" 
-                        title="Enter staff ID (6 to 12 digits)"
-                        placeholder="e.g., 990101">
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Phone Number</label>
+                        <input type="text" name="phoneNumber" class="form-control" placeholder="01X-XXXXXXX" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Account Role</label>
+                        <select name="role" class="form-select" required>
+                            <option value="Technician" selected>Technician</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Secure Password</label>
+                        <div class="input-group">
+                            <input type="password" name="password" id="passwordInput" class="form-control" placeholder="••••••••" required>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3"><label class="form-label">Phone Number</label><input type="text" name="phoneNumber" class="form-control" required></div>
-                <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
-<div class="mb-3">
-    <label class="form-label">Account Role</label>
-    <select name="role" class="form-select" required>
-        <option value="Technician" selected>Technician</option>
-        <option value="Admin">Admin</option>
-    </select>
-    <small class="text-muted">Admin & Technician roles will automatically include User access.</small>
-</div>            
-</div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Account</button>
+
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <div class="p-3" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <p class="mb-2 small fw-bold text-secondary text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Password Requirements:</p>
+                            <div class="row g-0">
+                                <div class="col-6 small text-muted" id="reqLength" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Min. 8 Aksara</div>
+                                <div class="col-6 small text-muted" id="reqUpper" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Huruf Besar</div>
+                                <div class="col-6 small text-muted" id="reqNumber" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Nombor (0-9)</div>
+                                <div class="col-6 small text-muted" id="reqSpecial" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Simbol (@$!%)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-center">
+                        <div class="alert alert-info m-0 py-2 px-3 border-0" style="border-radius: 10px; font-size: 0.75rem; background-color: #f0f7ff;">
+                            <i class="fa-solid fa-circle-info me-1"></i> 
+                            Admin & Technician automatically include <strong>User</strong> access.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light border-0" style="border-radius: 0 0 20px 20px;">
+                <button type="button" class="btn btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-save px-5">Save Account</button>
             </div>
         </form>
     </div>
 </div>
-
 <div class="modal fade" id="editUserModal" tabindex="-1">
     <div class="modal-dialog">
         <form action="update_user.php" method="POST" class="modal-content" id="editAccountForm">
@@ -708,7 +1078,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
                 <input type="hidden" name="role" id="editRole">
                 <div class="mb-3">
                     <label class="form-label">Name</label>
-<input type="text" name="username" class="form-control" required oninput="this.value = this.value.toUpperCase()">
+                    <input type="text" id="editName" name="username" class="form-control bg-light" readonly>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Email</label>
@@ -743,8 +1113,48 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+
+// Tambah ini di baris paling bawah script hang
+document.addEventListener('DOMContentLoaded', function() {
+    filterTable(1);
+});
+
+
+document.querySelectorAll('.role-update-form').forEach(form => {
+    const adminCheck = form.querySelector('.admin-checkbox');
+    const techCheck = form.querySelector('.tech-checkbox');
+
+    if (adminCheck && techCheck) {
+        // Function untuk handle logic hierarchy
+        const handleHierarchy = () => {
+            if (adminCheck.checked) {
+                techCheck.checked = true;
+                techCheck.disabled = true; // Kunci sebab Admin memang dah ada kuasa Tech
+                // Tambah hidden input supaya value 'Technician' tetap hantar ke PHP
+                if(!form.querySelector('#hidden-tech')) {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'roles[]';
+                    hidden.value = 'Technician';
+                    hidden.id = 'hidden-tech';
+                    form.appendChild(hidden);
+                }
+            } else {
+                techCheck.disabled = false;
+                const hidden = form.querySelector('#hidden-tech');
+                if(hidden) hidden.remove();
+            }
+        };
+
+        adminCheck.addEventListener('change', handleHierarchy);
+        
+        // Run sekali masa page load
+        handleHierarchy();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('admin-sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
@@ -796,48 +1206,78 @@ function editUser(person_unique_id, name, email, id, phone, roles_list, status, 
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
 }
 
-function filterTable() {
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    const role = document.getElementById('roleFilter').value.toLowerCase();
-    const status = document.getElementById('statusFilter').value.toLowerCase();
-    const rows = document.querySelectorAll('#userTable tbody tr');
-    rows.forEach(row => {
-        const name = row.cells[0].textContent.toLowerCase();
-        const emailPhone = row.cells[1].textContent.toLowerCase();
-        
-// BETULKAN DI SINI: Ambil title terus dari div role-indicator atau span status
-        const statusSpan = row.cells[2].querySelector('span[title]');
-        const userStatus = statusSpan ? statusSpan.getAttribute('title').toLowerCase() : '';
-        
-        const roleDiv = row.cells[3].querySelector('.role-indicator');
-        const userRole = roleDiv ? roleDiv.getAttribute('title').toLowerCase() : '';
+let currentPage = 1;
+const rowsPerPage = 10;
+function filterTable(page = 1) {
+    // PENTING: Setiap kali input/filter berubah, kita reset ke page 1 
+    // KECUALI kalau function ni dipanggil dari butang pagination (ada parameter page)
+    currentPage = page;
 
-        const matchSearch = name.includes(search) || emailPhone.includes(search);
-        const matchRole = role === '' || userRole.includes(role); 
-        const matchStatus = status === '' || userStatus.includes(status);
-
-        row.style.display = (matchSearch && matchRole && matchStatus) ? '' : 'none';
-    });
-}
-document.getElementById('addAccountForm').addEventListener('submit', function(e) {
-    const emailInput = this.querySelector('input[name="email"]');
-    const email = emailInput.value.trim();
+    const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+    const roleRadio = document.querySelector('input[name="roleFilter"]:checked');
+    const statusRadio = document.querySelector('input[name="statusFilter"]:checked');
     
-    const uniklEmailPattern = /^[a-zA-Z0-9._%+-]+@(t\.)?unikl\.edu\.my$/;
+    const roleVal = roleRadio ? roleRadio.value.toLowerCase() : "";
+    const statusVal = statusRadio ? statusRadio.value.toLowerCase() : "";
 
-    if (!uniklEmailPattern.test(email)) { 
-        e.preventDefault(); 
-        Swal.fire({
-            icon: 'error',
-            title: 'Invalid Email',
-            text: 'Please enter a valid UniKL email (e.g., name@unikl.edu.my or name@t.unikl.edu.my)', 
-            didClose: () => {
-                emailInput.focus(); 
-            }
-        });
+    const allRows = Array.from(document.querySelectorAll('#userTable tbody tr'));
+    
+    // 1. Proses Tapisan
+    const filteredRows = allRows.filter(row => {
+        // Abaikan row "No accounts found" kalau ada
+        if (row.cells.length < 2) return false;
+
+        const rowRole = (row.getAttribute('data-role') || "").toLowerCase();
+        const rowStatus = (row.getAttribute('data-status') || "").toLowerCase();
+        const rowText = row.innerText.toLowerCase();
+
+        const matchesSearch = rowText.includes(searchVal);
+        const matchesRole = (roleVal === "") || rowRole.includes(roleVal);
+        const matchesStatus = (statusVal === "") || (rowStatus === statusVal);
+
+        return matchesSearch && matchesRole && matchesStatus;
+    });
+
+    const totalRows = filteredRows.length;
+
+    // 2. Update Kaunter Atas (12 accounts found)
+    const countDisplay = document.getElementById('totalAccountCount');
+    if (countDisplay) {
+        countDisplay.innerText = `${totalRows} accounts found`;
     }
-});
 
+    // 3. Logic Pagination
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
+    
+    // Kalau total rows sikit, pastikan tak tersekat kat page besar
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (totalRows === 0) currentPage = 1;
+
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+
+    // 4. Sorok/Tunjuk Row (Guna display: none secara agresif)
+    allRows.forEach(row => {
+        row.style.display = 'none';
+        row.style.visibility = 'hidden'; // Tambah ni untuk extra safety
+    });
+    
+    const rowsToShow = filteredRows.slice(start, end);
+    rowsToShow.forEach(row => {
+        row.style.display = '';
+        row.style.visibility = 'visible';
+    });
+
+    // 5. Update UI Pagination & Info
+    renderPaginationButtons(totalPages, currentPage);
+
+    const infoText = document.querySelector('.text-muted.small');
+    if (infoText) {
+        const showingFrom = totalRows === 0 ? 0 : start + 1;
+        const showingTo = Math.min(end, totalRows);
+        infoText.innerHTML = `Showing ${showingFrom} to ${showingTo} of ${totalRows} accounts`;
+    }
+}
 document.getElementById('editStatus').addEventListener('change', function() {
     const selectedStatus = this.value.toLowerCase();
     const remarksContainer = document.getElementById('editRemarksContainer');
@@ -869,7 +1309,201 @@ document.getElementById('editAccountForm').addEventListener('submit', function(e
         });
     }
 });
+
+const passwordInput = document.getElementById('passwordInput');
+const reqLength = document.getElementById('reqLength');
+const reqUpper = document.getElementById('reqUpper');
+const reqNumber = document.getElementById('reqNumber');
+const reqSpecial = document.getElementById('reqSpecial');
+
+passwordInput.addEventListener('input', function() {
+    const val = passwordInput.value;
+
+    // Check Length
+    updateStatus(reqLength, val.length >= 8);
+    // Check Uppercase
+    updateStatus(reqUpper, /[A-Z]/.test(val));
+    // Check Number
+    updateStatus(reqNumber, /[0-9]/.test(val));
+    // Check Special Char
+    updateStatus(reqSpecial, /[\W_]/.test(val));
+});
+
+function updateStatus(element, isValid) {
+    if (isValid) {
+        element.classList.remove('text-muted', 'text-danger');
+        element.classList.add('text-success', 'fw-bold');
+        element.querySelector('i').classList.replace('fa-circle-xmark', 'fa-check-circle');
+    } else {
+        element.classList.remove('text-success', 'fw-bold');
+        element.classList.add('text-muted');
+        element.querySelector('i').classList.replace('fa-check-circle', 'fa-circle-xmark');
+    }
+}
+
+// Toggle Show/Hide Password
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+    this.querySelector('i').classList.toggle('fa-eye');
+    this.querySelector('i').classList.toggle('fa-eye-slash');
+});
+
+function toggleRole(userId, roleType) {
+    // Gunakan SweetAlert biar nampak pro sikit
+    Swal.fire({
+        title: 'Confirm Change?',
+        text: `Do you want to update this user to ${roleType}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, update it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const params = new URLSearchParams();
+            // NAMA DI SINI MESTI SAMA DENGAN PHP ($_POST['person_id'] & $_POST['new_role'])
+            params.append('person_id', userId); 
+            params.append('new_role', roleType);
+
+            fetch('update_role_silent.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    Swal.fire('Updated!', 'Role has been changed.', 'success')
+                    .then(() => location.reload());
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                Swal.fire('Error', 'Something went wrong!', 'error');
+            });
+        }
+    });
+}
+function updateRole(pid, roleName) {
+    // 1. Bungkus data dalam format URL encoded
+    const params = new URLSearchParams();
+    params.append('person_id', pid);
+    params.append('new_role', roleName);
+
+    // 2. Hantar guna fetch
+    fetch('update_role_silent.php', {
+        method: 'POST',
+        headers: {
+            // Ini PENTING supaya PHP tahu ni data $_POST
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log("Berjaya!");
+            location.reload(); // Refresh untuk nampak perubahan warna petak
+        } else {
+            alert("Gagal: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+function saveRoleChanges(btn, userId) {
+    // 1. Cari form yang berkaitan dengan button yang ditekan
+    const form = btn.closest('.role-update-form');
+    const params = new URLSearchParams();
+    
+    params.append('user_id', userId);
+
+    // 2. Kumpul semua role yang di-tick
+    // Kita letak 'User' secara manual sebab dalam HTML ia bukan input yang boleh di-tick (statik)
+    let rolesArray = ['User']; 
+    
+    form.querySelectorAll('input[name="roles[]"]:checked').forEach(cb => {
+        rolesArray.push(cb.value);
+    });
+
+    // 3. Masukkan dalam params (PHP hang expect array roles)
+    // Kita hantar satu per satu guna nama roles[] supaya PHP automatik nampak sebagai array
+    rolesArray.forEach(role => {
+        params.append('roles[]', role);
+    });
+
+    // 4. Hantar ke Backend
+    fetch('update_role_silent.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+    })
+    .then(data => {
+        if(data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: data.message,
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                location.reload(); // Refresh untuk update dot warna kat table
+            });
+        } else {
+            Swal.fire('Error', data.message, 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        Swal.fire('Error', 'Server connection failed', 'error');
+    });
+}
+function updatePaginationUI(totalPages, currentPage) {
+    const paginationContainer = document.querySelector('.pagination'); // Pastikan class ni sama dengan HTML hang
+    if (!paginationContainer) return;
+
+    let html = '';
+    
+    // Butang Previous
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="filterTable(${currentPage - 1})">&laquo;</a>
+             </li>`;
+
+    // Butang Nombor Page
+    for (let i = 1; i <= totalPages; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="filterTable(${i})">${i}</a>
+                 </li>`;
+    }
+
+    // Butang Next
+    html += `<li class="page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="filterTable(${currentPage + 1})">&raquo;</a>
+             </li>`;
+
+    paginationContainer.innerHTML = html;
+}
 </script>
 
-</body>
+<nav class="mobile-bottom-nav">
+   
+    <a href="manageItem_admin.php" ><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" class="active" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>        </div>
+
+    <a href="profile_admin.php" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav></body>
+
 </html>
+

@@ -242,7 +242,7 @@ foreach (get_overdue_items($conn) as $item) {
 // Process Tech Prep
 $to_prep = get_collection_items_to_prep($conn);
 if (!empty($to_prep)) {
-    send_technician_prep_reminder('it.rcmp@unikl.edu.my', 'Main Technician', $to_prep);
+    send_technician_prep_reminder('aina.fatihah@t.unikl.edu.my', 'Main Technician', $to_prep);
 }
 
 echo "Summary: Pickups: {$counts['pickup']}, Today: {$counts['today']}, Tomorrow: {$counts['tomorrow']}, Overdue: {$counts['overdue']}.\n";

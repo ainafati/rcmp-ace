@@ -29,300 +29,437 @@ if (!$admin) {
 }
 
 $current_page = 'profile_admin.php'; 
+
+
+// LOGIK DISPLAY NAME
+$fullName = $admin['name'] ?? 'Admin';
+$lowerName = strtolower($fullName);
+$shortName = $fullName;
+$separators = [' binti ', ' bin ', ' a/l ', ' a/p '];
+foreach ($separators as $sep) {
+    $pos = strpos($lowerName, $sep);
+    if ($pos !== false) {
+        $shortName = substr($fullName, 0, $pos);
+        break;
+    }
+}
+$parts = explode(' ', trim($shortName));
+$displayName = (count($parts) > 1) ? $parts[0] . ' ' . $parts[1] : $parts[0];
+$displayName = htmlspecialchars($displayName);
 ?>
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>My Profile — UniKL Admin</title>
+    <title>Premium Profile — UniKL Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+    
     <style>
+	
+	/* Pastikan badge requirement nampak jelas */
+.req-badge {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important; /* Tambah border supaya nampak atas background putih */
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.3s ease;
+    background-color: #ffffff !important; /* Paksa warna putih */
+}
+
+/* Warna bila dah lepas syarat */
+.req-badge.text-success {
+    background-color: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+}
+
+.strength-meter {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 10px;
+    margin: 15px 0;
+    overflow: hidden;
+}
         :root {
-            --primary-color: #06b6d4;
-            --primary-hover: #0891b2;
-            --danger-color: #ef4444;
-            --bg-light-gray: #f8fafc;
-            --card-bg: #ffffff;
-            --text-dark: #1e293b; 
-            --text-muted: #64748b; 
-            --border-color: #e5e7eb;
-            --sidebar-width: 260px;
+            --primary-gradient: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+            --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            --glass-bg: rgba(255, 255, 255, 0.95);
         }
 
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; overflow-x: hidden; }
-
-        /* SIDEBAR */
-        .sidebar { 
-            width: var(--sidebar-width); 
-            position: fixed; 
-            top: 0; bottom: 0; left: 0; 
-            background: var(--card-bg); 
-            padding: 25px 20px; 
-            border-right: 1px solid var(--border-color); 
-            z-index: 1100; /* Paling atas */
-            display: flex; 
-            flex-direction: column; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #f8fafc;
         }
 
-        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 35px; }
-        .logo-icon { width: 40px; height: 40px; background: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        
-        .sidebar a { 
-            display: flex; align-items: center; gap: 12px; color: var(--text-muted); 
-            text-decoration: none; padding: 12px 15px; margin-bottom: 5px; 
-            border-radius: 10px; font-weight: 500; transition: 0.2s; 
-        }
-        
-        .sidebar a.active, .sidebar a:hover { background: var(--primary-color); color: #fff; }
-        .sidebar a.logout-link { color: var(--danger-color); margin-top: auto; }
-        .sidebar a.logout-link:hover { background: var(--danger-color); color: white; }
-
-        /* OVERLAY */
-        .sidebar-overlay { 
-            display: none; position: fixed; 
-            top: 0; left: 0; right: 0; bottom: 0; 
-            background: rgba(0, 0, 0, 0.4); z-index: 1050; 
-        }
-        .sidebar-overlay.active { display: block; }
-
-        /* MAIN CONTENT */
-        .main-content { margin-left: var(--sidebar-width); transition: 0.3s; min-height: 100vh; }
-        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1000; }
-        
-        /* AVATAR */
-        .avatar { width: 90px; height: 90px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 36px; font-weight: 700; }
-
-        /* MOBILE VIEW */
-        #sidebar-toggle-btn { display: none; background: #f1f5f9; border: none; padding: 8px 12px; border-radius: 8px; color: var(--text-dark); margin-right: 15px; }
-
-        @media (max-width: 992px) {
-            #sidebar-toggle-btn { display: block; }
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.open { transform: translateX(0); box-shadow: 15px 0 30px rgba(0,0,0,0.1); }
-            .main-content { margin-left: 0; }
-            .topbar h3 { font-size: 1.2rem; flex-grow: 1; text-align: center; margin-bottom: 0; }
+        .main-content {
+            background: #f1f5f9 url('https://www.transparenttextures.com/patterns/cubes.png');
+            min-height: 100vh;
+            padding: 2rem;
+            transition: all 0.3s;
         }
 
-        .card { border-radius: 20px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .profile-container {
+            max-width: 1000px;
+            margin: 20px auto;
+        }
+
+        .inventory-card {
+            border: none !important;
+            border-radius: 30px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08) !important;
+            background: var(--glass-bg);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .profile-header-banner {
+            background: var(--primary-gradient);
+            height: 160px;
+            position: relative;
+        }
+
+        .profile-avatar-wrapper {
+            position: absolute;
+            bottom: -60px;
+            left: 50px;
+            background: white;
+            padding: 8px;
+            border-radius: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .info-tile {
+            padding: 25px;
+            border-radius: 24px;
+            background: #ffffff;
+            border: 1px solid #f1f5f9;
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .tile-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            background: #eff6ff;
+            color: #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+
+        .btn-update {
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            border-radius: 14px;
+            font-weight: 600;
+        }
+
+        /* CUSTOM RESPONSIVE SPACING */
+        .profile-header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 3rem;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .profile-header-info {
+                flex-direction: column;
+                align-items: flex-start;
+                margin-top: 1.5rem; /* Tambah ruang lepas avatar */
+            }
+            .btn-update {
+                width: 100%; /* Butang jadi lebar penuh kat mobile biar senang tekan */
+                margin-top: 10px;
+            }
+            .main-content {
+                padding: 1rem;
+            }
+        }
+
+        /* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
+    body {
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
+    }
+
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
+    }
+
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
+    }
+
+    .mobile-bottom-nav a i {
+        font-size: 20px;
+    }
+
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
+    }
+}
+
     </style>
 </head>
 <body>
-
-<div class="sidebar-overlay" id="sidebar-overlay"></div>
-
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
 <div class="sidebar" id="admin-sidebar">
-    <div class="sidebar-header">
-        <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
-        <div class="logo-text"><strong>UniKL Admin</strong><span class="small text-muted d-block">System Control</span></div>
+    <div> <div class="sidebar-header">
+    <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
+    <div class="logo-text">
+        <strong>UniKL Admin</strong>
+        <span class="d-block">System Control</span> </div>
+</div>
+        
+        <div class="sidebar-nav"> 
+<a href="manageItem_admin.php" ><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" ><i class="fa-solid fa-chart-pie"></i> System Report</a>        </div>
     </div>
     
-    <nav class="flex-grow-1">
-        <a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-        <a href="report_admin.php"><i class="fa-solid fa-chart-pie"></i> System Report</a>
-    </nav>
-    
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <div class="sidebar-footer">
+        <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+    </div>
 </div>
 
 <div class="main-content">
     <div class="topbar">
-        <button id="sidebar-toggle-btn"><i class="fa fa-bars"></i></button>
-        <h3 class="mb-0">My Profile</h3>
-        <div class="ms-auto">
-            <i class="fa-solid fa-circle-user fa-2x" style="color: var(--primary-color);"></i>
+        <div class="topbar-left">
+            <h3 class="mb-0 fw-bold">Account Settings</h3>
         </div>
-    </div>
-
-    <div class="container-fluid py-4">
-        <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="card p-4 text-center h-100">
-                    <div class="avatar">
-                        <?= htmlspecialchars(strtoupper(substr($admin['name'], 0, 1))) ?>
-                    </div>
-                    <h4 class="fw-bold mb-1"><?= htmlspecialchars($admin['name']) ?></h4>
-                    <p class="text-muted small"><?= htmlspecialchars($admin['email']) ?></p>
-                    <div class="mt-3 p-2 bg-light rounded-3">
-                        <small class="text-uppercase fw-bold text-muted" style="font-size: 10px;">Account Role</small>
-                        <div class="text-dark fw-bold">System Administrator</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-8">
-                <div class="card p-4">
-                    <?php if (isset($_SESSION['message'])): ?>
-                        <div class="alert alert-success border-0 shadow-sm alert-dismissible fade show">
-                            <?= $_SESSION['message']; unset($_SESSION['message']); ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+         <div class="topbar-right">
+            <a href="profile_admin.php" class="user-pill text-decoration-none shadow-sm">
+                    <div class="text-end me-2 d-none d-md-block">
+                        <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
+                            <?= htmlspecialchars($displayName) ?>
                         </div>
-                    <?php endif; ?>
-
-<div id="viewMode">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h5 class="mb-0 fw-bold"><i class="fa-solid fa-id-card me-2 text-info"></i> Personal Info</h5>
-        <button id="editBtn" class="btn btn-primary px-4 rounded-pill"><i class="fa-solid fa-pen-to-square me-2"></i>Edit</button>
-    </div>
-    <div class="row g-3">
-        <div class="col-sm-6">
-            <label class="small text-muted">System ID (Display ID)</label>
-            <div class="fw-bold text-primary"><?= htmlspecialchars($admin['id'] ?? 'N/A') ?></div>
-        </div>
-        <div class="col-sm-6">
-            <label class="small text-muted">Full Name</label>
-            <div class="fw-bold"><?= htmlspecialchars($admin['name'] ?? '') ?></div>
-        </div>
-        <div class="col-sm-6">
-            <label class="small text-muted">Email Address</label>
-            <div class="fw-bold text-muted"><?= htmlspecialchars($admin['email'] ?? '') ?></div>
-        </div>
-        <div class="col-sm-6">
-            <label class="small text-muted">Phone Number</label>
-            <div class="fw-bold"><?= htmlspecialchars($admin['phoneNum'] ?? '') ?></div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Administrator</small>
+                    </div>
+                    <div class="profile-avatar">
+                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
+                    </div>
+                </a>
         </div>
     </div>
-</div>
 
-<div id="editMode" style="display: none;">
-    <h5 class="mb-4 fw-bold">Update Profile</h5>
-    <form action="update_profile_admin.php" method="POST" id="profileForm">
-        <div class="row g-3">
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold">Display ID (Read Only)</label>
-                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($admin['id'] ?? '') ?>" readonly>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold">Email (Read Only)</label>
-                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($admin['email'] ?? '') ?>" readonly>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold">Full Name</label>
-                <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($admin['name'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold">Phone</label>
-                <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum'] ?? '') ?>" required>
-            </div>
-        </div>
-        <hr class="my-4">
-        
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold text-danger">New Password (Optional)</label>
-                <input type="password" class="form-control shadow-sm" name="new_password" id="new_password">
-                
-                <div class="password-requirements mt-3 p-3 border rounded bg-white small">
-                    <p class="mb-2 fw-bold text-muted">Password must contain:</p>
-                    <div id="req-length" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>At least 8 characters</div>
-                    <div id="req-upper" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One uppercase letter (A-Z)</div>
-                    <div id="req-lower" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One lowercase letter (a-z)</div>
-                    <div id="req-number" class="text-danger mb-1"><i class="fa-solid fa-circle-xmark me-2"></i>One number (0-9)</div>
-                    <div id="req-special" class="text-danger"><i class="fa-solid fa-circle-xmark me-2"></i>One special character (@, #, $, etc.)</div>
+    <div class="profile-container animate-fade">
+        <div class="inventory-card">
+            <div class="profile-header-banner">
+                <div class="profile-avatar-wrapper">
+                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=3b82f6&color=fff&size=110&bold=true" class="rounded-circle" width="110">
                 </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold">Confirm New Password</label>
-                <input type="password" class="form-control shadow-sm" name="confirm_password" id="confirm_password">
-                <div id="match-msg" class="small mt-2"></div>
+
+            <div class="p-4 p-md-5 mt-5 mt-md-4">
+                <div id="viewMode">
+                    <div class="profile-header-info">
+                        <div>
+                            <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill mb-2">Verified Admin</span>
+                            <h2 class="fw-bold text-dark mb-0 text-capitalize"><?= htmlspecialchars($admin['name']) ?></h2>
+                        </div>
+                        <button id="editBtn" class="btn btn-update">
+                            <i class="fa-solid fa-user-gear me-2"></i>Edit Profile
+                        </button>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="info-tile">
+                                <div class="tile-icon"><i class="fa-solid fa-id-badge"></i></div>
+                                <small class="text-uppercase fw-bold text-muted">Employee ID</small>
+                                <div class="fw-bold fs-5">#<?= htmlspecialchars($admin['id']) ?></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="info-tile">
+                                <div class="tile-icon"><i class="fa-solid fa-envelope"></i></div>
+                                <small class="text-uppercase fw-bold text-muted">Email</small>
+                                <div class="fw-bold text-truncate"><?= htmlspecialchars($admin['email']) ?></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="info-tile">
+                                <div class="tile-icon"><i class="fa-solid fa-phone"></i></div>
+                                <small class="text-uppercase fw-bold text-muted">Contact</small>
+                                <div class="fw-bold fs-5"><?= htmlspecialchars($admin['phoneNum']) ?></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+               <div id="editMode" style="display: none;">
+                    <h4 class="fw-bold mb-4 text-dark">Modify Information</h4>
+                    <form action="update_profile_admin.php" method="POST" id="profileForm">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Full Name</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa-regular fa-user"></i></span>
+                                    <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($admin['name']) ?>" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Phone Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa-solid fa-phone"></i></span>
+                                    <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($admin['phoneNum']) ?>" required>
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-4">
+    <div class="p-4 rounded-4" style="background: #f8fafc; border: 1px dashed #cbd5e1;">
+        <h6 class="fw-bold mb-3"><i class="fa-solid fa-shield-halved me-2"></i>Security Update</h6>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">New Password</label>
+                <input type="password" class="form-control shadow-sm" name="new_password" id="new_password" placeholder="Leave blank to keep current">
+                
+                <div class="strength-meter">
+                    <div id="strength-bar" class="strength-meter-fill" style="width: 0%; height: 100%; transition: 0.3s;"></div>
+                </div>
+                
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <div id="req-length" class="req-badge text-muted">
+                        <i class="fa-solid fa-circle-xmark me-2"></i>8+ Char
+                    </div>
+                    <div id="req-upper" class="req-badge text-muted">
+                        <i class="fa-solid fa-circle-xmark me-2"></i>Upper
+                    </div>
+                    <div id="req-number" class="req-badge text-muted">
+                        <i class="fa-solid fa-circle-xmark me-2"></i>Number
+                    </div>
+                    <div id="req-special" class="req-badge text-muted">
+                        <i class="fa-solid fa-circle-xmark me-2"></i>Special
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">Confirm Password</label>
+                <input type="password" class="form-control shadow-sm" name="confirm_password" id="confirm_password" placeholder="••••••••">
+                <div id="match-msg" class="small mt-2" style="min-height: 20px;"></div>
             </div>
         </div>
+    </div>
+</div>
+                        </div>
 
-        <div class="mt-4">
-            <button type="submit" class="btn btn-primary px-4 shadow-sm" id="submitBtn">Save Changes</button>
-            <button type="button" id="cancelBtn" class="btn btn-light px-4 ms-2">Cancel</button>
-        </div>
-    </form>
-</div>                </div>
+                        <div class="mt-4 d-flex gap-2">
+                            <button type="submit" class="btn btn-update px-5">Save Changes</button>
+                            <button type="button" id="cancelBtn" class="btn btn-light px-4 rounded-4 fw-bold border">Cancel</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<nav class="mobile-bottom-nav d-none">
+    <a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i>Items</a>
+    <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i>Accounts</a>
+    <a href="report_admin.php"><i class="fa-solid fa-chart-pie"></i>Report</a>
+    <a href="profile_admin.php" class="active"><i class="fa-solid fa-user"></i>Profile</a>
+</nav>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Sidebar Logic
-    const sidebar = document.getElementById('admin-sidebar');
-    const toggleBtn = document.getElementById('sidebar-toggle-btn');
-    const overlay = document.getElementById('sidebar-overlay');
-
-    function toggleSidebar() {
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('active');
-    }
-
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleSidebar();
-        });
-    }
-    overlay.addEventListener('click', toggleSidebar);
-
-    // 2. View/Edit Toggle Logic
-    const viewMode = document.getElementById('viewMode');
-    const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
+    const viewMode = document.getElementById('viewMode');
+    const editMode = document.getElementById('editMode');
 
-    editBtn.addEventListener('click', () => {
-        viewMode.style.display = 'none';
-        editMode.style.display = 'block';
-    });
+    editBtn.onclick = () => { viewMode.style.display = 'none'; editMode.style.display = 'block'; };
+    cancelBtn.onclick = () => { editMode.style.display = 'none'; viewMode.style.display = 'block'; };
 
-    cancelBtn.addEventListener('click', () => {
-        editMode.style.display = 'none';
-        viewMode.style.display = 'block';
-    });
-
-    // 3. Password Validation Logic
     const newPass = document.getElementById('new_password');
     const confirmPass = document.getElementById('confirm_password');
 
-    function updateUI(el, isValid) {
-        if (isValid) {
-            el.classList.replace('text-danger', 'text-success');
-            el.querySelector('i').classList.replace('fa-circle-xmark', 'fa-circle-check');
-        } else {
-            el.classList.replace('text-success', 'text-danger');
-            el.querySelector('i').classList.replace('fa-circle-check', 'fa-circle-xmark');
-        }
-    }
-
-    newPass.addEventListener('keyup', function() {
+    newPass.addEventListener('input', function() {
         const val = this.value;
-        if (val === "") {
-            document.querySelectorAll('.password-requirements div').forEach(div => {
-                div.className = "text-danger mb-1";
-                div.querySelector('i').className = "fa-solid fa-circle-xmark me-2";
-            });
-            return;
+        const bar = document.getElementById('strength-bar');
+        
+        // Peraturan Password
+        const rules = {
+            'req-length': val.length >= 8,
+            'req-upper': /[A-Z]/.test(val),
+            'req-number': /[0-9]/.test(val), // SYARAT NOMBOR
+            'req-special': /[!@#$%^&*(),.?":{}|<> ]/.test(val)
+        };
+
+        let passedCount = 0;
+        for (const [id, passed] of Object.entries(rules)) {
+            const el = document.getElementById(id);
+            if(passed) {
+                el.classList.replace('bg-light', 'bg-success-subtle');
+                el.classList.replace('text-muted', 'text-success');
+                el.querySelector('i').classList.replace('fa-circle-xmark', 'fa-circle-check');
+                passedCount++;
+            } else {
+                el.classList.add('bg-light');
+                el.classList.remove('bg-success-subtle', 'text-success');
+                el.querySelector('i').classList.add('fa-circle-xmark');
+                el.querySelector('i').classList.remove('fa-circle-check');
+            }
         }
 
-        updateUI(document.getElementById('req-length'), val.length >= 8);
-        updateUI(document.getElementById('req-upper'), /[A-Z]/.test(val));
-        updateUI(document.getElementById('req-lower'), /[a-z]/.test(val));
-        updateUI(document.getElementById('req-number'), /[0-9]/.test(val));
-        updateUI(document.getElementById('req-special'), /[!@#$%^&*(),.?":{}|<> ]/.test(val));
+        // Strength Bar logic
+        let strength = (passedCount / 4) * 100;
+        bar.style.width = strength + "%";
+        bar.style.backgroundColor = strength < 50 ? "#ef4444" : strength < 100 ? "#f59e0b" : "#10b981";
     });
 
-    confirmPass.addEventListener('keyup', function() {
+    confirmPass.onkeyup = function() {
         const msg = document.getElementById('match-msg');
-        if (this.value === "") {
-            msg.textContent = "";
-        } else if (this.value === newPass.value) {
-            msg.textContent = "Passwords match!";
-            msg.className = "small mt-2 text-success";
-        } else {
-            msg.textContent = "Passwords do not match.";
-            msg.className = "small mt-2 text-danger";
-        }
-    });
+        if(this.value === "") msg.innerHTML = "";
+        else if(this.value === newPass.value) msg.innerHTML = "<span class='text-success fw-bold'>✓ Passwords match</span>";
+        else msg.innerHTML = "<span class='text-danger fw-bold'>✗ Passwords mismatch</span>";
+    };
 });
 </script>
 </body>

@@ -21,93 +21,118 @@ $user_id = (int) $_SESSION['person_id'];
 
 $limit = 5; 
 
+$categories = [];
+$cat_query = mysqli_query($conn, "SELECT * FROM categories ORDER BY category_name ASC");
+if ($cat_query) {
+    while ($row = mysqli_fetch_assoc($cat_query)) {
+        $categories[] = $row;
+    }
+}
 
 function renderReservationTable($data, $status_filter_string, $current_page = 1, $total_pages = 1, $total_rows = 0, $limit = 5, $is_paginated = false) {
-    
     ob_start(); 
     ?>
-    <div class="card-body p-0">
+    <div class="card-body p-0"> 
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table table-hover align-middle">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Item</th>
-                        <th>Date Reserved</th>
-                        <th>Status</th>
+                        <th class="small text-muted">#</th>
+                        <th class="small text-muted">ITEM NAME</th>
+                        <th class="small text-muted">DATE RESERVED</th>
+                        <th class="small text-muted">STATUS</th>
+                        <th class="small text-muted text-center">REMARK</th> 
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($data)): ?>
-                        <tr><td colspan="4" class="text-center text-muted py-4">No reservations matching this status found.</td></tr>
-                    <?php else: 
-                        $i = (($current_page - 1) * $limit) + 1; 
-                        foreach($data as $r): 
-                            $status = strtolower($r['status']);
-                            $badge_class = 'secondary'; $info_icon = ''; 
-
-                            if ($status == 'approved' || $status == 'checked out') {
-                                $badge_class = 'success';
-                            } elseif ($status == 'pending') {
-                                $badge_class = 'warning';
-                            } elseif ($status == 'rejected' || $status == 'completed') {
-                                $badge_class = 'danger';
-                                
-                                if ($status == 'rejected' && !empty($r['rejection_reason'])) {
-                                    $reason = htmlspecialchars($r['rejection_reason']);
-                                    $info_icon = "<i class=\"fa-solid fa-circle-info ms-1 info-icon\" data-bs-toggle=\"tooltip\" data-bs-placement=\"top\" data-bs-title='Sebab: $reason'></i>";
-                                }
-                            }
-                        ?>
-                        <tr>
-                            <td><?= $i++ ?></td>
-                            <td><strong><?= htmlspecialchars($r['item_name']) ?></strong></td>
-                            <td><?= date("d M Y", strtotime($r['reserve_date'])) ?></td>
-                            <td>
-                                <span class="badge rounded-pill text-bg-<?= $badge_class ?>"><?= htmlspecialchars(ucfirst($r['status'])) ?></span>
-                                <?= $info_icon ?> 
-                            </td>
-                        </tr>
-                    <?php endforeach; endif; ?>
+                    <?php 
+                    $i = (($current_page - 1) * $limit) + 1;
+                    
+                    // GUNA FOREACH supaya dia loop semua data dalam array $data
+                    if (!empty($data)):
+                        foreach ($data as $row): 
+                            $status_lower = strtolower($row['status']);
+                            // Logic warna badge
+                            $badge_class = 'bg-secondary-soft text-secondary';
+                            if ($status_lower == 'approved' || $status_lower == 'completed') $badge_class = 'bg-success-soft text-success';
+                            if ($status_lower == 'pending') $badge_class = 'bg-warning-soft text-warning';
+                            if (in_array($status_lower, ['rejected', 'voided', 'cancelled'])) $badge_class = 'bg-danger-soft text-danger';
+                    ?>
+                    <tr>
+                        <td><?= $i++ ?></td>
+                        <td class="fw-bold"><?= htmlspecialchars($row['item_name']) ?></td>
+                        <td class="small text-muted">
+                            <i class="fa-regular fa-calendar me-1"></i> <?= date('d M Y', strtotime($row['reserve_date'])) ?>
+                        </td>
+                        <td>
+                            <span class="badge modern-badge <?= $badge_class ?>"><?= strtoupper($row['status']) ?></span>
+                        </td>
+                        <td class="text-center">
+                            <?php if (!empty($row['rejection_reason'])): ?>
+                                <button type="button" 
+                                        class="btn btn-sm btn-light border shadow-sm rounded-circle" 
+                                        data-bs-toggle="tooltip" 
+                                        title="<?= htmlspecialchars($row['rejection_reason']) ?>"
+                                        style="width: 32px; height: 32px; padding: 0; color: #dc3545;">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            <?php else: ?>
+                                <span class="text-muted small">-</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php 
+                        endforeach; 
+                    else: ?>
+                        <tr><td colspan="5" class="text-center py-4 text-muted">No records found.</td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
-    </div>
-    <?php if ($is_paginated && $total_pages > 1): ?>
-        <nav aria-label="Reservation Pagination" class="d-flex justify-content-center p-3">
-            <ul class="pagination mb-0">
-                <li class="page-item <?= ($current_page <= 1) ? 'disabled' : '' ?>">
-                    <a class="page-link page-ajax-link" href="#" data-page="<?= max(1, $current_page - 1) ?>" data-status="<?= $status_filter_string ?>">Previous</a>
-                </li>
-                <?php 
-                $start_page = max(1, $current_page - 2);
-                $end_page = min($total_pages, $current_page + 2);
+        </div>
+		<?php if ($is_paginated && $total_pages > 1): ?>
+            <div class="card-footer bg-white border-top p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="small text-muted">
+                        Showing <strong><?= (($current_page - 1) * $limit) + 1 ?></strong> to 
+                        <strong><?= min($current_page * $limit, $total_rows) ?></strong> of 
+                        <strong><?= $total_rows ?></strong> entries
+                    </div>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item <?= ($current_page <= 1) ? 'disabled' : '' ?>">
+    <a class="page-link page-ajax-link shadow-none" href="#" 
+       data-status="<?= $status_filter_string ?>" 
+       data-page="<?= $current_page - 1 ?>">
+        <i class="fa-solid fa-chevron-left"></i>
+    </a>
+</li>
 
-                if ($start_page > 1) { echo '<li class="page-item"><a class="page-link page-ajax-link" href="#" data-page="1" data-status="' . $status_filter_string . '">1</a></li>'; }
-                if ($start_page > 2) { echo '<li class="page-item disabled"><span class="page-link">...</span></li>'; }
+<?php for ($p = 1; $p <= $total_pages; $p++): ?>
+    <li class="page-item <?= ($p == $current_page) ? 'active' : '' ?>">
+        <a class="page-link page-ajax-link shadow-none" href="#" 
+           data-status="<?= $status_filter_string ?>" 
+           data-page="<?= $p ?>">
+            <?= $p ?>
+        </a>
+    </li>
+<?php endfor; ?>
 
-                for($i = $start_page; $i <= $end_page; $i++): ?>
-                    <li class="page-item <?= ($i == $current_page) ? 'active' : '' ?>">
-                        <a class="page-link page-ajax-link" href="#" data-page="<?= $i ?>" data-status="<?= $status_filter_string ?>"><?= $i ?></a>
-                    </li>
-                <?php endfor; ?>
-                
-                <?php 
-                if ($end_page < $total_pages - 1) { echo '<li class="page-item disabled"><span class="page-link">...</span></li>'; }
-                if ($end_page < $total_pages) { echo '<li class="page-item"><a class="page-link page-ajax-link" href="#" data-page="' . $total_pages . '" data-status="' . $status_filter_string . '">' . $total_pages . '</a></li>'; }
-                ?>
-
-                <li class="page-item <?= ($current_page >= $total_pages) ? 'disabled' : '' ?>">
-                    <a class="page-link page-ajax-link" href="#" data-page="<?= min($total_pages, $current_page + 1) ?>" data-status="<?= $status_filter_string ?>">Next</a>
-                </li>
-            </ul>
-        </nav>
-    <?php endif; ?>
+<li class="page-item <?= ($current_page >= $total_pages) ? 'disabled' : '' ?>">
+    <a class="page-link page-ajax-link shadow-none" href="#" 
+       data-status="<?= $status_filter_string ?>" 
+       data-page="<?= $current_page + 1 ?>">
+        <i class="fa-solid fa-chevron-right"></i>
+    </a>
+</li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        <?php endif; ?>
     <?php
     return ob_get_clean(); 
 }
-
-
 
 if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
@@ -133,9 +158,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             $icon_class = "fa-triangle-exclamation";
             break;
         case 'rejected,completed':
-            $where_clause = "AND (ri.status = 'Rejected' OR ri.status = 'Completed')";
-            $header_text = "Rejected";
-            $bg_class = "bg-danger text-white";
+ $where_clause = "AND ri.status IN ('Rejected', 'Completed', 'Voided', 'Cancelled')"; 
+    $header_text = "Rejected / Selesai";
+	$bg_class = "bg-danger text-white";
             $icon_class = "fa-ban";
             break;
         case 'all':
@@ -146,7 +171,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             $icon_class = "fa-table";
             break;
     }
-    
+	
     $count_sql = "
         SELECT COUNT(ri.id) AS total 
         FROM reservation_items ri 
@@ -233,13 +258,15 @@ $total = 0; $approved = 0; $pending = 0; $rejected_completed = 0;
 $summary_sql = "
     SELECT
         COUNT(ri.id) AS total,
-        SUM(CASE WHEN ri.status = 'Approved' OR ri.status = 'Checked Out' THEN 1 ELSE 0 END) AS approved,
+        SUM(CASE WHEN ri.status IN ('Approved', 'Checked Out') THEN 1 ELSE 0 END) AS approved,
         SUM(CASE WHEN ri.status = 'Pending' THEN 1 ELSE 0 END) AS pending,
-        SUM(CASE WHEN ri.status = 'Rejected' OR ri.status = 'Completed' THEN 1 ELSE 0 END) AS rejected_completed
+        /* Masukkan Voided di sini */
+        SUM(CASE WHEN ri.status IN ('Rejected', 'Completed', 'Voided', 'Cancelled') THEN 1 ELSE 0 END) AS rejected_completed
     FROM reservation_items ri
     JOIN reservations r ON ri.reserve_id = r.reserve_id
     WHERE r.person_id = ?
 ";
+
 $stmt_summary = $conn->prepare($summary_sql);
 if ($stmt_summary === false) { die("Database Error (Summary): " . $conn->error); }
 $stmt_summary->bind_param("i", $user_id);
@@ -320,8 +347,20 @@ $newly_approved_items = $stmt_new_approved->get_result()->fetch_all(MYSQLI_ASSOC
 $stmt_new_approved->close();
 
 
+$stmt_stats = $conn->prepare("SELECT status, COUNT(*) as count FROM reservation_items ri 
+                              JOIN reservations r ON ri.reserve_id = r.reserve_id 
+                              WHERE r.person_id = ? GROUP BY status");
+$stmt_stats->bind_param("i", $user_id);
+$stmt_stats->execute();
+$stats = $stmt_stats->get_result()->fetch_all(MYSQLI_ASSOC);
 
-
+$chart_data = ['Approved' => 0, 'Pending' => 0, 'Rejected' => 0];
+foreach($stats as $row) {
+    $s = strtolower($row['status']);
+    if($s == 'approved' || $s == 'checked out') $chart_data['Approved'] += $row['count'];
+    if($s == 'pending') $chart_data['Pending'] += $row['count'];
+    if(in_array($s, ['rejected', 'voided', 'cancelled'])) $chart_data['Rejected'] += $row['count'];
+}
 
 $page_initial = 1;
 $offset_initial = ($page_initial - 1) * $limit; 
@@ -398,14 +437,15 @@ foreach ($calendar_data as $res) {
 // Convert data kepada JSON untuk kegunaan JavaScript
 $calendar_events_json = json_encode($calendar_events);
 
-
+// Tambah column 'is_read' dan 'related_id' supaya HTML kau tak error
 $notif_sql = "
-    SELECT id, message, type, created_at 
+    SELECT id, message, type, created_at, is_read, related_id 
     FROM notifications 
-    WHERE person_id = ? AND is_read = 0 
+    WHERE person_id = ? 
     ORDER BY created_at DESC 
-    LIMIT 5
-";
+    LIMIT 10
+"; 
+// Aku cadangkan LIMIT 10 supaya dropdown nampak penuh sikit
 $stmt_notif_list = $conn->prepare($notif_sql);
 if ($stmt_notif_list === false) { die("Database Error (Notifications): " . $conn->error); }
 
@@ -415,6 +455,27 @@ $new_notifications = $stmt_notif_list->get_result()->fetch_all(MYSQLI_ASSOC);
 $new_notif_count = count($new_notifications);
 $stmt_notif_list->close();
 
+// --- CHECK FOR RECENT VOIDED ITEMS (Untuk Alert Banner) ---
+// Kita cari item yang status 'Voided' dalam masa 48 jam terakhir
+$void_alert_sql = "
+    SELECT i.item_name, ri.rejection_reason, r.reserve_date
+    FROM reservation_items ri
+    JOIN item i ON ri.item_id = i.item_id
+    JOIN reservations r ON ri.reserve_id = r.reserve_id
+    WHERE r.person_id = ? 
+    AND ri.status = 'Voided'
+    AND ri.id IN (
+        SELECT id FROM reservation_items 
+        WHERE status = 'Voided'
+    )
+    ORDER BY r.reserve_date DESC
+    LIMIT 1
+";
+$stmt_void_alert = $conn->prepare($void_alert_sql);
+$stmt_void_alert->bind_param("i", $user_id);
+$stmt_void_alert->execute();
+$recent_voided_item = $stmt_void_alert->get_result()->fetch_assoc();
+$stmt_void_alert->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -422,671 +483,785 @@ $stmt_notif_list->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>User Dashboard — UniKL Equipment System</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/main.min.css' rel='stylesheet' />
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.css' rel='stylesheet' />
+    <link rel="stylesheet" href="../css/style.css">
+
     <style>
-        /* --- CSS STYLES --- */
-        :root {
-            --primary-color: #06b6d4; 
-            --primary-light: #f0f9ff; 
-            --primary-hover: #0891b2; 
-            --bg-light-gray: #f4f7f9; 
-            --card-bg: #ffffff;
-            --text-dark: #1e293b; 
-            --text-muted: #64748b; 
-            --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05); 
-        }
+       :root {
+    /* Gunakan satu identiti warna sahaja */
+    --primary-color: #06b6d4;      /* Cyan asal anda */
+    --primary-hover: #0891b2;
+    --primary-light: #ecfeff;
+    
+    /* Warna Latar Belakang */
+    --bg-color: #f8fafc;           /* Sangat bersih */
+    --text-main: #1e293b;
+    --text-muted: #94a3b8;
+    
+    --soft-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+}
+
         body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-light-gray); 
-            color: var(--text-dark); 
-            min-height: 100vh; 
-        }
-        .sidebar { 
-            width: 280px;
-            position: fixed; 
-            top: 0; 
-            bottom: 0; 
-            left: 0; 
-            background: var(--card-bg);
-            padding: 20px; 
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-            z-index: 1000; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            transition: transform 0.3s ease-in-out; 
-        }
-        .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
-        .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-        .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
-        .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-        .sidebar a { 
-            display: flex; align-items: center; gap: 15px; 
-            color: var(--text-muted); text-decoration: none; 
-            padding: 14px 18px; margin-bottom: 6px; 
-            border-radius: 10px; font-weight: 500; font-size: 15px; 
-            transition: all 0.2s; 
-        }
-          
-        .sidebar a.active { 
-            background: var(--primary-light); 
-            color: var(--primary-color); 
-            font-weight: 700; 
-            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
-        }
-        .sidebar a:hover:not(.active) {
-            background: #eef1f4;
-            color: var(--text-dark);
-        }
-        .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: 20px; }
-        .sidebar a i { width: 20px; text-align: center; }
-
-        .main-content { margin-left: 280px; transition: margin-left 0.3s ease-in-out; }
-        .topbar { 
-            background: var(--card-bg); 
-            padding: 18px 30px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #eef1f4; 
-            z-index: 999; 
-            position: sticky; 
-            top: 0; 
-        }
-        .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
-        .topbar .user-profile { 
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
-            position: relative; 
-        }
-        .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
-        .container-fluid { padding: 30px; }
-          
-        .card { 
-            border-radius: 12px;
-            box-shadow: var(--shadow-light); 
-            background: var(--card-bg); 
-            margin-bottom: 25px; 
-            border: none; 
-            transition: all 0.2s;
-        }
-        .card:hover {
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); 
-        }
-          
-        .card-summary { 
-            text-align: left; 
-            border: 1px solid #eef1f4;
-            border-radius: 12px;
-            overflow: hidden; 
-            box-shadow: none; 
-            transition: transform 0.2s, box-shadow 0.2s, outline 0.2s;
-        }
-        .card-summary:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1) !important;
-        }
-          
-        .card-clickable {
-            cursor: pointer;
-        }
-        .card-clickable.active {
-            outline: 2px solid var(--primary-color); 
-            box-shadow: 0 0 0 5px var(--primary-light), 0 6px 15px rgba(0, 0, 0, 0.1) !important; 
-            transform: none !important; 
-        }
-          
-        .card-summary .card-body { 
-            padding: 25px !important;
-            border-left: 5px solid; 
-        }
-          
-        .card-summary h3 { font-weight: 700; font-size: 28px; margin: 0; color: var(--text-dark); }
-        .card-summary p { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
-        .card-summary i { opacity: 0.8; }
-          
-        .border-left-primary { border-left-color: var(--primary-color) !important; background-color: var(--primary-light) !important; }
-        .border-left-success { border-left-color: #22c55e !important; background-color: #f0fdf4 !important; } 
-        .border-left-warning { border-left-color: #f59e0b !important; background-color: #fffbeb !important; } 
-        .border-left-danger { border-left-color: #ef4444 !important; background-color: #fff7f7 !important; } 
-          
-        
-        /* NEW STYLES for Action Center */
-        .action-center-card {
-            border: 1px solid #e2e8f0; /* slategray-200 */
-            box-shadow: none;
-        }
-        
-        .action-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color) !important;
+            color: var(--text-main);
         }
 
-        .action-item {
-            padding: 15px 0;
+       .main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
+    
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
+    
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
+    
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
+    
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
+
+
+        /* --- DASHBOARD HEADER --- */
+        .page-title { font-weight: 800; letter-spacing: -1px; color: var(--text-main); margin-bottom: 5px; }
+        .page-subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px; }
+
+
+        
+        /* --- ACTION CENTER (STYLING GAMBAR 3) --- */
+        .action-item-soft {
+            background: #fff9f0; /* Soft Peach/Orange */
+            border: 1px solid #ffe8cc;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 15px;
             display: flex;
             align-items: center;
-            border-bottom: 1px solid #f1f5f9; /* slategray-100 */
-            transition: background-color 0.2s;
+            transition: 0.2s;
         }
-        .action-item:hover {
-            background-color: #fafbfd;
-        }
-        .action-item:last-child {
-            border-bottom: none;
-        }
-
-        .item-icon-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-            margin-right: 15px;
-            opacity: 0.9;
-        }
-
-        .icon-return { background-color: #fef3c7; color: #d97706; } /* Yellow/Amber for urgency */
-        .icon-approved { background-color: #e0f2fe; color: var(--primary-color); } /* Primary Blue for new approval */
-
-        .action-title {
-            font-size: 14px;
+        .action-item-soft:hover { transform: translateY(-2px); }
+        
+        .badge-urgent {
+            background: #fff0f0;
+            color: #ff5b5b;
             font-weight: 700;
-            margin-bottom: 2px;
+            font-size: 0.65rem;
+            padding: 4px 10px;
+            border-radius: 20px;
             text-transform: uppercase;
         }
-        .action-subtitle {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
 
-        .badge-pill-custom {
-            padding: 0.4em 0.8em;
-            border-radius: 50rem; /* make it pill-shaped */
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        /* NEW STYLES for Service Hours Card */
-        .service-hours-card {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3); /* Stronger shadow */
-        }
-        .service-hours-card h5 {
-            color: white;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            font-size: 1.5rem;
-        }
-        .service-hours-card h5 i {
-            color: #a5f3fc; /* Light blue accent */
-        }
-        .service-hours-card hr {
-            border-color: rgba(255, 255, 255, 0.3);
-            margin: 15px 0;
-        }
-        .schedule-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-        .schedule-day {
-            font-weight: 400;
-        }
-        .schedule-time {
-            font-weight: 700;
-            text-align: right;
-        }
-        .service-hours-card .small-note {
-            font-size: 13px;
-            margin-top: 15px;
-            opacity: 0.85;
-        }
-
-        /* Table Styles */
-        .table-responsive { 
-            padding: 0 30px 30px 30px; 
-        }
-
-        .table thead th { 
-            background: #f1f5f9; 
-            color: var(--text-muted); 
-            border: none; 
-            font-weight: 600; 
-            text-transform: uppercase; 
-            font-size: 11px; 
-            padding: 12px 18px; 
-        }
-        .table tbody td { 
-            border-bottom: 1px solid #eef1f4; 
-            padding: 15px 18px; 
-            vertical-align: middle; 
-            font-size: 14px;
-        }
-        .table tbody tr:last-child td { border-bottom: none; }
-        .table tbody tr:hover {
-            background-color: #fafbfd; 
-            cursor: pointer;
-        }
-          
-        .badge { font-weight: 700; padding: 0.5em 0.8em; }
-          
-        #reservationTables .card-header {
-            border-top-left-radius: 12px !important;
-            border-top-right-radius: 12px !important;
-            border-bottom: none;
-            padding: 15px 30px !important;
-        }
-          
-        .page-link {
-            color: var(--primary-color);
-            border-radius: 8px;
-            margin: 0 3px;
-        }
-        .pagination .page-item.active .page-link {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-            z-index: 1;
-        }
-        .pagination .page-item.disabled .page-link {
-             color: var(--text-muted);
-        }
-
-        .menu-toggle-btn { display: none; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
-
-.fc { 
-    font-size: 14px;
-    height: 100%; /* 🔥 TAMBAH INI: Paksa kalendar mengambil keseluruhan ketinggian kontena */
-}
-        .fc .fc-toolbar-title {
-            font-size: 1.5em; 
-            font-weight: 700;
-            color: var(--text-dark);
-        }
-        .fc-event {
-            border-radius: 4px;
-            border: none !important;
-            padding: 2px 5px !important;
-            font-size: 12px !important;
-            font-weight: 600 !important;
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .fc-toolbar-chunk .fc-button {
-            text-transform: capitalize !important;
-        }
-        .fc-dayGridMonth-button,
-        .fc-timeGridWeek-button,
-        .fc-timeGridDay-button,
-        .fc-listWeek-button {
-            text-transform: capitalize !important;
-        }
-
-        @media (max-width: 992px) {
-            .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
-            .sidebar.active { transform: translateX(0); }
-            .sidebar.active ~ #overlay { display: block; }
-            .main-content { margin-left: 0; width: 100%; }
-            .menu-toggle-btn { display: inline-block; order: -1; font-size: 24px; background: none; border: none; color: var(--text-dark); padding: 0; }
-            .topbar { padding: 15px 20px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 15px; }
-            .topbar h3 { font-size: 20px; text-align: center; }
-            .topbar .user-name { display: none; }
-            .container-fluid { padding: 15px; }
-            .card { border-radius: 10px; }
-            .card-summary .card-body { padding: 20px !important; }
-            .card-summary h3 { font-size: 24px; }
-            .table-responsive { padding: 0 15px 15px 15px; }
-            .table { min-width: 450px; font-size: 13px; }
-            .table thead th, .table tbody td { padding: 10px 12px; }
-        }
+        /* --- CALENDAR OVERRIDE --- */
+        #fullCalendarContainer { background: white; border-radius: 15px; }
+        .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 700 !important; color: var(--text-main); }
+        .fc-button-primary { background-color: #f4f7fe !important; border: none !important; color: var(--text-main) !important; }
+        
+       
+        canvas { max-height: 250px !important; }
 		
-		@media (max-width: 576px) { /* Sasarkan telefon yang sangat kecil (sm breakpoint) */
-            .table tbody td {
-                padding: 10px 10px !important; /* Mengurangkan padding */
-                font-size: 13px;
-            }
-            .table thead th {
-                padding: 10px 10px;
-                font-size: 10px; /* Menjadikan header lebih kecil */
-            }
+
+/* Card Styling */
+.card-custom-soft {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    background: #ffffff;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+/* Sidebar Active State (Bagi sama dengan My Loan) */
+.sidebar .nav-link.active {
+    background-color: var(--theme-cyan) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+}
+
+/* Info Row Styling (Service Hours & Contact) */
+.info-box {
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.info-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+}
+
+.topbar h4.fw-bold {
+    background: linear-gradient(90deg, #1e293b, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+}
+    /* Body Background - Dashboard standard mahal guna warna ni */
+    body { background-color: #f8fafc; }
+
+    /* Card Summary Styling */
+    .card-exclusive {
+        border: none !important;
+        border-radius: 20px !important;
+        transition: all 0.3s ease;
+        background: #ffffff;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .card-exclusive:hover {
+        transform: translateY(-7px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* Decorative Top Border (Nampak lebih premium dari border-left) */
+    .accent-primary { border-top: 5px solid #4361ee !important; }
+    .accent-success { border-top: 5px solid #2ec4b6 !important; }
+    .accent-warning { border-top: 5px solid #ff9f1c !important; }
+    .accent-danger  { border-top: 5px solid #e71d36 !important; }
+
+    /* Icon Glass Box */
+    .icon-box-modern {
+        width: 60px;
+        height: 60px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+
+    .bg-blue-soft { background: #eef2ff; color: #4361ee; }
+    .bg-green-soft { background: #e7f9f7; color: #2ec4b6; }
+    .bg-orange-soft { background: #fff7ed; color: #ff9f1c; }
+    .bg-red-soft { background: #fff1f2; color: #e71d36; }
+
+    /* Text Styling */
+    .stat-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #94a3b8;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #1e293b;
+        letter-spacing: -1px;
+    }
+
+    /* Table Container Styling */
+    .table-exclusive-card {
+        border: none;
+        border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+    }
+
+    .modern-badge {
+        padding: 6px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.7rem;
+    }
+	 /* Reset & Container Background */
+    .dashboard-wrapper { background-color: #f8fafc; padding: 20px; }
+
+   
+    .card-exclusive:hover { transform: translateY(-7px); box-shadow: 0 15px 30px rgba(0,0,0,0.08) !important; }
+    
+    .accent-primary { border-top: 5px solid #4361ee !important; }
+    .accent-success { border-top: 5px solid #2ec4b6 !important; }
+    .accent-warning { border-top: 5px solid #ff9f1c !important; }
+    .accent-danger  { border-top: 5px solid #e71d36 !important; }
+
+    .icon-box-modern {
+        width: 55px; height: 55px; border-radius: 15px;
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+    }
+    .bg-blue-soft   { background: #eef2ff; color: #4361ee; }
+    .bg-green-soft  { background: #e7f9f7; color: #2ec4b6; }
+    .bg-orange-soft { background: #fff7ed; color: #ff9f1c; }
+    .bg-red-soft    { background: #fff1f2; color: #e71d36; }
+
+    .stat-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+    .stat-value { font-size: 1.8rem; font-weight: 800; color: #1e293b; letter-spacing: -1px; }
+
+    /* Table Card Styling */
+    .table-exclusive-card {
+        border: none !important;
+        border-radius: 24px !important;
+        background: #ffffff !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03) !important;
+        overflow: hidden !important;
+    }
+
+    
+	
+	/* Pastikan table dalam modal tak kembang sangat */
+#modalContentContainer .card {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#modalContentContainer .table td {
+    padding: 10px 15px !important; /* Kecikkan padding */
+}
+
+.modal-xl {
+    max-width: 900px; /* Jangan lebar sangat sampai nampak kosong */
+}
+
+.notification-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background-color: #ef4444; /* Merah */
+    border: 2px solid white;
+    border-radius: 50%;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* --- FIX FULLCALENDAR BUTTON OVERFLOW --- */
+.fc .fc-toolbar {
+    flex-wrap: wrap; /* Bagi dia turun bawah kalau tak muat */
+    gap: 10px;
+    justify-content: center;
+}
+
+.fc .fc-toolbar-chunk {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Kecikkan font butang month/week supaya muat */
+.fc .fc-button {
+    padding: 4px 8px !important;
+    font-size: 0.75rem !important;
+    text-transform: capitalize !important;
+}
+
+/* Fix untuk skrin paling kecil (Phone) */
+@media (max-width: 576px) {
+    .fc-toolbar-title {
+        font-size: 0.9rem !important; /* Kecikkan tajuk bulan */
+        width: 100%;
+        text-align: center;
+        order: -1; /* Letak tajuk kat atas sekali */
+    }
+    
+    .fc .fc-toolbar {
+        flex-direction: column; /* Susun menegak kat mobile */
+    }
+}
+/* --- MOBILE BOTTOM NAV (THEMED TO SIDEBAR) --- */
+@media (max-width: 991px) {
+    body {
+        padding-bottom: 80px; 
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* TUKAR KAT SINI: Guna warna gelap macam sidebar laptop */
+        background: #1e293b; 
+        border-top: 1px solid rgba(255,255,255,0.1); /* Border nipis supaya tak nampak kaku */
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
+    }
+
+    .mobile-bottom-nav a {
+        /* Warna icon/text masa tak tekan (kelabu cerah) */
+        color: #94a3b8; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 500;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        transition: all 0.3s ease;
+    }
+
+    /* Warna bila AKTIF atau HOVER (Cyan menyala) */
+    .mobile-bottom-nav a.active, 
+    .mobile-bottom-nav a:hover {
+        color: #06b6d4; 
+    }
+
+    .mobile-bottom-nav a i {
+        font-size: 20px;
+        transition: transform 0.2s;
+    }
+
+    /* Effect sikit bila klik */
+    .mobile-bottom-nav a:active i {
+        transform: scale(0.9);
+    }
+}
+
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
         }
-    </style>
+    }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
+}
+
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+</style>
 </head>
 <body>
-
-<div id="overlay"></div> 
-
-<div class="sidebar">
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
-            <div class="logo-text"><strong>UniKL User</strong><span>Equipment System</span></div>
+            <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
+            <div class="logo-text"><strong>UniKL User</strong><br><span style="font-size: 0.85rem; color: #64748b;">Equipment System</span></div>
         </div>
-        <a href="dashboard_user.php" class="active"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="item_user.php"><i class="fa-solid fa-box"></i> Item Availability</a>
-        <a href="history.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-    </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        
+        <div class="sidebar-nav">
+  
+
+  <a href="dashboard_user.php" class="active"><i class="fa-solid fa-house"></i> Dashboard</a>
+
+ <a href="item_user.php"><i class="fa-solid fa-calendar-plus"></i> Book Equipment</a>
+    <a href="history.php" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> My Loan</a>
 </div>
+    </div>
+    
+<div class="sidebar-footer">
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+</div> 	
+</div>
+
+
 
 <div class="main-content">
-    <div class="topbar">
-        <button class="menu-toggle-btn" id="menuToggle">
-            <i class="fa fa-bars"></i>
-        </button>
-        <h3>Dashboard</h3>
-        <div class="user-profile">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
-            <div class="dropdown me-3" style="position: relative;">
-                <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fa-solid fa-bell fa-xl"></i>
-                    <?php if (($new_notif_count ?? 0) > 0): ?>
-                        <span class="position-absolute translate-middle badge rounded-circle bg-danger border border-light p-1" style="top: 2px; right: -5px; font-size: 0.6em; z-index: 1001;" id="notif-count-badge">
-                              <?= $new_notif_count ?>
-                        </span>
-                    <?php endif; ?>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end" style="width: 300px;" id="notificationList">
-                    <h6 class="dropdown-header">Notifications (<span id="notif-count-header"><?= $new_notif_count ?? 0 ?></span> New)</h6>
-                    <?php if (($new_notif_count ?? 0) > 0): ?>
-                        <?php foreach(($new_notifications ?? []) as $notif): 
-                            $icon = ($notif['type'] == 'reject' || $notif['type'] == 'reservation_rejected') ? 'fa-times-circle text-danger' : 'fa-check-circle text-success';
-                        ?>
-                            <li class="notif-item" data-id="<?= $notif['id'] ?>">
-                                <a class="dropdown-item" href="#">
-                                    <div class="d-flex align-items-start">
-                                        <i class="fa-solid <?= $icon ?> me-2 mt-1 fa-lg"></i>
-                                        <div>
-                                            <p class="mb-0 small fw-bold text-wrap"><?= htmlspecialchars($notif['message']) ?></p>
-                                            <small class="text-muted"><?= date('H:i, d M', strtotime($notif['created_at'])) ?></small>
-                                        </div>
+<div class="topbar">
+    <div class="topbar-left">
+        <nav aria-label="breadcrumb">
+            <p class="mb-0 text-muted small">Pages / Dashboard</p>
+            <h4 class="fw-bold">Main Dashboard</h4>
+        </nav>
+    </div>
+<div class="topbar-right">
+    <div class="dropdown me-3">
+        <div class="notification-wrapper" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; position: relative;">
+            <i class="fa-solid fa-bell"></i>
+            <?php if (($new_notif_count ?? 0) > 0): ?>
+                <span class="notification-dot"></span>
+            <?php endif; ?>
+        </div>
+        
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="width: 320px; max-height: 450px; overflow-y: auto; border-radius: 15px;" id="notificationList">
+            
+            <div class="p-3 d-flex justify-content-between align-items-center border-bottom bg-light" style="border-radius: 15px 15px 0 0;">
+                <h6 class="mb-0 fw-bold text-dark">Notifications</h6>
+                <button type="button" id="markAllReadBtn" class="btn btn-sm fw-bold" 
+    style="font-size: 0.7rem; background-color: #e0f2fe; color: #0369a1; border-radius: 8px; padding: 4px 10px;">
+    Mark As Read
+</button>
+            </div>
+
+           <div id="notifItemsContainer">
+    <?php if (!empty($new_notifications)): // Guna variable dari Part 1 ?>
+        <?php foreach($new_notifications as $notif): 
+            $isUnread = (isset($notif['is_read']) && $notif['is_read'] == 0);
+            $msg = $notif['message'];
+            
+            // Logic Warna & Icon
+            $iconClass = 'text-secondary';
+            $itemBg = $isUnread ? '#f8fafc' : '#ffffff';
+            $accentColor = '#cbd5e1'; // Default grey
+
+            if (stripos($msg, 'approved') !== false) { $iconClass = 'text-success'; $accentColor = '#22c55e'; }
+            elseif (stripos($msg, 'rejected') !== false || stripos($msg, 'voided') !== false) { $iconClass = 'text-danger'; $accentColor = '#ef4444'; }
+            elseif (stripos($msg, 'pending') !== false) { $iconClass = 'text-warning'; $accentColor = '#f59e0b'; }
+        ?>
+            <li class="notif-item-wrapper">
+                <a class="dropdown-item p-3" href="history.php" 
+                   style="background-color: <?= $itemBg ?>; border-left: 4px solid <?= $isUnread ? $accentColor : 'transparent' ?>; white-space: normal;">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3 mt-1">
+                            <i class="fa-solid fa-circle-info <?= $iconClass ?>"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="mb-1 small <?= $isUnread ? 'fw-bold text-dark' : 'text-muted' ?>">
+                                <?= htmlspecialchars($msg) ?>
+                            </p>
+                            <small class="text-muted" style="font-size: 0.65rem;">
+                                <i class="fa-regular fa-clock me-1"></i><?= date('d M, H:i', strtotime($notif['created_at'])) ?>
+                            </small>
+                        </div>
+                    </div>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <li class="p-4 text-center text-muted small">No new notifications</li>
+    <?php endif; ?>
+</div>
+            <?php if (($new_notif_count ?? 0) > 0): ?>
+                <li class="mark-all-container">
+                    <a href="notifications.php" class="dropdown-item text-center small py-3 fw-bold text-primary" style="font-size: 0.8rem; border-top: 1px solid #eee; background-color: #f8f9fa;">
+                    View All Notifications <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+                </li>
+            <?php endif; ?>
+        </ul>
+    </div>
+
+    <a href="profile_tech.php" class="user-pill text-decoration-none">
+        <div class="text-end me-2 d-none d-md-block">
+            <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
+                <?= htmlspecialchars($displayName) ?>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Technician</small>
+        </div>
+        <div class="profile-avatar">
+            <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
+        </div>
+    </a>
+</div>
+</div> 
+
+    <div class="container-fluid p-0">
+        
+        <h2 class="page-title">Dashboard</h2>
+        <p class="page-subtitle">Welcome back! Here's your reservation overview.</p>
+
+<div class="row mb-4">
+
+    <div class="col-md-3 col-12 mb-3"> 
+        <div class="card card-summary card-clickable border-0 shadow-sm border-left-primary h-100" 
+             data-bs-toggle="modal" data-bs-target="#reservationModal" data-status-filter="all"> 
+            <div class="card-body d-flex align-items-center justify-content-between p-3">
+                <div>
+                    <p class="text-muted text-uppercase mb-0 fw-bold" style="font-size: 0.65rem;">Total Reservations</p>
+                    <h3 class="mb-0 text-primary" style="font-size: 1.4rem; font-weight: 800;"><?= $total ?></h3>
+                </div>
+                <div class="icon-circle bg-primary-light">
+                    <i class="fa-solid fa-layer-group text-primary opacity-50"></i>
+                </div>
+            </div>
+        </div> 
+    </div>
+   
+    <div class="col-md-3 col-12 mb-3"> 
+        <div class="card card-summary card-clickable border-0 shadow-sm border-left-success h-100"
+             data-bs-toggle="modal" data-bs-target="#reservationModal" data-status-filter="approved,checked out"> 
+            <div class="card-body d-flex align-items-center justify-content-between p-3">
+                <div>
+                    <p class="text-muted text-uppercase mb-0 fw-bold" style="font-size: 0.65rem;">Approved</p>
+                    <h3 class="mb-0 text-success" style="font-size: 1.4rem; font-weight: 800;"><?= $approved ?></h3>
+                </div>
+                <i class="fa-solid fa-circle-check fa-2x text-success opacity-25"></i>
+            </div>
+        </div> 
+    </div>
+
+    <div class="col-md-3 col-12 mb-3"> 
+        <div class="card card-summary card-clickable border-0 shadow-sm border-left-warning h-100"
+             data-bs-toggle="modal" data-bs-target="#reservationModal" data-status-filter="pending"> 
+            <div class="card-body d-flex align-items-center justify-content-between p-3">
+                <div>
+                    <p class="text-muted text-uppercase mb-0 fw-bold" style="font-size: 0.65rem;">Pending</p>
+                    <h3 class="mb-0 text-warning" style="font-size: 1.4rem; font-weight: 800;"><?= $pending ?></h3>
+                </div>
+                <i class="fa-solid fa-hourglass-half fa-2x text-warning opacity-25"></i>
+            </div>
+        </div> 
+    </div>
+<div class="col-md-3 col-12 mb-3"> 
+    <div class="card card-summary card-clickable border-0 shadow-sm border-left-danger h-100"
+         data-bs-toggle="modal" data-bs-target="#reservationModal" data-status-filter="rejected,completed"> 
+        <div class="card-body d-flex align-items-center justify-content-between p-3">
+            <div>
+                <p class="text-muted text-uppercase mb-0 fw-bold" style="font-size: 0.65rem;">Inactive Requests</p>
+                <h3 class="mb-0 text-danger" style="font-size: 1.4rem; font-weight: 800;"><?= $rejected_completed ?></h3>
+            </div>
+            <i class="fa-solid fa-ban fa-2x text-danger opacity-25"></i>
+        </div>
+    </div> 
+</div>
+</div>
+
+<div class="modal fade" id="reservationModal" tabindex="-1" aria-labelledby="reservationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered shadow-lg">
+        <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden;">
+          <div class="modal-header border-bottom bg-white p-3">
+    <div class="d-flex align-items-center">
+        <div class="text-secondary me-2">
+            <i class="fa-solid fa-list-ul"></i>
+        </div>
+        <div>
+            <h6 class="modal-title fw-bold mb-0" id="modalTitle">Records</h6>
+            <small class="text-muted" id="modalSubtitle" style="font-size: 0.7rem;"></small>
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+            <div class="modal-body p-0" id="modalContentContainer">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted small fw-bold">Fetching latest data...</p>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-3 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal" style="font-size: 0.8rem;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>		
+        <div class="row g-4 mb-4">
+    <div class="col-12"> <div class="card card-custom-soft shadow-sm border-0">
+            <div class="card-body p-4"> <div class="d-flex align-items-center mb-4">
+                    <div class="icon-wrapper bg-light text-primary p-2 rounded-3 me-2">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold">Reservation Calendar</h5>
+                </div>
+                
+               <div id="fullCalendarContainer" style="min-height: 500px; background: white;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card card-custom-soft shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="icon-wrapper bg-light text-warning p-2 rounded-3 me-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold">Action Center</h5>
+                </div>
+                <p class="text-muted small mb-4">Pending returns & urgent tasks</p>
+
+                <div class="action-list">
+                    <?php if (empty($due_soon_items)): ?>
+                        <div class="text-center py-4 bg-light rounded-4">
+                            <i class="fa-solid fa-calendar-check text-muted mb-2 fa-2x"></i>
+                            <p class="text-muted small mb-0">No urgent returns for now!</p>
+                        </div>
+                    <?php else: ?>
+                       <?php foreach ($due_soon_items as $task): ?>
+                            <div class="action-item-soft mb-2 p-3 d-flex align-items-center justify-content-between" style="background: #fffcf5; border: 1px solid #ffeeba; border-radius: 12px;">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-white rounded-circle p-2 me-3 shadow-sm text-warning d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <i class="fa-solid fa-clock"></i>
                                     </div>
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider my-1"></li>
+                                    <div>
+                                        <div class="fw-bold text-dark" style="font-size: 0.9rem;"><?= htmlspecialchars($task['item_name']) ?></div>
+                                        <div class="text-muted small">Return by: <?= date('d M Y', strtotime($task['due_date'])) ?></div>
+                                    </div>
+                                </div>
+                                <span class="badge bg-danger text-white px-2 py-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">DUE SOON</span>
+                            </div>
                         <?php endforeach; ?>
-                        <li><a class="dropdown-item text-center small text-primary" href="#" id="markAllRead">Mark all as read</a></li>
-                    <?php else: ?>
-                        <li><span class="dropdown-item text-center text-muted" id="no-notif-message">No new notifications.</span></li>
-                    <?php endif; ?>
-                </ul>
-            </div>
-            
-            <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
-            </a>
-        </div>
-    </div>
-<div class="container-fluid">
-        
-        <div class="row mb-5">
-            
-            <div class="col-lg-3 col-sm-6 mb-4"> 
-                <div class="card card-summary card-clickable text-primary border-left-primary h-100" 
-                    data-bs-toggle="collapse" 
-                    data-bs-target="#tableCollapseTotal" 
-                    aria-expanded="true" 
-                    aria-controls="tableCollapseTotal" 
-                    data-status-filter="all"> 
-                    <div class="card-body d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Total Reservations</p> 
-                            <h3 class="mb-0" data-count="total"><?= $total ?></h3>
-                        </div>
-                        <i class="fa-solid fa-layer-group fa-3x text-primary"></i> 
-                    </div>
-                </div> 
-            </div>
-            
-            <div class="col-lg-3 col-sm-6 mb-4"> 
-                <div class="card card-summary card-clickable text-success border-left-success h-100"
-                    data-bs-toggle="collapse" 
-                    data-bs-target="#tableCollapseApproved" 
-                    aria-expanded="false" 
-                    aria-controls="tableCollapseApproved"
-                    data-status-filter="approved,checked out"> 
-                    <div class="card-body d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Approved</p> 
-                            <h3 class="mb-0" data-count="approved"><?= $approved ?></h3>
-                        </div>
-                        <i class="fa-solid fa-circle-check fa-3x text-success"></i> 
-                    </div>
-                </div> 
-            </div>
-
-            <div class="col-lg-3 col-sm-6 mb-4"> 
-                <div class="card card-summary card-clickable text-warning border-left-warning h-100"
-                    data-bs-toggle="collapse" 
-                    data-bs-target="#tableCollapsePending" 
-                    aria-expanded="false" 
-                    aria-controls="tableCollapsePending"
-                    data-status-filter="pending"> 
-                    <div class="card-body d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Pending</p> 
-                            <h3 class="mb-0" data-count="pending"><?= $pending ?></h3>
-                        </div>
-                        <i class="fa-solid fa-hourglass-half fa-3x text-warning"></i> 
-                    </div>
-                </div> 
-            </div>
-
-            <div class="col-lg-3 col-sm-6 mb-4"> 
-                <div class="card card-summary card-clickable text-danger border-left-danger h-100"
-                    data-bs-toggle="collapse" 
-                    data-bs-target="#tableCollapseRejected" 
-                    aria-expanded="false" 
-                    aria-controls="tableCollapseRejected"
-                    data-status-filter="rejected,completed"> 
-                    <div class="card-body d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="text-muted text-uppercase mb-1 small fw-bold">Rejected</p> 
-                            <h3 class="mb-0" data-count="rejected_completed"><?= $rejected_completed ?></h3>
-                        </div>
-                        <i class="fa-solid fa-circle-xmark fa-3x text-danger"></i> 
-                    </div>
-                </div> 
-            </div>
-        </div>
-        
-        <div id="reservationTables" class="mt-2 mb-5">
-            <div class="collapse multi-collapse mb-4" id="tableCollapseTotal" data-bs-parent="#reservationTables">
-                <div class="card card-content-container" data-status-id="all">
-                    <div class="card-header bg-primary text-white py-3 fw-bold rounded-top-2">
-                        <i class="fa-solid fa-table me-2"></i> All Reservations (Showing 1-<?= min($limit, $total ?? 0) ?> of <?= $total ?? 0 ?> Items)
-                    </div>
-                    <?= renderReservationTable($initial_reservations_data ?? [], 'all', $page_initial ?? 1, $total_pages_initial ?? 1, $total ?? 0, $limit ?? 10, true) ?>
-                </div>
-            </div>
-
-            <div class="collapse multi-collapse mb-4" id="tableCollapseApproved" data-bs-parent="#reservationTables">
-                <div class="card card-content-container" data-status-id="approved,checked out">
-                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading Approved Data...</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapse multi-collapse mb-4" id="tableCollapsePending" data-bs-parent="#reservationTables">
-                <div class="card card-content-container" data-status-id="pending">
-                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading Pending Data...</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="collapse multi-collapse mb-4" id="tableCollapseRejected" data-bs-parent="#reservationTables">
-                <div class="card card-content-container" data-status-id="rejected,completed">
-                    <div class="d-flex justify-content-center align-items-center py-5 loading-spinner">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <span class="ms-3 text-primary fw-bold">Loading History Data...</span>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-        
-        <div class="row mb-5">
-<div class="col-lg-6 mb-4">
-    <div class="card p-4 h-100 d-flex flex-column"> 
-        <h5 class="fw-bold mb-3"><i class="fa-solid fa-calendar-alt me-2 text-primary"></i> Reservation Calendar</h5>
-        <div id="fullCalendarContainer" class="p-3 border rounded-3 flex-grow-1"> 
-        </div>
-    </div>
-</div>            <div class="col-lg-6 mb-4">
-                <div class="card p-4 h-100 action-center-card">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-bell me-2 text-danger"></i> Timely Action Center</h5>
-                    <p class="text-muted small">Upcoming returns and newly approved items requiring action.</p>
-
-                    <ul class="action-list">
-                        <?php 
-                        if (empty($due_soon_items) && empty($newly_approved_items)): ?>
-                            <li class="py-4 text-center text-muted">🎉 All good! No urgent activities in the coming days.</li>
-                        <?php endif; ?>
-
-                        <?php foreach($due_soon_items as $item): ?>
-                            <li class="action-item">
-                                <div class="item-icon-circle icon-return">
-                                    <i class="fa-solid fa-clock-rotate-left"></i>
-                                </div>
-                                <div class="d-flex flex-column flex-grow-1">
-                                    <p class="action-title text-danger mb-0">Return Due Soon</p>
-                                    <p class="action-subtitle mb-0"><?= htmlspecialchars($item['item_name']) ?></p>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge badge-pill-custom text-bg-warning"><?= date("d M Y", strtotime($item['due_date'])) ?></span>
-                                    <p class="mb-0 small text-muted">Due Date</p>
-                                </div>
-                            </li>
-                        <?php endforeach; ?>
-
-                        <?php foreach($newly_approved_items as $item): ?>
-                            <li class="action-item">
-                                <div class="item-icon-circle icon-approved">
-                                    <i class="fa-solid fa-box-open"></i>
-                                </div>
-                                <div class="d-flex flex-column flex-grow-1">
-                                    <p class="action-title text-primary mb-0">Newly Approved</p>
-                                    <p class="action-subtitle mb-0"><?= htmlspecialchars($item['item_name']) ?></p>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge badge-pill-custom text-bg-primary"><?= date("d M Y", strtotime($item['reserve_date'])) ?></span>
-                                    <p class="mb-0 small text-muted">Pick Up From</p>
-                                </div>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-
-                    <div class="mt-auto pt-3 text-end">
-                        <a href="history.php" class="btn btn-sm btn-outline-secondary">View All History <i class="fa-solid fa-arrow-right-long ms-2"></i></a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row mt-4">
-            <div class="col-md-6 mb-3">
-                <div class="service-hours-card h-100">
-                    <h5><i class="fa-solid fa-hourglass-half me-2"></i> Equipment Service Hours</h5>
-                    <hr>
-                    
-                    <div class="schedule-item">
-                        <span class="schedule-day"><i class="fa-solid fa-calendar-check me-2"></i> Monday – Thursday:</span>
-                        <span class="schedule-time">9:00 AM – 5:00 PM</span>
-                    </div>
-                    
-                    <div class="schedule-item">
-                        <span class="schedule-day"><i class="fa-solid fa-calendar-check me-2"></i> Friday:</span>
-                        <span class="schedule-time">9:00 AM – 12:00 PM</span>
-                    </div>
-
-                    <p class="small-note">Please note the service break on Friday: <strong>1:00 PM – 2:45 PM</strong>. All pickups and returns must be completed within these hours.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 mb-3">
-                <div class="card h-100 p-4">
-                    <h5 class="fw-bold text-dark"><i class="fa-solid fa-phone me-2 text-primary"></i> Contact & Location</h5>
-                    <hr class="mt-3 mb-3">
-                    <div class="schedule-item">
-                        <span class="text-muted"><i class="fa-solid fa-location-dot me-2"></i> Location:</span>
-                        <span class="fw-semibold text-end">No 3, Jalan Greentown, 30450 Ipoh Perak</span>
-                    </div>
-                    <div class="schedule-item">
-                        <span class="text-muted"><i class="fa-solid fa-phone-volume me-2"></i> Contact No.:</span>
-                        <span class="fw-semibold text-end">1 300-22-7267</span>
-                    </div>
-                    <div class="schedule-item">
-                        <span class="text-muted"><i class="fa-solid fa-envelope me-2"></i> Email:</span>
-                        <span class="fw-semibold text-end text-primary">+605-2432 636</span>
-                    </div>
-                    <p class="text-muted mt-3 mb-0 small">Please contact the number for any immediate issues or inquiries.</p>
-                </div>
-            </div>
-        </div>
-        <div class="row mb-5">
-            <div class="col-lg-6 mb-4">
-                <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie me-2 text-primary"></i> Reservation Status </h5>
-                    <?php if (($total ?? 0) > 0): ?>
-                        <div style="max-height: 350px;">
-                               <canvas id="statusChart"></canvas>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert alert-secondary text-center py-5">No reservation data to display a chart.</div>
                     <?php endif; ?>
                 </div>
-            </div>
-            <div class="col-lg-6 mb-4">
-                <div class="card p-4 h-100">
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-ranking-star me-2 text-success"></i> Most Reserved Items (Personal)</h5>
-                    <?php if (!empty($top_items ?? [])): ?>
-                        <div style="max-height: 350px;">
-                            <canvas id="topItemsChart"></canvas>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert alert-secondary text-center py-5">No reservation history to determine top items.</div>
-                    <?php endif; ?>
+
+                <div class="text-center mt-3">
+                    <a href="history.php" class="btn btn-link text-decoration-none small fw-bold p-0" style="font-size: 0.8rem;">
+                        View All Tasks <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card card-custom-soft h-100 shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-light text-info p-2 rounded-3 me-2"><i class="fa-solid fa-chart-pie"></i></div>
+                        <h5 class="mb-0 fw-bold">Request Overview</h5>
+                    </div>
+                    <div class="text-end">
+                       <h4 class="mb-0 fw-bold"><?= $total ?></h4>
+                        <small class="text-muted">Total</small>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center">
+                    <canvas id="statusChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card card-custom-soft h-100 shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="icon-wrapper bg-light text-success p-2 rounded-3 me-2"><i class="fa-solid fa-chart-line"></i></div>
+                    <h5 class="mb-0 fw-bold">Most Reserved Equipment</h5>
+                </div>
+                <div style="height: 250px;">
+                    <canvas id="topItemsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row g-4 mt-2">
+    <div class="col-md-6">
+        <div class="card card-custom-soft h-100">
+            <div class="d-flex align-items-center mb-4">
+                <div class="icon-wrapper bg-light text-primary p-2 rounded-3 me-2">
+                    <i class="fa-solid fa-clock"></i>
+                </div>
+                <h5 class="mb-0 fw-bold">Service Hours</h5>
+            </div>
+            
+            <div class="info-box">
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Monday - Thursday</span>
+                        <span class="text-muted small">09:00 AM – 05:00 PM</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Friday</span>
+                        <span class="text-muted small">09:00 AM – 12:00 PM</span>
+                    </div>
+                </div>
+            </div>
+            <p class="text-muted small mt-2"><i>Note: Closed during public holidays.</i></p>
+        </div>
+    </div>
+
+<div class="col-md-6">
+        <div class="card card-custom-soft h-100 p-4"> <div class="d-flex align-items-center mb-4">
+                <div class="icon-wrapper bg-light text-success p-2 rounded-3 me-2">
+                    <i class="fa-solid fa-address-book"></i> </div>
+                <h5 class="mb-0 fw-bold">Contact & Location</h5>
+            </div>
+
+            <div class="info-box mb-3 d-flex align-items-center">
+                <div class="info-icon bg-blue-light text-primary me-3" style="width: 40px; text-align: center;">
+                    <i class="fa-solid fa-location-dot"></i> </div>
+                <div>
+                    <span class="d-block small text-muted">Location:</span>
+                    <span class="fw-bold">No 3, Jalan Greentown, 30450 Ipoh Perak</span>
+                </div>
+            </div>
+
+            <div class="info-box mb-3 d-flex align-items-center">
+                <div class="info-icon bg-red-light text-danger me-3" style="width: 40px; text-align: center;">
+                    <i class="fa-solid fa-phone"></i> </div>
+                <div>
+                    <span class="d-block small text-muted">Contact No:</span>
+                    <span class="fw-bold">1 300-22-7267</span>
+                </div>
+            </div>
+
+            <div class="info-box d-flex align-items-center">
+                <div class="info-icon bg-success-light text-success me-3" style="width: 40px; text-align: center;">
+                    <i class="fa-solid fa-envelope"></i> </div>
+                <div>
+                    <span class="d-block small text-muted">Email Us:</span>
+                    <span class="fw-bold">+605-2432 636</span>
+                </div>
+            </div>
+        </div>
+    </div></div>
+    </div> 
+	</div> 
+	
+	<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <?php if (false): ?>
+    <div id="voidToast" class="toast show border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-danger text-white">
+            <i class="fa-solid fa-circle-exclamation me-2"></i>
+            <strong class="me-auto">Application Cancelled</strong>
+            <small>Just now</small>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close" onclick="dismissToast(<?= $recent_voided_item['id'] ?>)"></button>
+        </div>
+        <div class="toast-body">
+            Item <strong><?= htmlspecialchars($recent_voided_item['item_name']) ?></strong> has been canceled.
+            <div class="mt-2 pt-2 border-top small text-muted">
+                Reason: <?= htmlspecialchars($recent_voided_item['rejection_reason']) ?>
+            </div>
+        </div>
+    </div>
+  <?php endif; ?>
+</div>
+	
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 
+// --- 1. SIDEBAR & OVERLAY LOGIC ---
 const sidebar = document.querySelector('.sidebar');
 const overlay = document.getElementById('overlay');
 const menuToggle = document.getElementById('menuToggle');
 
 function toggleSidebar() {
     sidebar.classList.toggle('active');
-    
     if (sidebar.classList.contains('active')) {
         overlay.style.display = 'block';
     } else {
@@ -1094,13 +1269,8 @@ function toggleSidebar() {
     }
 }
 
-if (menuToggle) {
-    menuToggle.addEventListener('click', toggleSidebar);
-}
-
-if (overlay) { 
-    overlay.addEventListener('click', toggleSidebar); 
-}
+if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+if (overlay) overlay.addEventListener('click', toggleSidebar);
 
 window.addEventListener('resize', function() {
     if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
@@ -1109,312 +1279,255 @@ window.addEventListener('resize', function() {
     }
 });
 
-        const calendarEl = document.getElementById('fullCalendarContainer');
-        // Anggap $calendar_events_json telah wujud dari PHP anda:
-        const calendarEventsJson = <?= $calendar_events_json ?? '[]' ?>; 
+// --- 2. FULLCALENDAR LOGIC ---
+const calendarEl = document.getElementById('fullCalendarContainer');
+const calendarEventsJson = <?= $calendar_events_json ?? '[]' ?>; 
 
-        if (calendarEl && typeof FullCalendar !== 'undefined') {
-             const calendar = new FullCalendar.Calendar(calendarEl, {
-                 initialView: 'dayGridMonth',
-                 headerToolbar: {
-                     left: 'prev,next today',
-                     center: 'title',
-                     right: 'dayGridMonth,timeGridWeek'
-                 },
-                 events: calendarEventsJson,
-                 height: '100%',
-                 editable: false,
-                 navLinks: true, 
-                 eventClick: function(info) {
-                     if (info.event.url) {
-                         window.open(info.event.url);
-                         info.jsEvent.preventDefault();
-                     }
-                 },
-             });
-             calendar.render();
+if (calendarEl && typeof FullCalendar !== 'undefined') {
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+		handleWindowResize: true,
+    windowResize: function(arg) {
+        if (window.innerWidth < 768) {
+            calendar.setOption('aspectRatio', 0.8); // Lebih tinggi kat phone
+        } else {
+            calendar.setOption('aspectRatio', 2); // Maintain lebar kat PC
         }
-        
+    },
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        events: calendarEventsJson,
+        height: 'auto',
+        contentHeight: 750,
+        aspectRatio: 2,
+        editable: false,
+        navLinks: true, 
+        eventClick: function(info) {
+            if (info.event.url) {
+                window.open(info.event.url);
+                info.jsEvent.preventDefault();
+            }
+        },
+    });
+    calendar.render();
+}
+// --- 3. MODAL AJAX TABLE LOGIC (FIXED) ---
+function loadReservationTable(status, label = "Records", count = "", page = 1) {
+    const modalContent = document.getElementById('modalContentContainer');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
 
+    if (modalTitle) modalTitle.innerText = label.toUpperCase();
+    if (modalSubtitle) modalSubtitle.innerText = count ? `Viewing ${count} records for ${label}` : "";
+    
+    modalContent.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            <p class="mt-2 text-muted small">Fetching latest data...</p>
+        </div>`;
 
+    fetch(`dashboard_user.php?ajax=1&status=${status}&page=${page}`)
+        .then(response => response.text())
+        .then(data => {
+            modalContent.innerHTML = data;
+            
+            // PENTING: Re-attach listener untuk butang paging yang baru masuk
+            attachModalPagination(label); 
+
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            modalContent.innerHTML = '<div class="p-4 text-center text-danger small">Failed to load data.</div>';
+        });
+}
+
+function attachModalPagination(currentLabel) {
+    // Cari semua link paging dalam modal
+    document.querySelectorAll('.page-ajax-link').forEach(link => {
+        link.onclick = function(e) {
+            e.preventDefault();
+            const status = this.getAttribute('data-status');
+            const page = this.getAttribute('data-page');
+            // Panggil semula fungsi dengan label yang betul
+            loadReservationTable(status, currentLabel, "", page);
+        };
+    });
+}
+
+// --- 4. DOM CONTENT LOADED (CHARTS & LISTENERS) ---
 document.addEventListener('DOMContentLoaded', function () {
     
-    
-    function initializeTooltips() {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            var oldTooltip = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
-            if (oldTooltip) { oldTooltip.dispose(); }
-            
-            return new bootstrap.Tooltip(tooltipTriggerEl, {
-                placement: tooltipTriggerEl.getAttribute('data-bs-placement') || 'bottom',
-                html: true,
-                title: tooltipTriggerEl.getAttribute('data-bs-title') 
-            });
-        });
-    }
-    
-    
-    function loadReservationTable(status_filter, page_num = 1) {
-        const container = document.querySelector(`.card-content-container[data-status-id="${status_filter}"]`);
-        if (!container) return;
-        
-        container.innerHTML = `
-            <div class="d-flex justify-content-center align-items-center py-5">
-                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-                <span class="ms-3 text-primary fw-bold">Loading Page ${page_num}...</span>
-            </div>
-        `;
-
-        fetch(`dashboard_user.php?ajax=1&status=${status_filter}&page=${page_num}`)
-            .then(response => response.text())
-            .then(html => {
-                container.innerHTML = html;
-                attachPaginationListeners(); 
-                initializeTooltips();
-            })
-            .catch(error => {
-                console.error('Error fetching paginated data:', error);
-                container.innerHTML = '<div class="alert alert-danger p-4 m-4">Failed to load data. Please check network.</div>';
-            });
-    }
-    
-    
-    function attachPaginationListeners() {
-        document.querySelectorAll('.page-ajax-link').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const pageNum = this.getAttribute('data-page');
-                const statusFilter = this.getAttribute('data-status');
-                
-                if (pageNum && statusFilter) {
-                    loadReservationTable(statusFilter, pageNum);
-                }
-            });
-        });
-    }
-    
-    
+    // Listener untuk Card Click (Dashboard Task Cards)
     document.querySelectorAll('.card-clickable').forEach(card => {
-        const targetId = card.getAttribute('data-bs-target');
-        const targetCollapse = document.querySelector(targetId);
-        const statusFilter = card.getAttribute('data-status-filter');
-        
-        if(targetCollapse) {
+        card.addEventListener('click', function() {
+            const status = this.getAttribute('data-status-filter');
+            const label = this.querySelector('p') ? this.querySelector('p').innerText : "Tasks"; 
+            const count = this.querySelector('h3') ? this.querySelector('h3').innerText : "";
             
-            card.addEventListener('click', function() {
-                document.querySelectorAll('.card-clickable').forEach(c => c.classList.remove('active'));
-                
-                if (!targetCollapse.classList.contains('show')) {
-                    this.classList.add('active');
-                    loadReservationTable(statusFilter, 1); 
-                }
-            });
-            
-            targetCollapse.addEventListener('hidden.bs.collapse', function () {
-                card.classList.remove('active');
-            });
-            targetCollapse.addEventListener('shown.bs.collapse', function () {
-                card.classList.add('active');
-            });
-        }
+            // Panggil fungsi ajax
+            loadReservationTable(status, label, count);
+        });
     });
 
-    
+    // Handle butang Quick View
     document.querySelectorAll('.quick-view-approved').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            
             const approvedCard = document.querySelector('.card-clickable[data-status-filter="approved,checked out"]');
-            if (approvedCard) {
-                
-                approvedCard.click(); 
-            }
+            if (approvedCard) approvedCard.click();
         });
     });
 
-    
-    attachPaginationListeners();
-    initializeTooltips();
-    
-    
-    const total = <?= $total ?>;
-    if (total > 0) {
-        const statusData = {
-            labels: [
-                'Approved / On Loan',
-                'Pending',
-                'Completed / Rejected'
-            ],
-            datasets: [{
-                label: 'Reservation Status',
-                data: [<?= $approved ?>, <?= $pending ?>, <?= $rejected_completed ?>],
-                backgroundColor: [
-                    '#22c55e', 
-                    '#f59e0b', 
-                    '#ef4444'  
-                ],
-                hoverOffset: 4
-            }]
-        };
-
-        new Chart(
-            document.getElementById('statusChart'),
-            {
-                type: 'doughnut',
-                data: statusData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20
-                            }
-                        },
-                        title: {
-                            display: false
-                        }
-                    }
-                }
+    // --- CHART LOGIC (DOUGHNUT) ---
+    const total = <?= $total ?? 0 ?>;
+    if (total > 0 && document.getElementById('statusChart')) {
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Approved', 'Pending', 'Rejected'],
+                datasets: [{
+                    data: [<?= $approved ?? 0 ?>, <?= $pending ?? 0 ?>, <?= $rejected_completed ?? 0 ?>],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
             }
-        );
-    }
-    
-    
-    const topItemsData = <?= json_encode($top_items); ?>;
-    
-    if (topItemsData.length > 0) {
-        const itemLabels = topItemsData.map(item => item.item_name);
-        const itemCounts = topItemsData.map(item => item.reservation_count);
-
-        const topItemsChartData = {
-            labels: itemLabels,
-            datasets: [
-                {
-                    label: 'Times Reserved',
-                    data: itemCounts,
-                    backgroundColor: [
-                        '#06b6d4', 
-                        '#10b981', 
-                        '#8b5cf6',
-                        '#f97316',
-                        '#ef4444'
-                    ],
-                    borderColor: '#06b6d4',
-                    borderWidth: 1,
-                    borderRadius: 5,
-                }
-            ]
-        };
-
-        new Chart(
-            document.getElementById('topItemsChart'),
-            {
-                type: 'bar',
-                data: topItemsChartData,
-                options: {
-                    indexAxis: 'y', 
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false,
-                        },
-                        title: {
-                            display: false,
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Reservations'
-                            }
-                        },
-                        y: {
-                            
-                            ticks: {
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        );
-    }
-
-
-    
-    const markAllReadBtn = document.getElementById('markAllRead');
-    
-    const markAsRead = function(id = 'all') {
-        fetch('update_notification.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `action=mark_read&id=${id}`
-        })
-        .then(response => {
-             if (!response.ok) {
-                 throw new Error('Server returned ' + response.status + ' status. Check network tab.');
-             }
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.indexOf('application/json') !== -1) {
-                return response.json();
-            } else {
-                 return response.text().then(text => {
-                     throw new Error('Expected JSON response, received text/html: ' + text.substring(0, 100) + '...');
-                 });
-            }
-        })
-        .then(data => {
-            if (data.success) {
-                const badge = document.querySelector('.dropdown .badge');
-                if (badge) {
-                    badge.textContent = '0'; 
-                    badge.style.display = 'none'; 
-                }
-
-                const header = document.querySelector('#notificationList h6');
-                if (header) {
-                    header.textContent = 'Notifications (0 New)';
-                }
-
-                const notifList = document.getElementById('notificationList');
-                if (notifList) {
-                    let children = Array.from(notifList.children);
-                    for (let i = children.length - 1; i >= 1; i--) {
-                        if(children[i].classList.contains('notif-item') || children[i].querySelector('.dropdown-divider') || children[i].querySelector('#markAllRead')) {
-                           children[i].remove();
-                        }
-                    }
-                    const noNotifLi = document.createElement('li');
-                    noNotifLi.innerHTML = '<span class="dropdown-item text-center text-muted">No new notifications.</span>';
-                    notifList.appendChild(noNotifLi);
-                }
-                
-            } else {
-                console.error('Failed to mark as read:', data.message);
-                alert('Gagal menandakan notifikasi sebagai telah dibaca. Ralat: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error marking as read:', error);
-            alert('Ralat rangkaian/server. Sila cuba lagi. (Lihat Console untuk butiran)');
         });
-    };
+    }
+    
+    // --- CHART LOGIC (BAR - TOP ITEMS) ---
+    const topItemsData = <?= json_encode($top_items ?? []); ?>;
+    if (topItemsData.length > 0 && document.getElementById('topItemsChart')) {
+        new Chart(document.getElementById('topItemsChart'), {
+            type: 'bar',
+            data: {
+                labels: topItemsData.map(item => item.item_name),
+                datasets: [{
+                    label: 'Times Reserved',
+                    data: topItemsData.map(item => item.reservation_count),
+                    backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'],
+                    borderRadius: 10,
+                    barThickness: 15,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false, grid: { display: false } },
+                    y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+                }
+            }
+        });
+    }
 
-    if (markAllReadBtn) {
+if (markAllReadBtn) {
         markAllReadBtn.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation(); // PENTING: Biar dropdown tak tertutup
+            
+            // Tambah loading state sikit bagi nampak pro
+            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            this.disabled = true;
+            
             markAsRead('all');
         });
     }
 });
+function markAsRead(id) {
+    const params = new URLSearchParams();
+    params.append('action', 'mark_read');
+    params.append('id', id);
+
+    fetch('update_notification.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Refresh bahagian notifikasi atau hilangkan dot merah
+            location.reload(); 
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Fungsi Dismiss Toast (Kekalkan di luar DOMContentLoaded jika dipanggil via onclick HTML)
+function dismissToast(id) {
+    const toastEl = document.getElementById('voidToast');
+    const toast = bootstrap.Toast.getInstance(toastEl);
+    if (toast) toast.hide();
+
+    const params = new URLSearchParams();
+    params.append('action', 'dismiss_void');
+    params.append('id', id);
+
+    fetch('update_notification.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(response => response.json())
+    .catch(error => console.error('Error:', error));
+}
+    // Aktifkan semua tooltips dalam page
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+	
+	function dismissToast(id) {
+    // Sembunyikan toast secara visual
+    const toastEl = document.getElementById('voidToast');
+    const toast = bootstrap.Toast.getInstance(toastEl);
+    if (toast) toast.hide();
+
+    // Hantar request ke server untuk "Mark as Read/Dismiss"
+    fetch('update_notification.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=dismiss_void&id=${id}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) console.error('Failed to dismiss in database');
+    })
+    .catch(error => console.error('Error:', error));
+}
 </script>
-</body>
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_user.php" class="nav-item active">
+        <i class="fa-solid fa-house"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="item_user.php" class="nav-item">
+        <i class="fa-solid fa-calendar-plus"></i>
+        <span>Book Equipment</span>
+    </a>
+    <a href="history.php" class="nav-item">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>My Loan</span>
+    </a>
+    <a href="profile.php" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav></body>
 </html>
+

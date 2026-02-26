@@ -2,34 +2,31 @@
 session_start();
 include '../config.php';
 
-
-if (!isset($_SESSION['admin_id'])) {
+// Gunakan person_id (ikut file profile_admin.php kau)
+if (!isset($_SESSION['person_id'])) {
     $_SESSION['error'] = "Sila log masuk semula.";
-    header("Location: login.php");
+    header("Location: ../login.php"); // Pastikan path ke login betul
     exit();
 }
-$admin_id = (int) $_SESSION['admin_id'];
 
+$person_id = (int) $_SESSION['person_id'];
 
+// Ambil data dari form
 $name = isset($_POST['name']) ? trim($_POST['name']) : '';
-$email = isset($_POST['email']) ? trim($_POST['email']) : '';
 $phoneNum = isset($_POST['phoneNum']) ? trim($_POST['phoneNum']) : '';
 $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : '';
 $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
 
+// Email tak ada dlm input form kau tadi, tapi kalau nak update juga kena ada dlm form
+// Kalau tak ada dlm form, kita jangan update email.
 
-if (empty($name) || empty($email) || empty($phoneNum)) {
-    $_SESSION['error'] = "Name, email, and phone number cannot be empty.";
+if (empty($name) || empty($phoneNum)) {
+    $_SESSION['error'] = "Name and phone number cannot be empty.";
     header("Location: profile_admin.php");
     exit();
 }
 
-
-$sql = "UPDATE admin SET name = ?, email = ?, phoneNum = ? WHERE admin_id = ?";
-$types = "sssi"; 
-$params = [$name, $email, $phoneNum, $admin_id];
-
-
+// Check kalau nak tukar password
 if (!empty($new_password)) {
     if ($new_password !== $confirm_password) {
         $_SESSION['error'] = "New passwords do not match.";
@@ -45,32 +42,19 @@ if (!empty($new_password)) {
 
     $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
     
-    $sql = "UPDATE admin SET name = ?, email = ?, phoneNum = ?, password = ? WHERE admin_id = ?";
-    $types = "ssssi";
-    $params = [$name, $email, $phoneNum, $hashed_password, $admin_id];
+    // UPDATE table person (Ikut nama table asal kau)
+    $stmt = $conn->prepare("UPDATE person SET name = ?, phoneNum = ?, password = ? WHERE person_id = ?");
+    $stmt->bind_param("sssi", $name, $phoneNum, $hashed_password, $person_id);
+} else {
+    // Update tanpa tukar password
+    $stmt = $conn->prepare("UPDATE person SET name = ?, phoneNum = ? WHERE person_id = ?");
+    $stmt->bind_param("ssi", $name, $phoneNum, $person_id);
 }
-
-
-$stmt = $conn->prepare($sql);
-
-if ($stmt === false) {
-    $_SESSION['error'] = "SQL Error: " . $conn->error;
-    header("Location: profile_admin.php");
-    exit();
-}
-
-
-$bind_params = [];
-$bind_params[] = $types;
-foreach ($params as $key => $value) {
-    $bind_params[] = &$params[$key];
-}
-call_user_func_array([$stmt, 'bind_param'], $bind_params);
 
 if ($stmt->execute()) {
     $_SESSION['message'] = "Your profile has been updated successfully!";
 } else {
-    $_SESSION['error'] = "Failed to update profile. Please try again.";
+    $_SESSION['error'] = "Failed to update profile: " . $conn->error;
 }
 
 $stmt->close();

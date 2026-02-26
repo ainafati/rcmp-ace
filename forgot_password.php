@@ -16,121 +16,159 @@ $back_url = ($role === 'technician') ? 'login_technician.php' : 'login.php';
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <style>
-        :root {
-            --primary: #002147;
-            --accent: #00A3C9;
-            --bg-body: #f8fafc;
-            --text-muted: #64748b;
-            --white: #ffffff;
-        }
+<style>
+    :root {
+        --primary: #002147;
+        --accent: #00A3C9;
+        --bg-body: #f8fafc;
+        --text-muted: #64748b;
+        --white: #ffffff;
+    }
 
+    /* Reset & Base */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--primary);
+        position: relative;
+        padding: 20px;
+    }
+
+    body::before {
+        content: "";
+        position: fixed; /* Guna fixed supaya background penuh walau scroll */
+        inset: 0;
+        background-image: url('img/view.png'); 
+        background-size: cover;
+        background-position: center;
+        filter: blur(8px) brightness(0.4);
+        z-index: -1;
+    }
+
+    .main-container {
+        display: flex;
+        width: 900px;
+        max-width: 100%;
+        min-height: 550px;
+        background: var(--white);
+        border-radius: 40px; 
+        overflow: hidden;
+        box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.4);
+        z-index: 10;
+    }
+
+    .side-visual {
+        flex: 1;
+        background: var(--primary);
+        padding: 50px;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .side-visual img { height: 45px; width: auto; margin-bottom: 20px;}
+    .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+    .side-visual h1 span { color: var(--accent); }
+    .side-visual p { font-size: 0.9rem; opacity: 0.8; margin-top: 10px; }
+
+    .side-form {
+        flex: 1.2;
+        padding: 50px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: white;
+    }
+
+    h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 10px; }
+    .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
+
+    .input-group { margin-bottom: 20px; }
+    .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; }
+    .input-group input {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        transition: 0.3s;
+        font-size: 0.9rem;
+    }
+    .input-group input:focus { 
+        outline: none; border-color: var(--accent); background: white;
+        box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
+    }
+
+    .btn-submit {
+        background: var(--primary);
+        color: white;
+        padding: 16px;
+        border-radius: 50px;
+        width: 100%;
+        font-weight: 700;
+        cursor: pointer;
+        transition: 0.3s;
+        border: none;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .btn-submit:hover { background: var(--accent); transform: translateY(-2px); }
+
+    .back-btn {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 25px;
+    }
+
+    /* MOBILE VIEW - FIX UNTUK RESET ACCESS */
+    @media (max-width: 768px) {
         body {
-            font-family: 'Poppins', sans-serif;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: var(--bg-body);
-            position: relative;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        body::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background-image: url('img/view.png'); 
-            background-size: cover;
-            background-position: center;
-            filter: blur(8px) brightness(0.4);
-            z-index: -1;
+            overflow-y: auto;
+            align-items: flex-start; /* Supaya tak terpotong kalau skrin pendek */
         }
 
         .main-container {
-            display: flex;
-            width: 900px;
-            max-width: 95%;
-            height: 550px;
-            background: var(--white);
-            border-radius: 40px; 
-            overflow: hidden;
-            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.4);
+            flex-direction: column; /* Susun menegak */
+            height: auto;
+            border-radius: 30px;
+            margin: auto;
         }
 
         .side-visual {
-            flex: 1;
-            background: var(--primary);
-            padding: 50px;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            display: flex; /* AKTIFKAN BALIK */
+            padding: 40px 30px;
+            text-align: center;
+            order: 1; /* Biru kat atas */
         }
 
-        .side-visual img { height: 45px; width: auto; margin-bottom: 20px;}
-        .side-visual h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; }
-        .side-visual h1 span { color: var(--accent); }
+        .side-visual img { margin: 0 auto 15px auto; height: 35px; }
+        .side-visual h1 { font-size: 1.6rem; }
+        .side-visual p { font-size: 0.8rem; }
+        .side-visual div:last-child { display: none; } /* Sorok 'Encryption Active' kat mobile supaya jimat ruang */
 
         .side-form {
-            flex: 1.2;
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            padding: 40px 25px;
+            order: 2; /* Form kat bawah */
+            text-align: center;
         }
 
-        h2 { font-weight: 800; color: var(--primary); font-size: 1.8rem; margin-bottom: 10px; }
-        .sub-text { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 30px; }
-
-        .input-group { margin-bottom: 20px; }
-        .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; text-transform: uppercase; }
-        .input-group input {
-            width: 100%;
-            padding: 14px 16px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            transition: 0.3s;
-        }
-        .input-group input:focus { 
-            outline: none; border-color: var(--accent); background: white;
-            box-shadow: 0 0 0 4px rgba(0, 163, 201, 0.1);
-        }
-
-        .btn-submit {
-            background: var(--primary);
-            color: white;
-            padding: 16px;
-            border-radius: 50px;
-            width: 100%;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.3s;
-            border: none;
-        }
-        .btn-submit:hover { background: var(--accent); transform: translateY(-2px); }
-
-        .back-btn {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 0.8rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 25px;
-        }
-
-        .alert { padding: 12px; border-radius: 12px; font-size: 0.8rem; margin-bottom: 20px; font-weight: 500; }
-        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-
-        @media (max-width: 768px) {
-            .side-visual { display: none; }
-        }
-    </style>
+        h2 { font-size: 1.4rem; }
+        .sub-text { font-size: 0.8rem; margin-bottom: 20px; }
+        
+        .input-group label { text-align: left; }
+    }
+</style>
 </head>
 <body>
 

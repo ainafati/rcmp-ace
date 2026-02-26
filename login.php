@@ -52,7 +52,6 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
     html, body {
         height: 100%;
         width: 100%;
-        overflow: hidden; 
         font-family: 'Poppins', sans-serif;
     }
 
@@ -62,6 +61,7 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
         justify-content: center;
         background-color: var(--primary);
         position: relative;
+        overflow-x: hidden;
     }
 
     body::before {
@@ -143,92 +143,116 @@ if (empty($login_attempt_email) && !empty($remembered_email)) {
     #login-section { display: none; animation: fadeIn 0.4s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .input-group { 
-        margin-bottom: 15px; 
-        position: relative; 
-        width: 100%;
-    }
+    .input-group { margin-bottom: 15px; position: relative; width: 100%; }
+    .input-group label { font-size: 0.7rem; font-weight: 700; color: var(--primary); text-transform: uppercase; margin-bottom: 5px; display: block; }
+    .password-container { position: relative; width: 100%; }
+    .input-group input { width: 100%; padding: 12px 45px 12px 15px; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 0.85rem; background: #f8fafc; display: block; outline: none; }
+    input::-ms-reveal, input::-ms-clear { display: none; }
+    .toggle-password { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; z-index: 10; padding: 5px; }
 
-    .input-group label { 
-        font-size: 0.7rem; 
-        font-weight: 700; 
-        color: var(--primary); 
-        text-transform: uppercase; 
-        margin-bottom: 5px; 
-        display: block; 
-    }
-
-    /* CONTAINER PASSWORD */
-    .password-container {
-        position: relative;
-        width: 100%;
-    }
-
-    .input-group input {
-        width: 100%;
-        padding: 12px 45px 12px 15px; /* Tambah padding kanan supaya tak bertindih dengan mata */
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        font-size: 0.85rem;
-        background: #f8fafc;
-        display: block;
-        outline: none;
-    }
-
-    /* FIX: BUANG MATA DEFAULT DARI BROWSER (EDGE/CHROME) */
-    input::-ms-reveal,
-    input::-ms-clear {
-        display: none;
-    }
-
-    /* IKON MATA ANDA */
-    .toggle-password {
-        position: absolute;
-        right: 15px;
-        top: 50%;
-        transform: translateY(-50%); 
-        color: var(--text-muted);
-        cursor: pointer;
-        z-index: 10;
-        padding: 5px;
-    }
-
-    .btn-login {
-        background: var(--primary);
-        color: white;
-        border: none;
-        padding: 14px;
-        border-radius: 50px;
-        width: 100%;
-        font-weight: 700;
-        cursor: pointer;
-        transition: 0.3s;
-    }
+    .btn-login { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 50px; width: 100%; font-weight: 700; cursor: pointer; transition: 0.3s; }
     .btn-login:hover { background: var(--accent); }
-
     .back-btn { background: none; border: none; color: var(--accent); font-weight: 700; font-size: 0.7rem; cursor: pointer; margin-bottom: 15px; }
-
     .alert { padding: 10px; border-radius: 10px; font-size: 0.75rem; margin-bottom: 15px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-
-    @media (max-width: 768px) {
-        .main-container { flex-direction: column; height: auto; max-height: 95vh; overflow-y: auto; }
-        .side-visual { display: none; }
-        .side-form { padding: 30px 20px; }
+@media (max-width: 768px) {
+    html, body {
+        height: 100%; /* Pastikan html/body ambil 100% tinggi skrin */
+        overflow-y: auto; 
     }
+
+    body {
+        display: flex; /* Guna flex balik untuk centre-kan kotak */
+        align-items: center; 
+        justify-content: center;
+        padding: 20px 15px;
+        min-height: 100vh; /* Background akan sentiasa penuh ikut tinggi skrin */
+    }
+
+    /* Pastikan background penuh dan tak lari */
+    body::before {
+        position: fixed; /* Lock background supaya tak bergerak bila scroll */
+        height: 100vh;
+        width: 100vw;
+    }
+
+    .main-container {
+        flex-direction: column;
+        height: auto; 
+        width: 100%;
+        max-width: 400px; /* Kecilkan sikit lebar kotak supaya nampak kemas */
+        margin: auto; /* Auto margin untuk tolong centering */
+        border-radius: 30px;
+    }
+
+    .side-visual {
+        order: 1; /* NexCheck Portal kat atas */
+        padding: 25px 20px;
+        text-align: center;
+    }
+
+    .side-visual img { margin: 0 auto 10px auto; height: 35px; }
+    
+    .side-form {
+        order: 2; /* Form kat bawah */
+        padding: 30px 20px;
+    }
+
+    .roles-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .role-box {
+        min-height: 75px; /* Kotak role lebih nipis/kecil */
+        flex-direction: row;
+        padding: 10px 20px;
+        justify-content: flex-start;
+        gap: 15px;
+    }
+
+    .role-box i { margin-bottom: 0; font-size: 1.3rem; }
+    
+    /* Center-kan Welcome Back punya teks */
+    h2, .sub-text { text-align: center; }
+}
 </style>
 </head>
 <body>
 
 <div class="main-container">
-    <div class="side-visual">
-        <div>
-            <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
-            <h1>NexCheck <span>Portal.</span></h1>
-            <p>High-precision IT asset reservation and inventory management ecosystem for UniKL RCMP.</p>
-        </div>
-        <div style="font-size: 0.75rem; opacity: 0.6;"><i class="fas fa-shield-alt"></i> Secure Protocol Active</div>
-    </div>
+<div class="side-visual">
+    <div>
+        <img src="img/Logo-UniKL-PCM.jpg" alt="Logo">
+        <h1>NexCheck <span>Portal.</span></h1>
+        <p>High-precision IT asset reservation and inventory management ecosystem for UniKL RCMP.</p>
 
+        <div style="margin-top: 30px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
+            <h4 style="color: var(--accent); font-size: 0.85rem; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                <i class="fas fa-gavel me-2"></i> Quick Policy
+            </h4>
+           <ul style="list-style: none; padding: 0;">
+    <li style="font-size: 0.75rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; opacity: 0.9;">
+        <i class="fas fa-check-circle" style="color: var(--accent); margin-top: 3px;"></i> 
+        Registered UniKL students and staff only.
+    </li>
+    <li style="font-size: 0.75rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; opacity: 0.9;">
+        <i class="fas fa-check-circle" style="color: var(--accent); margin-top: 3px;"></i> 
+        Full liability for loss or damage.
+    </li>
+    <li style="font-size: 0.75rem; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 10px; opacity: 0.9;">
+        <i class="fas fa-check-circle" style="color: var(--accent); margin-top: 3px;"></i> 
+        Usage for academic or official purposes only.
+    </li>
+    <li style="font-size: 0.75rem; display: flex; align-items: flex-start; gap: 10px; opacity: 0.9;">
+        <i class="fas fa-check-circle" style="color: var(--accent); margin-top: 3px;"></i> 
+        Collect within 24 hours of approval.
+    </li>
+</ul>
+        </div>
+    </div>
+    
+    <div style="font-size: 0.75rem; opacity: 0.6;"><i class="fas fa-shield-alt"></i> Secure Protocol Active</div>
+</div>
     <div class="side-form">
         <div id="role-section">
             <h2>Welcome Back</h2>

@@ -1,31 +1,20 @@
 <?php
-
 session_start();
-
 include '../config.php';
 include_once '../logger.php';
 
-
-
 function build_pagination_query($page_param_name, $page_number) {
     $params = $_GET;
-    
-    
     if (!isset($params['tab'])) {
-        
         if ($page_param_name == 'page_returns') {
             $params['tab'] = 'returns';
         } elseif ($page_param_name == 'page_logs') {
             $params['tab'] = 'activity';
         }
     }
-    
     $params[$page_param_name] = $page_number;
-    
-    
     if ($page_param_name == 'page_returns' && isset($params['page_logs'])) unset($params['page_logs']);
     if ($page_param_name == 'page_logs' && isset($params['page_returns'])) unset($params['page_returns']);
-    
     return http_build_query($params);
 }
 
@@ -37,85 +26,113 @@ if (!isset($_SESSION['person_id']) || $_SESSION['logged_in_role'] !== $allowed_r
 
 $person_id = (int)$_SESSION['person_id'];
 
+// 1. Ambil nama dari Session (sebab session dah ada nama masa login)
+$fullName = $_SESSION['name'] ?? 'Admin'; 
 
-// Ambil nama penuh, pecahkan kepada perkataan
-$full_name = isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin';
-$name_parts = explode(' ', trim($full_name));
+// 2. Logik buang Bin / Binti / A/L / A/P
+$lowerName = strtolower($fullName);
+$shortName = $fullName; // Default
 
-// Ambil 2 perkataan pertama dan gabungkan semula
-$admin_display_name = isset($name_parts[1]) ? $name_parts[0] . ' ' . $name_parts[1] : $name_parts[0];
-$admin_name = htmlspecialchars($admin_display_name);
+// Senarai pemisah yang biasa digunakan di Malaysia
+$separators = [' binti ', ' bin ', ' a/l ', ' a/p '];
 
-
-$stmt_admin = null;
-if (isset($_SESSION['admin_id']) && $stmt_admin = $conn->prepare("SELECT name FROM person WHERE person_id = ?")) {
-    $admin_id = (int)$_SESSION['admin_id'];
-    $stmt_admin->bind_param("i", $admin_id);
-    $stmt_admin->execute();
-    $stmt_admin->bind_result($aname);
-    $admin = [];
-    if ($stmt_admin->fetch()) {
-        $admin['name'] = $aname;
+foreach ($separators as $sep) {
+    $pos = strpos($lowerName, $sep);
+    if ($pos !== false) {
+        $shortName = substr($fullName, 0, $pos);
+        break; // Berhenti bila dah jumpa satu
     }
-    $stmt_admin->close();
 }
 
+// 3. Jika masih panjang (tiada bin/binti), ambil 2 perkataan pertama sahaja
+$parts = explode(' ', trim($shortName));
+if (count($parts) > 2) {
+    $displayName = $parts[0] . ' ' . $parts[1];
+} else {
+    $displayName = $shortName;
+}
+
+// Pastikan displayName bersih untuk display
+$displayName = htmlspecialchars(trim($displayName));
+
+
+// --- Handle Admin Name Display ---
+$full_name = isset($_SESSION['name']) ? $_SESSION['name'] : 'Admin';
+$name_parts = explode(' ', trim($full_name));
+$admin_display_name = isset($name_parts[1]) ? $name_parts[0] . ' ' . $name_parts[1] : $name_parts[0];
+
 $active_tab = (isset($_GET['tab']) && $_GET['tab'] == 'activity') ? 'activity' : 'returns';
-
-$records = array();
-
 $categories_result = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 $categories = $categories_result->fetch_all(MYSQLI_ASSOC);
 
-
 $items_per_page_returns = 10;
+
+// Pastikan dia check 'page_returns' sebab itu nama param dalam link bawah
 $page_returns = isset($_GET['page_returns']) ? (int)$_GET['page_returns'] : 1;
 if ($page_returns < 1) $page_returns = 1;
 
+// Ambil tarikh dari URL (GET). Jika tak ada, baru guna default bulan semasa.
 $report_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $report_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
-$report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 
+// Pecahkan tarikh untuk Sync dengan Dropdown Bulan/Tahun
 $current_month = date('m', strtotime($report_start_date));
 $current_year = date('Y', strtotime($report_start_date));
 
+$report_category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
+$status_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : 'Returned';
+$asset_filter_code = isset($_GET['asset_code']) ? $_GET['asset_code'] : '';
 
+$page = $page_returns;
+// --- SQL Building ---
 $sql_base_report = "FROM reservation_items ri
     JOIN reservations r ON ri.reserve_id = r.reserve_id
-    JOIN person u ON r.person_id = u.person_id /* User (Peminjam) dari reservations */
+    JOIN person u ON r.person_id = u.person_id
     JOIN item i ON ri.item_id = i.item_id
     JOIN categories c ON i.category_id = c.category_id
     LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
-    LEFT JOIN assets a ON ra.asset_id = a.asset_id /* Sambungan ke Asset (jika ada) */
-    LEFT JOIN person p_handler ON ri.approved_by = p_handler.person_id"; /* Handler (Admin/Tech) yang meluluskan */
-	
-$where_clauses_report = array(
-    "ri.status = 'Returned'", 
-    "r.return_date BETWEEN ? AND ?" 
-);
-$param_types_report = "ss";
-$param_values_report = array($report_start_date, $report_end_date);
+    LEFT JOIN assets a ON ra.asset_id = a.asset_id
+    LEFT JOIN person p_handler ON ri.approved_by = p_handler.person_id";
 
+// Clause asas
+$where_clauses_report = array("ri.status = ?");
+$param_types_report = "s";
+$param_values_report = array($status_filter);
+
+// Filter Tarikh (Penting: Guna r.return_date untuk Returned, r.reserve_date untuk yang lain)
+if ($status_filter === 'Returned') {
+    $where_clauses_report[] = "r.return_date BETWEEN ? AND ?";
+} else {
+    $where_clauses_report[] = "r.reserve_date BETWEEN ? AND ?";
+}
+$param_types_report .= "ss";
+$param_values_report[] = $report_start_date;
+$param_values_report[] = $report_end_date;
+
+// Filter Category
 if ($report_category_id > 0) {
     $where_clauses_report[] = "i.category_id = ?";
     $param_types_report .= "i";
     $param_values_report[] = $report_category_id;
 }
 
+// Filter Asset Code (BARU)
+if (!empty($asset_filter_code)) {
+    $where_clauses_report[] = "a.asset_code LIKE ?";
+    $param_types_report .= "s";
+    $param_values_report[] = "%" . $asset_filter_code . "%";
+}
+
 $sql_where_report = " WHERE " . implode(' AND ', $where_clauses_report);
-
-
-
+// --- Get Total Count First ---
 $stmt_count_report = $conn->prepare("SELECT COUNT(ri.id) " . $sql_base_report . $sql_where_report);
 if ($stmt_count_report) {
-    
     $bind_params_count = array();
     $bind_params_count[] = $param_types_report;
-    for ($i = 0; $i < count($param_values_report); $i++) {
-        $bind_params_count[] = &$param_values_report[$i];
+    foreach ($param_values_report as $key => $value) {
+        $bind_params_count[] = &$param_values_report[$key];
     }
     call_user_func_array(array($stmt_count_report, 'bind_param'), $bind_params_count);
-    
     $stmt_count_report->execute();
     $stmt_count_report->bind_result($total_records_returns);
     $stmt_count_report->fetch();
@@ -123,7 +140,7 @@ if ($stmt_count_report) {
     
     $total_pages_returns = ceil($total_records_returns / $items_per_page_returns);
     if ($total_pages_returns == 0) $total_pages_returns = 1;
-    if ($total_records_returns > 0 && $page_returns > $total_pages_returns) $page_returns = $total_pages_returns;
+    if ($page_returns > $total_pages_returns) $page_returns = $total_pages_returns;
     $offset_returns = ($page_returns - 1) * $items_per_page_returns;
 } else {
     $total_records_returns = 0;
@@ -131,121 +148,31 @@ if ($stmt_count_report) {
     $offset_returns = 0;
 }
 
+// --- Define variables for HTML (to fix Undefined Variable errors) ---
+$total_pages = $total_pages_returns;
+$total_records = $total_records_returns;
+$page = $page_returns;
+$pagination_params = build_pagination_query('page_returns', $page);
 
-
-$sql_report = "SELECT
-    u.name AS user_name, i.item_name, a.asset_code, c.category_name,
-    r.reserve_date, r.return_date, ri.return_condition,
-    p_handler.name AS handler_name
+$sql_report = "SELECT u.name AS user_name, i.item_name, a.asset_code, c.category_name,
+    r.reserve_date, r.return_date, ri.return_condition, p_handler.name AS approved_by_name,
+    (SELECT name FROM person WHERE person_id = ri.checked_out_by) as checked_out_by_name,
+    (SELECT name FROM person WHERE person_id = ri.checked_in_by) as checked_in_by_name
     " . $sql_base_report . $sql_where_report . "
-    ORDER BY r.return_date DESC
-    LIMIT ? OFFSET ?";
-
-$param_values_select = array_merge($param_values_report);
-$param_types_select = $param_types_report . "ii";
-$param_values_select[] = $items_per_page_returns;
-$param_values_select[] = $offset_returns;
-
-$stmt_report = $conn->prepare($sql_report);
+    ORDER BY r.return_date DESC LIMIT ? OFFSET ?";
+	
+	$stmt_report = $conn->prepare($sql_report);
 if ($stmt_report) {
-    
-    $bind_params_select = array();
-    $bind_params_select[] = $param_types_select;
-    for ($i = 0; $i < count($param_values_select); $i++) {
-        $bind_params_select[] = &$param_values_select[$i];
+    $param_types_select = $param_types_report . "ii";
+    $param_values_select = array_merge($param_values_report, [$items_per_page_returns, $offset_returns]);
+    $bind_params_select = array($param_types_select);
+    foreach ($param_values_select as $key => $value) {
+        $bind_params_select[] = &$param_values_select[$key];
     }
     call_user_func_array(array($stmt_report, 'bind_param'), $bind_params_select);
     $stmt_report->execute();
-    $result_report = $stmt_report->get_result();
-    $records = $result_report->fetch_all(MYSQLI_ASSOC);
+    $records = $stmt_report->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt_report->close();
-}
-
-
-
-$logs = array();
-$items_per_page_logs = 10;
-$page_logs = isset($_GET['page_logs']) ? (int)$_GET['page_logs'] : 1;
-if ($page_logs < 1) $page_logs = 1;
-
-$log_start_date = isset($_GET['log_start_date']) ? $_GET['log_start_date'] : date('Y-m-d');
-$log_end_date = isset($_GET['log_end_date']) ? $_GET['log_end_date'] : date('Y-m-d');
-$log_user_type = isset($_GET['user_type']) ? $_GET['user_type'] : '';
-$log_search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$end_date_sql = $log_end_date . ' 23:59:59'; 
-
-
-$sql_base_log = "FROM activity_logs";
-$where_clauses_log = array("timestamp BETWEEN ? AND ?");
-$param_types_log = "ss";
-$param_values_log = array($log_start_date, $end_date_sql);
-
-if (!empty($log_user_type)) {
-    $where_clauses_log[] = "user_type = ?";
-    $param_types_log .= "s";
-    $param_values_log[] = $log_user_type;
-}
-if (!empty($log_search)) {
-    $where_clauses_log[] = "(action LIKE ? OR details LIKE ?)";
-    $param_types_log .= "ss";
-    $search_like = "%" . $log_search . "%";
-    $param_values_log[] = $search_like;
-    $param_values_log[] = $search_like;
-}
-$sql_where_log = " WHERE " . implode(' AND ', $where_clauses_log);
-
-
-
-$stmt_count_log = $conn->prepare("SELECT COUNT(log_id) " . $sql_base_log . $sql_where_log);
-if ($stmt_count_log) {
-    
-    $bind_params_count_log = array();
-    $bind_params_count_log[] = $param_types_log;
-    for ($i = 0; $i < count($param_values_log); $i++) {
-        $bind_params_count_log[] = &$param_values_log[$i];
-    }
-    call_user_func_array(array($stmt_count_log, 'bind_param'), $bind_params_count_log);
-
-    $stmt_count_log->execute();
-    $stmt_count_log->bind_result($total_records_logs);
-    $stmt_count_log->fetch();
-    $stmt_count_log->close();
-    
-    $total_pages_logs = ceil($total_records_logs / $items_per_page_logs);
-    if ($total_pages_logs == 0) $total_pages_logs = 1;
-    if ($total_records_logs > 0 && $page_logs > $total_pages_logs) $page_logs = $total_pages_logs;
-    $offset_logs = ($page_logs - 1) * $items_per_page_logs;
-} else {
-    $total_records_logs = 0;
-    $total_pages_logs = 1;
-    $offset_logs = 0;
-}
-
-
-
-$sql_log = "SELECT log_id, timestamp, user_type, person_id, action, details, ip_address
-    " . $sql_base_log . $sql_where_log . "
-    ORDER BY timestamp DESC
-    LIMIT ? OFFSET ?";
-
-$param_values_select_log = array_merge($param_values_log);
-$param_types_select_log = $param_types_log . "ii";
-$param_values_select_log[] = $items_per_page_logs;
-$param_values_select_log[] = $offset_logs;
-
-$stmt_log = $conn->prepare($sql_log);
-if ($stmt_log) {
-    
-    $bind_params_select_log = array();
-    $bind_params_select_log[] = $param_types_select_log;
-    for ($i = 0; $i < count($param_values_select_log); $i++) {
-        $bind_params_select_log[] = &$param_values_select_log[$i];
-    }
-    call_user_func_array(array($stmt_log, 'bind_param'), $bind_params_select_log);
-    $stmt_log->execute();
-    $result_log = $stmt_log->get_result();
-    $logs = $result_log->fetch_all(MYSQLI_ASSOC);
-    $stmt_log->close();
 }
 
 $conn->close();
@@ -254,646 +181,511 @@ $conn->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>System Reports - UniKL Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Returned Items Report — UniKL Technician</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	    <link rel="stylesheet" href="../css/style.css">
 <style>
-    /* Definisi Pembolehubah CSS */
-    :root {
-        --primary-color: #06b6d4;
-        --primary-hover: #0891b2;
-        --danger-color: #ef4444;
 
-        --bg-light-gray: #f8fafc;
-        --card-bg: #ffffff;
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --border-color: #e5e7eb;
-    }
+.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
+    
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
+    
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
+    
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
+    
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
 
+:root {
+    --bg-main: #f4f7fe; /* Warna background dashboard soft blue */
+    --card-shadow: 0 10px 30px rgba(132, 147, 168, 0.15);
+    --primary-text: #1b2559;
+}
+
+body {
+    background-color: var(--bg-main);
+    font-family: 'DM Sans', 'Inter', sans-serif; /* Guna font lebih rounded */
+    color: var(--primary-text);
+}
+
+/* --- Container Utama (Glass Card) --- */
+.card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px); /* Efek glassmorphism */
+    border: none;
+    border-radius: 25px; /* Lebih bulat macam dalam gambar b17eff.png */
+    box-shadow: var(--card-shadow);
+    padding: 30px !important;
+    margin-bottom: 25px;
+}
+
+/* --- Input & Filter Section --- */
+.form-select, .form-control {
+    background: #ffffff !important;
+    border: 1px solid #e0e5f2 !important;
+    border-radius: 16px; /* Pill shape */
+    padding: 12px 16px;
+    font-weight: 500;
+    color: var(--primary-text);
+}
+
+/* --- Table Styling (Floating Rows) --- */
+.table {
+    border-collapse: separate;
+    border-spacing: 0 12px; /* Jarakkan row supaya nampak terapung */
+}
+
+.table thead th {
+    border: none;
+    color: #a3aed0; /* Warna kelabu muted untuk header */
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 15px;
+}
+
+.table tbody tr {
+    background-color: #ffffff;
+    border-radius: 20px;
+    transition: transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
+
+.table tbody tr:hover {
+    transform: scale(1.01); /* Efek pop-up bila hover */
+    background-color: #ffffff !important;
+}
+
+.table td {
+    padding: 20px 15px !important;
+    border: none !important;
+}
+
+/* Round kan bucu row */
+.table td:first-child { border-radius: 20px 0 0 20px; }
+.table td:last-child { border-radius: 0 20px 20px 0; }
+
+/* --- Badge Status (Modern Pill) --- */
+.badge {
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+.badge.bg-success { background-color: #05cd991a !important; color: #05cd99 !important; }
+.badge.bg-danger { background-color: #ee5d501a !important; color: #ee5d50 !important; }
+
+/* --- Button Export (Macam image_e626b9.png) --- */
+.btn-export {
+    border-radius: 14px;
+    padding: 8px 20px;
+    font-weight: 600;
+    border: 1px solid #e0e5f2;
+    background: #ffffff;
+    transition: 0.3s;
+}
+
+.btn-export-pdf { color: #ee5d50; border-color: #fdd8d5; }
+.btn-export-excel { color: #05cd99; border-color: #bdf3e4; }
+
+/* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
     body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        background-color: var(--bg-light-gray); /* Menggunakan pembolehubah */
-        color: #334155;
-        min-height: 100vh;
-        overflow-x: hidden;
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
     }
 
-    /* DESKTOP STYLES */
-    .sidebar {
-        width: 250px;
+    .mobile-bottom-nav {
+        display: flex !important;
         position: fixed;
-        top: 0;
         bottom: 0;
         left: 0;
-        background: var(--card-bg); /* Menggunakan pembolehubah */
-        padding: 20px;
-        border-right: 1px solid var(--border-color); /* Menggunakan pembolehubah */
-        z-index: 1000;
+        width: 100%;
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
+    }
+
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        transition: transform 0.3s ease;
-    }
-
-    .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1040;
-    }
-
-    .sidebar-overlay.active {
-        display: block;
-    }
-
-    .sidebar-header {
-        display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 30px;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
     }
 
-    .logo-icon {
-        width: 40px;
-        height: 40px;
-        background-color: var(--primary-color); /* Perubahan dari #3b82f6 */
-        color: white;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
+    }
+
+    .mobile-bottom-nav a i {
         font-size: 20px;
     }
 
-    .logo-text strong {
-        display: block;
-        font-size: 16px;
-        color: var(--text-dark); /* Menggunakan pembolehubah */
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
     }
-
-    .logo-text span {
-        font-size: 12px;
-        color: #94a3b8;
-    }
-
-    .sidebar a {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--text-muted); /* Menggunakan pembolehubah */
-        text-decoration: none;
-        padding: 12px 15px;
-        margin-bottom: 8px;
-        border-radius: 8px;
-        font-weight: 500;
-        font-size: 15px;
-        transition: all 0.2s ease-in-out;
-    }
-
-    .sidebar a.active, .sidebar a:hover {
-        background: var(--primary-color); /* Perubahan dari #3b82f6 */
-        color: #fff;
-    }
-
-    .sidebar a.logout-link {
-        color: var(--danger-color); /* Menggunakan pembolehubah */
-        font-weight: 600;
-        margin-top: auto;
-    }
-
-    .sidebar a.logout-link:hover {
-        color: #fff;
-        background: var(--danger-color); /* Menggunakan pembolehubah */
-    }
-
-    .main-content {
-        margin-left: 250px;
-        transition: margin-left 0.3s ease;
-    }
-
-    .topbar {
-        background: var(--card-bg); /* Menggunakan pembolehubah */
-        padding: 15px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid var(--border-color); /* Menggunakan pembolehubah */
-    }
-
-    .topbar h3 {
-        font-weight: 600;
-        margin: 0;
-        color: var(--text-dark); /* Menggunakan pembolehubah */
-        font-size: 22px;
-    }
-
-    .topbar .admin-profile {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .topbar .admin-name {
-        font-weight: 600;
-        font-size: 15px;
-        color: #334155;
-    }
-
-    .container-fluid {
-        padding: 30px;
-    }
-
-    .card {
-        border-radius: 16px;
-        padding: 25px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        background: var(--card-bg); /* Menggunakan pembolehubah */
-        margin-bottom: 25px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .card h5 {
-        font-weight: 600;
-        color: var(--text-dark); /* Menggunakan pembolehubah */
-    }
-
-    .table thead th {
-        background: var(--bg-light-gray); /* Menggunakan pembolehubah */
-        color: var(--text-muted); /* Menggunakan pembolehubah */
-        border: none;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 12px;
-    }
-
-    .table tbody td {
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    .badge {
-        font-size: 0.8rem;
-        padding: 0.4em 0.6em;
-    }
-
-    /* Gaya untuk Tab */
-    .nav-tabs {
-        border-bottom: 2px solid #e2e8f0;
-        margin-bottom: 0;
-    }
-
-    .nav-tabs .nav-link {
-        border: none;
-        border-bottom: 2px solid transparent;
-        color: var(--text-muted); /* Menggunakan pembolehubah */
-        font-weight: 600;
-        padding: 12px 20px;
-        margin-bottom: -2px;
-    }
-
-    .nav-tabs .nav-link.active {
-        color: var(--primary-color); /* Perubahan dari #3b82f6 */
-        background-color: transparent;
-        border-color: var(--primary-color); /* Perubahan dari #3b82f6 */
-    }
-
-    .tab-content .tab-pane .card {
-        border-top-left-radius: 0;
-        border-top: none;
-    }
-
-    /* Gaya untuk Pagination */
-    .pagination .page-item .page-link {
-        border-radius: 8px;
-        margin: 0 3px;
-        border: 1px solid #e2e8f0;
-        color: var(--primary-color); /* Perubahan dari #3b82f6 */
-    }
-
-    .pagination .page-item.active .page-link {
-        background-color: var(--primary-color); /* Perubahan dari #3b82f6 */
-        border-color: var(--primary-color); /* Perubahan dari #3b82f6 */
-        color: #fff;
-    }
-
-    .pagination .page-item.disabled .page-link {
-        color: #94a3b8;
-    }
-
-    /* --- MOBILE VIEW (MAX-WIDTH 768px) --- */
-    #sidebar-toggle-btn {
-        display: none; /* Default: hide on desktop */
-        background: none;
-        border: none;
-        color: #334155;
-        font-size: 20px;
-        padding: 0;
-        margin-right: 15px;
-    }
-
-    @media (max-width: 768px) {
-        /* GENERAL LAYOUT */
-        #sidebar-toggle-btn {
-            display: block;
-        }
-
-        .sidebar {
-            transform: translateX(-100%);
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
-            z-index: 1050;
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .main-content {
-            margin-left: 0;
-            width: 100%;
-        }
-
-        .topbar {
-            padding: 10px 15px;
-            justify-content: flex-start;
-        }
-
-        .topbar h3 {
-            font-size: 16px;
-            flex-grow: 1;
-        }
-
-        .topbar .admin-name {
-            display: none;
-        }
-
-        .topbar .admin-profile {
-            margin-left: auto;
-        }
-
-        .container-fluid {
-            padding: 10px 5px;
-        }
-
-        .card {
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        /* TABS */
-        .nav-tabs .nav-link {
-            padding: 10px 12px;
-            font-size: 14px;
-        }
-
-        /* FILTER FORMS */
-        #reportForm .row, #logForm .row {
-            --bs-gutter-x: 0.5rem;
-        }
-
-        #reportForm .col-md-3, #reportForm .col-md-4, #reportForm .col-md-6,
-        #logForm .col-md-3 {
-            width: 100%;
-            margin-bottom: 8px;
-        }
-
-        .form-label {
-            font-size: 14px;
-        }
-
-        /* TABLES */
-        .table-responsive {
-            overflow-x: auto;
-            display: block;
-            width: 100%;
-        }
-
-        .table {
-            width: 100%;
-            min-width: 650px;
-        } /* Force minimum width to enable scrolling */
-
-        .table thead th {
-            font-size: 10px;
-            padding: 0.5rem 0.3rem;
-            white-space: nowrap;
-        }
-
-        .table tbody td {
-            padding: 0.4rem 0.3rem;
-            font-size: 14px;
-        }
-
-        /* Export buttons layout */
-        .d-flex.justify-content-between.align-items-center.mb-3 {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 10px;
-        }
-
-        .d-flex.justify-content-between.align-items-center.mb-3 > div,
-        .d-flex.justify-content-between.align-items-center.mb-3 > a,
-        .d-flex.justify-content-between.align-items-center.mb-3 > div a {
-            width: 100%;
-            text-align: center;
-        }
-
-        .d-flex.justify-content-between.align-items-center.mb-3 > div a:first-child {
-            margin-bottom: 5px;
+}
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
         }
     }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
+}
+
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+/* --- Pagination Upgrade (Modern & Align Right) --- */
+.pagination-wrapper {
+    display: flex;
+    justify-content: flex-end; /* Letak belah kanan */
+    margin-top: 25px;
+}
+
+.pagination {
+    gap: 8px;
+}
+
+.page-item .page-link {
+    border: none;
+    border-radius: 12px !important; /* Kotak jadi rounded */
+    color: #64748b;
+    font-weight: 600;
+    padding: 10px 16px;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.page-item.active .page-link {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+    color: white !important;
+    box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.25);
+}
+
+.page-item.disabled .page-link {
+    background: transparent;
+    opacity: 0.5;
+}
+
+.page-link:hover:not(.active) {
+    background: #f1f5f9;
+    transform: translateY(-2px);
+}
+
+/* --- Filter & Card Woah Factor --- */
+.card {
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border: none;
+    border-radius: 14px;
+    padding: 12px 24px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(30, 41, 59, 0.2);
+}
+
+/* Custom Table Row - Floating Effect */
+.table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.table tbody tr:hover {
+    background: #ffffff !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    transform: scale(1.005);
+}
 </style>
+
 </head>
 <body>
-
-<div class="sidebar-overlay" id="sidebar-overlay"></div>
-
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
 <div class="sidebar" id="admin-sidebar">
-    <div>
-        <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-user-shield"></i></div>
-            <div class="logo-text"><strong>UniKL Admin</strong><span>System Control</span></div>
-        </div>
-        <a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="manage_accounts.php"><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
-        <a href="report_admin.php" class="active"><i class="fa-solid fa-chart-pie"></i> System Report</a>
-    </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <div> <div class="sidebar-header">
+    <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
+    <div class="logo-text">
+        <strong>UniKL Admin</strong>
+        <span class="d-block">System Control</span> </div>
 </div>
+        
+        <div class="sidebar-nav"> 
+<a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" class="active" ><i class="fa-solid fa-chart-pie"></i> System Report</a>        </div>
+    </div>
+    
+    <div class="sidebar-footer">
+        <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+    </div>
+</div>
+
 
 <div class="main-content">
     <div class="topbar">
-        <button id="sidebar-toggle-btn" class="me-3"><i class="fa fa-bars"></i></button>
-        <h3>System Reports</h3>
-        <div class="admin-profile">
-            <span class="admin-name"><?= htmlspecialchars($admin_name) ?></span>
-            <a href="profile_admin.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
-            </a>
+        <div class="topbar-left">
+            <button id="sidebarToggle" class="btn d-none">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h3 class="mb-0">Returned Item Report</h3>
+        </div>
+
+        <div class="topbar-right">
+            <a href="profile_admin.php" class="user-pill text-decoration-none shadow-sm">
+                    <div class="text-end me-2 d-none d-md-block">
+                        <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
+                            <?= htmlspecialchars($displayName) ?>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Administrator</small>
+                    </div>
+                    <div class="profile-avatar">
+                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
+                    </div>
+                </a>
         </div>
     </div>
-    <div class="container-fluid">
 
-        <ul class="nav nav-tabs" id="reportTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link <?php if($active_tab == 'returns') echo 'active'; ?>"
-                   href="?tab=returns" id="returns-tab" role="tab">
-                    <i class="fa-solid fa-right-left me-2"></i> Returned Items Report
+	
+    <div class="container-fluid">
+        <div class="card p-4 mb-4">
+            <h5 class="mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Report Data</h5>
+
+            <form method="GET" action="report_admin.php" id="reportForm">
+                <input type="hidden" id="start_date_hidden" name="start_date" value="<?= htmlspecialchars($report_start_date) ?>">
+<input type="hidden" id="end_date_hidden" name="end_date" value="<?= htmlspecialchars($report_end_date) ?>">
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label for="month_select" class="form-label fw-bold">Select Month</label>
+                        <select id="month_select" class="form-select">
+                            <?php for ($m = 1; $m <= 12; $m++) {
+                                $month_name = date('F', mktime(0, 0, 0, $m, 1));
+                                $selected = ($m == $current_month) ? 'selected' : '';
+                                
+                                echo "<option value='" . str_pad($m, 2, '0', STR_PAD_LEFT) . "' $selected>$month_name</option>";
+                            } ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label for="year_select" class="form-label fw-bold">Select Year</label>
+                        <select id="year_select" class="form-select">
+                            <?php $start_year = date('Y') - 5; $end_year = date('Y');
+                            for ($y = $end_year; $y >= $start_year; $y--) {
+                                $selected = ($y == $current_year) ? 'selected' : '';
+                                echo "<option value='$y' $selected>$y</option>";
+                            } ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 col-6">
+                        <label for="category_filter" class="form-label fw-bold">Filter by Category</label>
+                        <select id="category_filter" name="category_id" class="form-select">
+                            <option value="0">All Categories</option>
+                            <?php if (!empty($categories)): foreach($categories as $cat): ?>
+                                <option value="<?= $cat['category_id'] ?>" <?= ($cat['category_id'] == $category_filter_id) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($cat['category_name']) ?>
+                                </option>
+                            <?php endforeach; endif; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 col-6">
+                        <label for="asset_code_filter" class="form-label fw-bold">Filter by Asset Code</label>
+                        <input type="text" id="asset_code_filter" name="asset_code" class="form-control" 
+                            value="<?= htmlspecialchars($asset_filter_code) ?>" placeholder="e.g., LCT-001">
+                    </div>
+
+<div class="col-md-3 col-6">
+    <label for="status_filter" class="form-label fw-bold">Report Type / Status</label>
+    <select id="status_filter" name="status_filter" class="form-select">
+        <option value="Returned" <?= ($status_filter == 'Returned') ? 'selected' : '' ?>>1. Returned Items</option>
+        <option value="Cancelled" <?= ($status_filter == 'Cancelled') ? 'selected' : '' ?>>2. User Cancelled</option>
+        <option value="Voided" <?= ($status_filter == 'Voided') ? 'selected' : '' ?>>3. Reservation Incomplete</option>
+        <option value="Expired" <?= ($status_filter == 'Expired') ? 'selected' : '' ?>>4. Unclaimed (Expired)</option>
+    </select>
+</div>                </div>
+                <hr>
+
+               <div class="row g-3 align-items-end">
+    <div class="col-md-4 col-12">
+        <label for="start_date_display" class="form-label fw-bold">Start Date</label>
+        <input type="text" id="start_date_display" class="form-control" value="<?= htmlspecialchars($report_start_date) ?>">
+    </div>
+    <div class="col-md-4 col-12">
+        <label for="end_date_display" class="form-label fw-bold">End Date</label>
+        <input type="text" id="end_date_display" class="form-control" value="<?= htmlspecialchars($report_end_date) ?>">
+    </div>
+    <div class="col-md-4 col-12">
+        <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-arrows-rotate me-2"></i>Apply Filters</button>
+    </div>
+</div>
+            </form>
+        </div>
+
+        <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+   <h5 class="fw-bold">Returned Items 
+    <span class="text-muted">(<?= $total_records_returns ?> found)</span>
+</h5>
+    <div>
+    <a href="generate_pdf_admin.php?<?= $pagination_params ?>" target="_blank" class="btn btn-export btn-export-pdf me-2">
+        <i class="fa-solid fa-file-pdf me-2"></i>PDF
+    </a>
+    <a href="export_excel.php?<?= $pagination_params ?>" target="_blank" class="btn btn-export btn-export-excel">
+        <i class="fa-solid fa-file-excel me-2"></i>Excel
+    </a>
+</div>
+</div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                   
+                   <thead>
+    <tr>
+        <th>User</th>
+        <th>Item Details & Status</th> 
+        <th class="d-none d-md-table-cell">Category</th>
+        <th class="d-none d-lg-table-cell">Reserve Date</th>
+        <th><?= ($status_filter === 'Returned') ? 'Return Date' : 'Status Date' ?></th>
+        <th class="d-none d-lg-table-cell">Approved By</th>
+        <?php if ($status_filter === 'Returned'): ?>
+            <th class="d-none d-lg-table-cell">Check Out By</th>
+            <th class="d-none d-lg-table-cell">Check In By</th>
+        <?php endif; ?>
+    </tr>
+</thead>
+<tbody>
+    <?php if (empty($records)): ?>
+        <tr><td colspan="8" class="text-center text-muted py-5">No records found for <?= htmlspecialchars($status_filter) ?>.</td></tr>
+    <?php else: foreach ($records as $record): ?>
+        <tr>
+            <td><?= htmlspecialchars($record['user_name']) ?></td>
+            <td>
+                <strong><?= htmlspecialchars($record['item_name']) ?></strong>
+                <small class="text-muted d-block">Asset: <?= htmlspecialchars($record['asset_code'] ?: 'N/A') ?></small>
+                
+                <?php if ($status_filter === 'Returned'): ?>
+                    <span class="badge bg-success">Returned</span>
+                <?php elseif ($status_filter === 'Cancelled'): ?>
+                    <span class="badge bg-secondary">Cancelled</span>
+                <?php elseif ($status_filter === 'Voided'): ?>
+                    <span class="badge bg-danger">Rejected</span>
+                <?php elseif ($status_filter === 'Expired'): ?>
+                    <span class="badge bg-warning text-dark">Expired</span>
+                <?php endif; ?>
+            </td>
+            
+            <td class="d-none d-md-table-cell"><?= htmlspecialchars($record['category_name']) ?></td>
+            <td class="d-none d-lg-table-cell"><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
+            <td>
+                <?php 
+                    $displayDate = ($status_filter === 'Returned') ? $record['return_date'] : $record['reserve_date'];
+                    echo date("d M Y", strtotime($displayDate)); 
+                ?>
+            </td>
+            <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['approved_by_name'] ?: 'N/A') ?></td>
+            
+            <?php if ($status_filter === 'Returned'): ?>
+                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['checked_out_by_name'] ?: 'N/A') ?></td>
+                <td class="d-none d-lg-table-cell"><?= htmlspecialchars($record['checked_in_by_name'] ?: 'N/A') ?></td>
+            <?php endif; ?>
+        </tr>
+    <?php endforeach; endif; ?>
+</tbody>
+                </table>
+            </div>
+
+<?php if ($total_pages > 1): ?>
+<div class="pagination-wrapper">
+    <nav aria-label="Page navigation">
+        <ul class="pagination mb-0">
+            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                <a class="page-link" href="?page_returns=<?= max(1, $page - 1) ?>&<?= http_build_query(array_merge($_GET, ['page_returns' => max(1, $page - 1)])) ?>" aria-label="Previous">
+                    <i class="fa-solid fa-chevron-left"></i>
                 </a>
             </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link <?php if($active_tab == 'activity') echo 'active'; ?>"
-                   href="?tab=activity" id="activity-tab" role="tab">
-                    <i class="fa-solid fa-clipboard-list me-2"></i> Activity Log
+
+            <?php 
+            $start_page = max(1, $page - 2);
+            $end_page = min($total_pages, $page + 2);
+
+            if ($start_page > 1): ?>
+                <li class="page-item"><a class="page-link" href="?page_returns=1&<?= http_build_query(array_merge($_GET, ['page_returns' => 1])) ?>">1</a></li>
+                <?php if ($start_page > 2): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+            <?php endif; ?>
+
+            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                    <a class="page-link" href="?page_returns=<?= $i ?>&<?= http_build_query(array_merge($_GET, ['page_returns' => $i])) ?>"><?= $i ?></a>
+                </li>
+            <?php endfor; ?>
+
+            <?php if ($end_page < $total_pages): ?>
+                <?php if ($end_page < $total_pages - 1): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+                <li class="page-item"><a class="page-link" href="?page_returns=<?= $total_pages ?>&<?= http_build_query(array_merge($_GET, ['page_returns' => $total_pages])) ?>"><?= $total_pages ?></a></li>
+            <?php endif; ?>
+
+            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                <a class="page-link" href="?page_returns=<?= min($total_pages, $page + 1) ?>&<?= http_build_query(array_merge($_GET, ['page_returns' => min($total_pages, $page + 1)])) ?>" aria-label="Next">
+                    <i class="fa-solid fa-chevron-right"></i>
                 </a>
             </li>
         </ul>
-
-        <div class="tab-content" id="reportTabContent">
-            
-            <div class="tab-pane fade <?php if($active_tab == 'returns') echo 'show active'; ?>"
-                 id="returns-pane" role="tabpanel">
-                
-                <div class="card p-4">
-                    <h5 class="mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Returned Items</h5>
-                    <form method="GET" action="report_admin.php" id="reportForm">
-                        <input type="hidden" name="tab" value="returns">
-                        
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-3">
-                                <label for="month_filter" class="form-label fw-bold">Select Month</label>
-                                <select id="month_filter" class="form-select">
-                                    <?php for ($m = 1; $m <= 12; $m++) {
-                                        $month_name = date('F', mktime(0, 0, 0, $m, 1));
-                                        $selected = ($m == $current_month) ? 'selected' : '';
-                                        echo "<option value='$m' $selected>$month_name</option>";
-                                    } ?>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="year_filter" class="form-label fw-bold">Select Year</label>
-                                <select id="year_filter" class="form-select">
-                                    <?php $start_year = date('Y') - 5; $end_year = date('Y');
-                                    for ($y = $end_year; $y >= $start_year; $y--) {
-                                        $selected = ($y == $current_year) ? 'selected' : '';
-                                        echo "<option value='$y' $selected>$y</option>";
-                                    } ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="category_filter" class="form-label fw-bold">Filter by Category</label>
-                                <select id="category_filter" name="category_id" class="form-select">
-                                    <option value="0">All Categories</option>
-                                    <?php foreach($categories as $cat): ?>
-                                        <option value="<?= $cat['category_id'] ?>" <?= ($cat['category_id'] == $report_category_id) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($cat['category_name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="row g-3 align-items-end">
-                            <div class="col-md-4">
-                                <label for="start_date" class="form-label fw-bold">Start Date</label>
-                                <input type="text" id="start_date" name="start_date" class="form-control" value="<?= htmlspecialchars($report_start_date) ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="end_date" class="form-label fw-bold">End Date</label>
-                                <input type="text" id="end_date" name="end_date" class="form-control" value="<?= htmlspecialchars($report_end_date) ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-search me-2"></i>Apply Filters</button>
-                            </div>
-                        </div>
-                    </form>
-                    
-                    <hr class="my-4">
-                    
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Returned Items (<?= $total_records_returns ?> records found)</h5>
-                        <div>
-                            <a href="generate_pdf_admin.php?start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i></a>
-                            <a href="export_excel.php?export=returns&start_date=<?= urlencode($report_start_date) ?>&end_date=<?= urlencode($report_end_date) ?>&category_id=<?= $report_category_id ?>" target="_blank" class="btn btn-success">
-                            <i class="fa-solid fa-file-excel me-2"></i>
-                        </a>
-                        </div>
-                    </div>
-<div class="table-responsive">
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>USER</th>
-                <th>ITEM DETAILS & STATUS</th>
-                <th>CATEGORY</th>
-                <th>RESERVE DATE</th>
-                <th>RETURN DATE</th>
-                <th>RETURN CONDITION</th>
-                <th>APPROVED BY</th>
-                <th>CHECK OUT BY</th>
-                <th>CHECK IN BY</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($records)): ?>
-                <tr><td colspan="9" class="text-center text-muted py-5">No records found for the selected filters.</td></tr>
-            <?php else: foreach ($records as $record): 
-                $asset_code = htmlspecialchars($record['asset_code'] ?: 'N/A');
-                // Menggunakan handler_name untuk 3 kolom admin/tech sesuai asumsi
-                $handler_name = htmlspecialchars($record['handler_name'] ?: 'N/A');
-            ?>
-                <tr>
-                    <td><?= htmlspecialchars($record['user_name']) ?></td>
-                    <td>
-                        <strong><?= htmlspecialchars($record['item_name']) ?></strong>
-                        <small class="text-muted d-block">Asset: <?= $asset_code ?></small>
-                        </td>
-                    <td><?= htmlspecialchars($record['category_name']) ?></td>
-                    <td><?= date("d M Y", strtotime($record['reserve_date'])) ?></td>
-                    <td><?= date("d M Y", strtotime($record['return_date'])) ?></td>
-                    <td class="text-muted"><?= htmlspecialchars($record['return_condition'] ?: 'N/A') ?></td>
-                    
-                    <td><?= $handler_name ?></td>
-                    <td><?= $handler_name ?></td>
-                    <td><?= $handler_name ?></td>
-                </tr>
-            <?php endforeach; endif; ?>
-        </tbody>
-    </table>
-</div>                    
-                    <nav aria-label="Returned Items Pagination" class="mt-4">
-                        <p class="text-center text-muted small mb-2">
-                            Showing page <?= $page_returns ?> of <?= $total_pages_returns ?> (Total <?= $total_records_returns ?> records)
-                        </p>
-                        <ul class="pagination justify-content-center">
-                            <?php for ($i = 1; $i <= $total_pages_returns; $i++): ?>
-                                <li class="page-item <?php if ($i == $page_returns) echo 'active'; ?>">
-                                    <a class="page-link" href="?<?= build_pagination_query('page_returns', $i) ?>">
-                                        <?= $i ?>
-                                    </a>
-                                </li>
-                            <?php endfor; ?>
-                        </ul>
-                    </nav>
-                    
-                </div>
-            </div>
-
-            <div class="tab-pane fade <?php if($active_tab == 'activity') echo 'show active'; ?>"
-                 id="activity-pane" role="tabpanel">
-                
-                <div class="card p-4">
-                    <h5 class="mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Activity Logs</h5>
-                    <form method="GET" action="report_admin.php" id="logForm">
-                        <input type="hidden" name="tab" value="activity">
-                        
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label for="log_start_date" class="form-label fw-bold">Start Date</label>
-                                <input type="text" id="log_start_date" name="log_start_date" class="form-control" value="<?= htmlspecialchars($log_start_date) ?>">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="log_end_date" class="form-label fw-bold">End Date</label>
-                                <input type="text" id="log_end_date" name="log_end_date" class="form-control" value="<?= htmlspecialchars($log_end_date) ?>">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="user_type" class="form-label fw-bold">User Type</label>
-                                <select id="user_type" name="user_type" class="form-select">
-                                    <option value="">All Types</option>
-                                    <option value="admin" <?= ($log_user_type == 'admin') ? 'selected' : '' ?>>Admin</option>
-                                    <option value="user" <?= ($log_user_type == 'user') ? 'selected' : '' ?>>User</option>
-                                    <option value="tech" <?= ($log_user_type == 'tech') ? 'selected' : '' ?>>Technician</option>
-                                    <option value="system" <?= ($log_user_type == 'system') ? 'selected' : '' ?>>System</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="search" class="form-label fw-bold">Search Details</label>
-                                <input type="text" id="search" name="search" class="form-control" value="<?= htmlspecialchars($log_search) ?>" placeholder="e.g., 'LOGIN' or 'Projector'">
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="text-end">
-                            <a href="?tab=activity" class="btn btn-secondary"><i class="fa-solid fa-eraser me-2"></i>Reset</a>
-                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-search me-2"></i>Apply Log Filters</button>
-                        </div>
-                    </form>
-                    
-                    <hr class="my-4">
-
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Log Records (<?= $total_records_logs ?> records found)</h5>
-                    
-                    <a href="export_excel.php?export=activity&log_start_date=<?= urlencode($log_start_date) ?>&log_end_date=<?= urlencode($log_end_date) ?>&user_type=<?= urlencode($log_user_type) ?>&search=<?= urlencode($log_search) ?>" target="_blank" class="btn btn-success">
-                        <i class="fa-solid fa-file-excel me-2"></i>
-                    </a>
-                    </div>
-                       <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Timestamp</th>
-                                    <th>User</th>
-                                    <th>Action</th>
-                                    <th>Details</th>
-                                    <th>IP Address</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($logs)): ?>
-                                    <tr><td colspan="5" class="text-center text-muted py-5">No activity logs found for the selected filters.</td></tr>
-                                <?php else: foreach ($logs as $log): ?>
-                                    <tr>
-                                        <td style="white-space: nowrap;"><?= date("d M Y, h:i:s A", strtotime($log['timestamp'])) ?></td>
-                                        <td>
-                                            <?php
-                                            $user_type = htmlspecialchars($log['user_type']);
-                                            $badge_class = 'bg-secondary';
-                                            if ($user_type == 'admin') $badge_class = 'bg-danger text-white';
-                                            if ($user_type == 'user') $badge_class = 'bg-primary text-white';
-                                            if ($user_type == 'tech') $badge_class = 'bg-info text-dark';
-                                            ?>
-                                            <span class="badge <?= $badge_class ?>"><?= ucfirst($user_type) ?></span>
-                                            <small class="d-block text-muted">ID: <?= htmlspecialchars($log['person_id'] ?: 'N/A') ?></small>
-                                        </td>
-                                        <td>
-                                            <strong class="text-primary"><?= htmlspecialchars($log['action']) ?></strong>
-                                        </td>
-                                        <td><?= htmlspecialchars($log['details']) ?></td>
-                                        <td class="text-muted"><small><?= htmlspecialchars($log['ip_address']) ?></small></td>
-                                    </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <nav aria-label="Activity Log Pagination" class="mt-4">
-                        <p class="text-center text-muted small mb-2">
-                            Showing page <?= $page_logs ?> of <?= $total_pages_logs ?> (Total <?= $total_records_logs ?> records)
-                        </p>
-                        <ul class="pagination justify-content-center">
-                            <?php for ($i = 1; $i <= $total_pages_logs; $i++): ?>
-                                <li class="page-item <?php if ($i == $page_logs) echo 'active'; ?>">
-                                    <a class="page-link" href="?<?= build_pagination_query('page_logs', $i) ?>">
-                                        <?= $i ?>
-                                    </a>
-                                </li>
-                            <?php endfor; ?>
-                        </ul>
-                    </nav>
-                    
-                </div>
-            </div>
-
+    </nav>
+</div>
+<?php endif; ?>
         </div>
     </div>
 </div>
@@ -902,82 +694,104 @@ $conn->close();
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
     
-    document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('admin-sidebar');
-        const toggleBtn = document.getElementById('sidebar-toggle-btn');
-        const overlay = document.getElementById('sidebar-overlay');
-        
-        if (toggleBtn) {
-            function toggleSidebar() {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-            }
+    const startDateDisplay = document.getElementById('start_date_display');
+    const endDateDisplay = document.getElementById('end_date_display');
+    const startDateHidden = document.getElementById('start_date_hidden');
+    const endDateHidden = document.getElementById('end_date_hidden');
 
-            toggleBtn.addEventListener('click', toggleSidebar);
-            overlay.addEventListener('click', toggleSidebar);
-            
-            
-            const sidebarLinks = sidebar.querySelectorAll('a');
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function() {
-                    if (window.innerWidth <= 768) {
-                        
-                        setTimeout(() => {
-                            sidebar.classList.remove('open');
-                            overlay.classList.remove('active');
-                        }, 100);
-                    }
-                });
-            });
+    
+    flatpickr(startDateDisplay, { 
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr) {
+            startDateHidden.value = dateStr; 
+        }
+    });
+    
+    flatpickr(endDateDisplay, { 
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr) {
+            endDateHidden.value = dateStr; 
         }
     });
 
-    
-    flatpickr("#start_date", { dateFormat: "Y-m-d" });
-    flatpickr("#end_date", { dateFormat: "Y-m-d" });
-    flatpickr("#log_start_date", { dateFormat: "Y-m-d" });
-    flatpickr("#log_end_date", { dateFormat: "Y-m-d" });
+    const monthSelect = document.getElementById('month_select');
+    const yearSelect = document.getElementById('year_select');
+    const reportForm = document.getElementById('reportForm');
+    const categoryFilter = document.getElementById('category_filter');
 
-    var monthFilter = document.getElementById('month_filter');
-    var yearFilter = document.getElementById('year_filter');
-    var categoryFilter = document.getElementById('category_filter');
     
-    // Fungsi untuk mengemas kini tarikh dan memohon semula penapis berdasarkan bulan/tahun/kategori
-    function updateAndSubmit() {
-        var year = yearFilter.value;
-        var month = monthFilter.value;
-        
-        // Kira tarikh mula (hari pertama bulan) dan tarikh tamat (hari terakhir bulan)
-        var startDate = new Date(year, month - 1, 1);
-        var endDate = new Date(year, month, 0);
-        
-        var formatDate = function(date) {
-            var y = date.getFullYear();
-            
-            var m = ('0' + (date.getMonth() + 1)).slice(-2);
-            var d = ('0' + date.getDate()).slice(-2);
-            return y + '-' + m + '-' + d;
-        };
+    const sidebar = document.getElementById('offcanvasSidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const body = document.body;
 
-        
-        var params = new URLSearchParams(window.location.search);
-        
-        params.set('start_date', formatDate(startDate));
-        params.set('end_date', formatDate(endDate));
-        params.set('category_id', categoryFilter.value);
-        params.set('tab', 'returns');
-        params.delete('page_returns'); 
-        
-        
-        window.location.search = params.toString();
+    function toggleSidebar() {
+        body.classList.toggle('offcanvas-open');
+        if (body.classList.contains('offcanvas-open')) {
+            backdrop.style.display = 'block';
+        } else {
+            setTimeout(() => {
+                backdrop.style.display = 'none';
+            }, 300);
+        }
     }
 
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleSidebar);
+    }
     
-    if (monthFilter) monthFilter.addEventListener('change', updateAndSubmit);
-    if (yearFilter) yearFilter.addEventListener('change', updateAndSubmit);
-    if (categoryFilter) categoryFilter.addEventListener('change', updateAndSubmit);
+    if (backdrop) {
+        backdrop.addEventListener('click', toggleSidebar);
+    }
+    
+    
+    function updateDateInputs() {
+    const year = yearSelect.value;
+    const month = monthSelect.value;
+    
+    if(!year || !month) return;
 
+    // Cari hari terakhir bagi bulan tersebut
+    const lastDay = new Date(year, month, 0).getDate();
+    
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${lastDay.toString().padStart(2, '0')}`;
+
+    // Update Flatpickr Display
+    startDateDisplay._flatpickr.setDate(startDate);
+    endDateDisplay._flatpickr.setDate(endDate);
+
+    // Update Hidden Inputs (Ini yang PHP baca)
+    startDateHidden.value = startDate;
+    endDateHidden.value = endDate;
+}
+
+function handleFilterChange(event) {
+    // Kalau user tukar Bulan atau Tahun, kita update tarikh dulu
+    if (event.target === monthSelect || event.target === yearSelect) {
+        updateDateInputs();
+    }
+    
+    // Submit form secara automatik untuk semua filter kecuali text input asset code
+    if (event.target !== document.getElementById('asset_code_filter')) {
+        reportForm.submit();
+    }
+}
+
+    if (monthSelect) monthSelect.addEventListener('change', handleFilterChange);
+    if (yearSelect) yearSelect.addEventListener('change', handleFilterChange);
+    if (categoryFilter) categoryFilter.addEventListener('change', handleFilterChange);
     
 </script>
-</body>
+
+
+<nav class="mobile-bottom-nav">
+   <nav class="mobile-bottom-nav">
+<a href="manageItem_admin.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+        <a href="manage_accounts.php" ><i class="fa-solid fa-users-cog"></i> Manage Accounts</a>
+        <a href="report_admin.php" class="active" ><i class="fa-solid fa-chart-pie"></i> System Report</a>        </div>
+    <a href="profile_admin.php" ><i class="fa-solid fa-user"></i><span>Profile</span></a>
+</nav></body>
 </html>
+
+

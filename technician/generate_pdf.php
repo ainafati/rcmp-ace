@@ -30,68 +30,59 @@ if (!file_exists($template_path)) {
     exit();
 }
 
-
+// 1. Tangkap semua filter dari URL
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
-$asset_id_filter = isset($_GET['asset_id']) && !empty($_GET['asset_id']) ? $_GET['asset_id'] : null;
+$status_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : 'Returned';
+$category_id = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
+$asset_code_filter = isset($_GET['asset_code']) ? trim($_GET['asset_code']) : '';
 
-// ------------------------------------------------------------------------
-// 2. SQL QUERY & DATA FETCHING
-// ------------------------------------------------------------------------
+// 2. Tentukan kolum tarikh secara dinamik
+// Kalau status 'Returned', guna return_date. Kalau lain, guna reserve_date
+$date_column = ($status_filter === 'Returned') ? "r.return_date" : "r.reserve_date";
 
+// 3. Bina SQL yang fleksibel
 $sql = "SELECT 
             u.name AS user_name, 
             i.item_name, 
             a.asset_code, 
-            ri.checked_out_on,      -- Tarikh sebenar aset dikeluarkan
-            r.return_date,          -- Tarikh pemulangan rasmi (dari jadual reservations)
+            ri.checked_out_on,
+            r.reserve_date,
+            r.return_date,
             ri.return_condition,
-            
             approved.name AS approved_by_name,
             checkout.name AS checked_out_by_name,
             checkin.name AS checked_in_by_name
-            
         FROM reservation_items ri
         JOIN reservations r ON ri.reserve_id = r.reserve_id
         JOIN person u ON r.person_id = u.person_id 
         JOIN item i ON ri.item_id = i.item_id
         LEFT JOIN reservation_assets ra ON ri.id = ra.reservation_item_id
         LEFT JOIN assets a ON ra.asset_id = a.asset_id
-        
-        -- JOINS kekal sama
         LEFT JOIN person approved ON ri.approved_by = approved.person_id
         LEFT JOIN person checkout ON ri.checked_out_by = checkout.person_id
         LEFT JOIN person checkin ON ri.checked_in_by = checkin.person_id
-        
-        WHERE ri.status = 'Returned' AND r.reserve_date BETWEEN ? AND ?";
-        
+        WHERE ri.status = ? AND $date_column BETWEEN ? AND ?";
 
-if ($asset_id_filter !== null) {
-    $sql .= " AND a.asset_id = ?";
-}
+// Tambah filter tambahan jika ada
+if ($category_id > 0) { $sql .= " AND i.category_id = ?"; }
+if (!empty($asset_code_filter)) { $sql .= " AND a.asset_code = ?"; }
 
-$sql .= " ORDER BY r.reserve_date DESC, a.asset_code ASC";
-
+$sql .= " ORDER BY $date_column DESC";
 
 $stmt = $conn->prepare($sql);
-if ($stmt === false) { die("SQL Prepare Error: " . htmlspecialchars($conn->error)); }
 
+// 4. Bind parameters ikut jumlah filter
+$params = [$status_filter, $start_date, $end_date];
+$types = "sss";
 
-if ($asset_id_filter !== null) {
-    
-    $stmt->bind_param("ssi", $start_date, $end_date, $asset_id_filter); 
-} else {
-    
-    $stmt->bind_param("ss", $start_date, $end_date);
-}
+if ($category_id > 0) { $types .= "i"; $params[] = $category_id; }
+if (!empty($asset_code_filter)) { $types .= "s"; $params[] = $asset_code_filter; }
 
+$stmt->bind_param($types, ...$params);
 $stmt->execute();
-$result = $stmt->get_result();
-$records = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-
-// ------------------------------------------------------------------------
+$records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();// ------------------------------------------------------------------------
 // 3. HTML GENERATION
 // ------------------------------------------------------------------------
 

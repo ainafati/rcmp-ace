@@ -1,10 +1,21 @@
 <?php
 session_start();
-
-// --- PHP INITIATION & DATABASE CONNECTION ---
 include '../config.php';
 
-// Pastikan pengguna log masuk
+// 1. Function untuk kira pending requests (Badge)
+function get_pending_count($conn) {
+    $sql = "SELECT COUNT(id) AS total FROM reservation_items WHERE LOWER(TRIM(status)) = 'pending'";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        return (int)$row['total'];
+    }
+    return 0;
+}
+
+$pending_count_for_badge = get_pending_count($conn); 
+
+// 2. Pastikan pengguna log masuk
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -12,17 +23,8 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int)$_SESSION['person_id'];
 
-// Semak sambungan database
-if (!isset($conn) || $conn->connect_error) {
-    die("Database Connection Error.");
-}
-
-// 1. Dapatkan butiran Juruteknik (Satu query yang lengkap)
+// 3. Dapatkan butiran Juruteknik
 $stmt = $conn->prepare("SELECT id AS staff_id, name, email, phoneNum FROM person WHERE person_id = ?");
-if ($stmt === false) {
-    die("SQL Error: " . htmlspecialchars($conn->error));
-}
-
 $stmt->bind_param("i", $person_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -35,7 +37,7 @@ if (!$tech) {
     exit();
 }
 
-// 2. LOGIK NAMA PENDEK (PENTING: Masukkan semula logik ini)
+// 4. Logik Nama Pendek (Shorten name logic)
 $fullName = $tech['name'] ?? 'Technician';
 $lowerName = strtolower($fullName);
 $posBinti = strpos($lowerName, ' binti ');
@@ -50,335 +52,400 @@ if ($posBinti !== false) {
 }
 $displayName = trim($shortName);
 
-// Pengurusan Mod Edit
+// 5. Pengurusan Mod Edit (Jika redirect balik dari update_profile_tech.php ada error)
 $keep_edit_mode = false;
 if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) {
     $keep_edit_mode = true;
     unset($_SESSION['keep_edit_mode']); 
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile — Technician</title>
+    <title>My Profile — UniKL Technician</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-<style>
-    :root {
-        --primary-color: #06b6d4; /* Cyan 600 */
-        --primary-light: #f0f9ff;
-        --primary-hover: #0891b2;
-        --bg-light-gray: #f4f7f9;
-        --card-bg: #ffffff;
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
-        --danger-color: #ef4444;
-        --secondary-color: #f59e0b; /* Amber */
-        --tertiary-color: #10b981; /* Emerald */
-    }
+    <link rel="stylesheet" href="../css/style.css">
+
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        body.profile-page {
+            background-color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Profile Card Styling */
+        .profile-header-card {
+            background: var(--glass-bg);
+            border-radius: 20px !important;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+
+        .avatar-main {
+            width: 100px; 
+            height: 100px; 
+            background: var(--primary-gradient); 
+            color: white; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 2.5rem; 
+            font-weight: 900; 
+            box-shadow: 0 10px 20px -5px rgba(6, 182, 212, 0.5);
+            margin: 0 auto 1.5rem;
+        }
+
+        .info-box {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #edf2f7;
+            transition: all 0.3s ease;
+        }
+
+        .info-box:hover {
+            border-color: #06b6d4;
+            transform: translateY(-2px);
+        }
+
+        /* Password Requirement Styles */
+        .pw-requirement {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            transition: color 0.3s ease;
+        }
+
+        .pw-requirement i { margin-right: 8px; font-size: 0.7rem; }
+        
+        .requirement-met {
+            color: #10b981 !important; /* Green */
+            font-weight: 600;
+        }
+
+        .btn-upgrade {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-upgrade:hover {
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+            color: white;
+        }
+
+        /* Sidebar Badge Styling */
+        .badge.rounded-pill {
+            background-color: #ef4444; /* Red */
+            font-size: 0.7rem;
+        }
+		.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
     
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
+    
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
+    
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
+    
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
+
+/* --- PEMBETULAN MOBILE VIEW (991px ke bawah) --- */
+@media (max-width: 991px) {
+    /* 1. Paksa sembunyi sidebar dan overlay sepenuhnya */
+    .sidebar, 
+    .sidebar-overlay,
+    #sidebar-backdrop {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+    }
+
+    /* 2. Pastikan main-content memenuhi 100% skrin tanpa margin kiri */
+    .main-content {
+        margin-left: 0 !important;
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        padding-bottom: 100px !important; /* Ruang supaya tidak kena tutup dengan nav bawah */
+    }
+
+    /* 3. Pastikan topbar berada di paling atas tanpa anjakan */
+    .topbar {
+        left: 0 !important;
+        width: 100% !important;
+        padding: 10px 15px !important;
+    }
+
+    /* 4. Sembunyikan butang toggle sidebar (ikon 3 garis) jika anda guna bottom nav */
+    #sidebarToggle {
+        display: none !important;
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+    }
+}
+/* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
     body {
-        font-family: 'Inter', sans-serif;
-        background-color: var(--bg-light-gray);
-        color: var(--text-dark);
-        min-height: 100vh;
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
     }
-    
-    /* --- Sidebar Styles (Technician Specific) --- */
-    .sidebar {
-        width: 280px; position: fixed; top: 0; bottom: 0; left: 0;
-        background: var(--card-bg); padding: 20px;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); 
-        z-index: 1050; /* KEMAS KINI PENTING: MESTI lebih tinggi daripada backdrop (1040) */
-        display: flex; flex-direction: column; 
-        justify-content: space-between; 
-        transition: transform 0.3s ease-in-out;
-    }
-    .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
-    .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
-    .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-    .sidebar a {
-        display: flex; align-items: center; gap: 15px;
-        color: var(--text-muted); text-decoration: none;
-        padding: 14px 18px; margin-bottom: 6px;
-        border-radius: 10px; font-weight: 500; font-size: 15px;
-        transition: all 0.2s;
-    }
-    .sidebar a.active {
-        background: var(--primary-light);
-        color: var(--primary-color);
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
-    }
-    .sidebar a:hover:not(.active) { background: #eef1f4; color: var(--text-dark); }
-    
-    /* LOGOUT LINK CSS */
-    .sidebar a.logout-link { 
-        color: var(--danger-color); 
-        font-weight: 600; 
-        margin-top: auto; 
-    }
-    .sidebar a.logout-link:hover {
-        background: var(--danger-color);
-        color: white;
-    }
-    
-    .sidebar a i { width: 20px; text-align: center; }
 
-    /* --- Content & Topbar Styles --- */
-    .main-content { margin-left: 280px; }
-    .topbar { background: var(--card-bg); padding: 18px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eef1f4; z-index: 999; position: sticky; top: 0; }
-    .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
-    .container-fluid { padding: 30px; }
-    
-    .card {
-        border-radius: 12px; box-shadow: var(--shadow-light);
-        background: var(--card-bg); margin-bottom: 25px;
-        border: none; padding: 25px;
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
     }
-    .card h5 { font-weight: 700; color: var(--text-dark); }
-    
-    /* --- PROFILE CARD DESIGN --- */
-    .profile-header-card {
+
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
         text-align: center;
-        padding: 40px 25px;
-        background: linear-gradient(135deg, var(--primary-color) 0%, #4dd0e1 100%);
-        color: white;
-    }
-    .profile-header-card h4 { color: white; margin-top: 15px; font-weight: 700; }
-    .profile-header-card p { color: rgba(255, 255, 255, 0.8); margin-bottom: 0; }
-
-    .avatar {
-        width: 120px; height: 120px; border-radius: 50%;
-        background: white;
-        color: var(--primary-color);
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto 20px auto;
-        font-size: 55px; font-weight: 600;
-        border: 5px solid white;
-        box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.3);
-    }
-    
-    /* Reka Bentuk Maklumat Dalam View Mode */
-    .info-card-container { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
-    .info-card {
-        padding: 18px 25px;
-        background-color: var(--bg-light-gray);
-        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 20px;
-        border: 1px solid #eef1f4;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .info-icon-wrapper.id-wrapper { background-color: var(--text-muted); }
-    .info-icon-wrapper {
-        width: 45px; height: 45px; border-radius: 50%;
-        color: white; display: flex; align-items: center; justify-content: center;
-        font-size: 20px; flex-shrink: 0;
-    }
-    .info-details strong {
-        display: block; font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;
-    }
-    .info-details span {
-        font-weight: 700; color: var(--text-dark); font-size: 17px;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
     }
 
-    /* === CSS TAMBAHAN UNTUK TOPBAR NAMA === */
-    .topbar .user-profile {
-        display: flex; align-items: center; gap: 10px;
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
     }
-    .topbar .user-name {
-        font-weight: 700; 
-        color: var(--text-dark); 
-        font-size: 1rem;
-    }
-    
-    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 600; }
-    .btn-primary { background-color: var(--primary-color); border: none; transition: background-color 0.2s; }
-    .btn-primary:hover { background-color: var(--primary-hover); }
 
-    /* Mobile Optimizations */
-    .offcanvas-backdrop.show {
-        opacity: 0.5;
-        transition: opacity 0.3s ease-in-out;
+    .mobile-bottom-nav a i {
+        font-size: 20px;
     }
-    
-    @media (max-width: 992px) {
-        .sidebar { transform: translateX(-280px); left: 0; width: 280px; }
-        .main-content { margin-left: 0; width: 100%; }
-        .topbar { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .topbar h3 { font-size: 20px; }
-        .container-fluid { padding: 15px; }
-        .info-card { padding: 15px; gap: 15px; }
+
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
     }
-</style>
+}
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
+        }
+    }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
+}
+
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+    </style>
 </head>
-<body class="profile-page">
+<body>
 
-<div class="offcanvas-backdrop fade" id="sidebar-backdrop" style="display: none; z-index: 1040;"></div>
-
-<div class="sidebar" id="offcanvasSidebar">
+<div class="sidebar-overlay" id="sidebarOverlay"></div> 
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>Dashboard</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><br><span style="font-size: 0.85rem; color: #64748b;">System Support</span></div>
         </div>
-        <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
-        <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
+            <a href="check_out.php">
+                <i class="fa-solid fa-dolly"></i> Manage Requests
+                <?php if ($pending_count_for_badge > 0): ?>
+                    <span class="badge rounded-pill"><?= $pending_count_for_badge ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+            <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+            </div>
     </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    
+<div class="sidebar-footer">
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+</div> 	
 </div>
+
+
+
 
 <div class="main-content">
     <div class="topbar">
-        <button class="btn btn-sm btn-outline-primary d-lg-none me-3" type="button" id="sidebarToggle" aria-controls="offcanvasSidebar">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-        <h3>My Profile</h3>
-        <div class="user-profile">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
-            <a href="#" title="My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
+        <div class="topbar-left">
+            <button id="sidebarToggle" class="btn d-none">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h3 class="mb-0">Settings</h3>
+        </div>
+
+        <div class="topbar-right">
+            <a href="profile_tech.php" class="user-pill text-decoration-none d-flex align-items-center">
+                <div class="text-end me-2 d-none d-md-block">
+                    <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1.2;">
+                        <?= htmlspecialchars($displayName) ?>
+                    </div>
+                    <small class="text-muted" style="font-size: 0.75rem;">Technician</small>
+                </div>
+                <div class="profile-avatar">
+                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35" alt="Profile">
+                </div>
             </a>
         </div>
     </div>
-    <div class="container-fluid">
+
+    <div class="container-fluid py-4 py-lg-5">
         <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <div class="row">
+            <div class="col-lg-11">
+                <div class="row g-4">
+                    
                     <div class="col-lg-4">
-                        <div class="card profile-header-card h-100">
-                            <div class="avatar">
+                        <div class="card profile-header-card border-0 shadow-sm p-4 text-center h-100">
+                            <div class="avatar-main">
                                 <?= htmlspecialchars(strtoupper(substr($tech['name'] ?? 'U', 0, 1))) ?>
                             </div>
-                            <h4 class="fw-bold"><?= htmlspecialchars($tech['name'] ?? '') ?></h4>
-                            <p class="mb-0">Technician (ID: <?= htmlspecialchars($tech['staff_id'] ?? '') ?>)</p> 
+                            <h4 class="fw-bold text-dark mb-1"><?= htmlspecialchars($tech['name'] ?? '') ?></h4>
+                            <p class="text-muted small mb-3"> IT Staff</p>
+                            <hr class="w-25 mx-auto">
+                            <div class="mt-3 text-start small text-muted px-2">
+                                <div class="mb-2"><i class="fa-solid fa-id-badge me-2 text-primary"></i> <strong>Staff ID:</strong> <?= htmlspecialchars($tech['staff_id'] ?? '') ?></div>
+                                <div><i class="fa-solid fa-calendar-check me-2 text-primary"></i> <strong>Role:</strong> Technician</div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="col-lg-8">
-                        <div class="card h-100">
+                        <div class="card border-0 shadow-sm p-4 p-md-5 rounded-4 h-100">
                             
                             <?php if (isset($_SESSION['message'])): ?>
-                                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
                                     <i class="fa-solid fa-check-circle me-2"></i><?= $_SESSION['message']; unset($_SESSION['message']); ?>
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (isset($_SESSION['error'])): ?>
-                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    <i class="fa-solid fa-exclamation-triangle me-2"></i><?= $_SESSION['error']; unset($_SESSION['error']); ?>
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                                 </div>
                             <?php endif; ?>
 
                             <div id="viewMode" style="display: <?= $keep_edit_mode ? 'none' : 'block' ?>;">
                                 <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h5 class="mb-0"><i class="fa-solid fa-id-card me-2 text-primary"></i> Contact Information</h5>
-                                    <button id="editBtn" class="btn btn-primary"><i class="fa-solid fa-pen me-2"></i> Edit Profile</button>
+                                    <h5 class="fw-bold m-0">Contact Details</h5>
+                                    <button id="editBtn" class="btn btn-upgrade btn-sm">Edit Profile</button>
                                 </div>
-                                
-                                <div class="info-card-container">
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper id-wrapper"><i class="fa-solid fa-hashtag"></i></div>
-                                        <div class="info-details">
-                                            <strong>Technician ID (Staff ID)</strong>
-                                            <span><?= htmlspecialchars($tech['staff_id'] ?? '') ?></span>
-                                        </div>
-                                    </div>
 
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper" style="background-color: var(--primary-color);"><i class="fa-solid fa-user"></i></div>
-                                        <div class="info-details">
-                                            <strong>Full Name</strong>
-                                            <span><?= htmlspecialchars($tech['name'] ?? '') ?></span>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="info-box">
+                                            <label class="text-uppercase text-muted fw-bold small" style="letter-spacing: 0.5px; font-size: 0.7rem;">Email Address</label>
+                                            <div class="fw-semibold text-dark mt-1"><?= htmlspecialchars($tech['email'] ?? '') ?></div>
                                         </div>
                                     </div>
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper" style="background-color: var(--secondary-color);"><i class="fa-solid fa-envelope"></i></div>
-                                        <div class="info-details">
-                                            <strong>Email Address</strong>
-                                            <span><?= htmlspecialchars($tech['email'] ?? '') ?></span>
-                                        </div>
-                                    </div>
-
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper" style="background-color: var(--tertiary-color);"><i class="fa-solid fa-phone"></i></div>
-                                        <div class="info-details">
-                                            <strong>Phone Number</strong>
-                                            <span><?= htmlspecialchars($tech['phoneNum'] ?? '') ?></span>
+                                    <div class="col-md-6">
+                                        <div class="info-box">
+                                            <label class="text-uppercase text-muted fw-bold small" style="letter-spacing: 0.5px; font-size: 0.7rem;">Phone Number</label>
+                                            <div class="fw-semibold text-dark mt-1"><?= htmlspecialchars($tech['phoneNum'] ?? '') ?></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div id="editMode" style="display: <?= $keep_edit_mode ? 'block' : 'none' ?>;">
-                                <h5><i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Update Your Details</h5>
-                                <hr>
+                                <h5 class="fw-bold mb-4">Update Information</h5>
                                 <form action="update_profile_tech.php" method="POST">
-                                    <input type="hidden" name="person_id" value="<?= $tech_id ?>"> 
+                                    <input type="hidden" name="person_id" value="<?= $person_id ?>">
                                     
-                                    <div class="mb-3">
-                                        <label for="staff_id" class="form-label">Technician ID (Staff ID)</label>
-                                        <input type="text" class="form-control" id="staff_id" name="staff_id" value="<?= htmlspecialchars($tech['staff_id'] ?? '') ?>" readonly>
-                                        <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> Staff ID cannot be changed.</small>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label for="name" class="form-label">Full Name</label>
-                                        <input type="text" class="form-control" id="name" name="name" value="<?= htmlspecialchars($tech['name'] ?? '') ?>" required>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="email" class="form-label">Email Address</label>
-                                            <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($tech['email'] ?? '') ?>" readonly>
-                                            <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> Email cannot be changed.</small>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold text-muted">FULL NAME</label>
+                                            <input type="text" class="form-control form-control-lg fs-6" name="name" value="<?= htmlspecialchars($tech['name'] ?? '') ?>" required>
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="phoneNum" class="form-label">Phone Number</label>
-                                            <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($tech['phoneNum'] ?? '') ?>" required>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold text-muted">PHONE NUMBER</label>
+                                            <input type="text" class="form-control form-control-lg fs-6" name="phoneNum" value="<?= htmlspecialchars($tech['phoneNum'] ?? '') ?>" required>
                                         </div>
                                     </div>
-                                    
-                                    <hr class="mt-4">
-                                    <p class="text-muted fw-bold">Change Password (optional)</p>
-                                    
-                                    <div class="alert alert-info py-2" role="alert">
-                                        <h6 class="alert-heading fw-bold mb-1"><i class="fa-solid fa-key me-2"></i>Password Requirements:</h6>
-                                        <ul class="list-unstyled mb-0" style="margin-left: -5px; font-size: 0.95rem;">
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must be at least <strong>8 characters</strong> long.</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>number</strong> (0-9).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>uppercase letter</strong> (A-Z).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>lowercase letter</strong> (a-z).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>special character</strong> (!@#$%..).</li>
-                                        </ul>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="new_password" class="form-label">New Password</label>
-                                            <input type="password" class="form-control" name="new_password" placeholder="Leave blank to keep current">
+
+                                    <div class="mt-4 p-4 rounded-4" style="background: #f1f5f9; border: 1px dashed #cbd5e1;">
+                                        <h6 class="fw-bold mb-3"><i class="fa-solid fa-lock me-2"></i>Change Password</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <input type="password" class="form-control" id="new_password" name="new_password" placeholder="New Password">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="password" class="form-control" name="confirm_password" placeholder="Confirm New Password">
+                                            </div>
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                            <input type="password" class="form-control" name="confirm_password">
+
+                                        <div class="mt-3 bg-white p-3 rounded-3">
+                                            <div class="row g-2">
+                                                <div class="col-sm-6">
+                                                    <div class="pw-requirement" id="req-length"><i class="fa-solid fa-circle"></i> Min 8 characters</div>
+                                                    <div class="pw-requirement" id="req-upper"><i class="fa-solid fa-circle"></i> One uppercase (A-Z)</div>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <div class="pw-requirement" id="req-number"><i class="fa-solid fa-circle"></i> One number (0-9)</div>
+                                                    <div class="pw-requirement" id="req-special"><i class="fa-solid fa-circle"></i> One special character</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save me-2"></i> Save Changes</button>
-                                    <button type="button" id="cancelBtn" class="btn btn-secondary"><i class="fa-solid fa-xmark me-2"></i> Cancel</button>
+
+                                    <div class="d-flex gap-2 mt-4">
+                                        <button type="submit" class="btn btn-upgrade px-4">Save Changes</button>
+                                        <button type="button" id="cancelBtn" class="btn btn-light px-4 text-muted">Cancel</button>
+                                    </div>
                                 </form>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -389,96 +456,92 @@ if (isset($_SESSION['keep_edit_mode']) && $_SESSION['keep_edit_mode'] === true) 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    
-    const shouldKeepEditMode = <?= json_encode($keep_edit_mode) ?>;
-
+    // Toggle View/Edit Mode
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
-    
-    // Sidebar Elements
+
+    editBtn?.addEventListener('click', () => {
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+        editMode.style.display = 'none';
+        viewMode.style.display = 'block';
+    });
+
+    // Real-time Password Validator
+    const pwdInput = document.getElementById('new_password');
+    const reqs = {
+        length: document.getElementById('req-length'),
+        upper: document.getElementById('req-upper'),
+        number: document.getElementById('req-number'),
+        special: document.getElementById('req-special')
+    };
+
+    pwdInput?.addEventListener('input', function() {
+        const val = this.value;
+        const checks = {
+            length: val.length >= 8,
+            upper: /[A-Z]/.test(val),
+            number: /[0-9]/.test(val),
+            special: /[!@#$%^&*(),.?":{}|<>]/.test(val)
+        };
+
+        Object.keys(checks).forEach(k => {
+            if (checks[k]) {
+                reqs[k].classList.add('requirement-met');
+                reqs[k].querySelector('i').className = 'fa-solid fa-check-circle';
+            } else {
+                reqs[k].classList.remove('requirement-met');
+                reqs[k].querySelector('i').className = 'fa-solid fa-circle';
+            }
+        });
+    });
+
+    // Sidebar Toggle for Mobile
     const sidebar = document.getElementById('offcanvasSidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
     const backdrop = document.getElementById('sidebar-backdrop');
-    
-    // --- View/Edit Mode Toggles ---
-    function switchToEditMode() {
-        viewMode.style.display = 'none';
-        editMode.style.display = 'block';
-    }
 
-    function switchToViewMode() {
-        // Clear password fields upon canceling
-        document.querySelector('input[name="new_password"]').value = '';
-        document.querySelector('input[name="confirm_password"]').value = '';
-        
-        editMode.style.display = 'none';
-        viewMode.style.display = 'block';
-    }
-
-    if(editBtn) editBtn.addEventListener('click', switchToEditMode);
-    if(cancelBtn) cancelBtn.addEventListener('click', switchToViewMode);
-
-    // --- Sidebar Toggle Logic (Optimized for Mobile Backdrop) ---
-    function toggleSidebar() {
-        // Menggunakan window.getComputedStyle untuk mendapatkan nilai transform yang tepat
-        const transformValue = window.getComputedStyle(sidebar).getPropertyValue('transform');
-        const isOpen = transformValue !== 'none' && transformValue !== 'matrix(1, 0, 0, 1, -280, 0)';
-        
-        if (isOpen) {
-            // Close Sidebar
-            sidebar.style.transform = 'translateX(-280px)';
-            backdrop.classList.remove('show');
-            
-            // Delay hide display to allow fade out transition
-            setTimeout(() => {
-                backdrop.style.display = 'none';
-            }, 300); 
-            
-        } else {
-            // Open Sidebar
-            backdrop.style.display = 'block'; // Show backdrop immediately
-            setTimeout(() => {
-                backdrop.classList.add('show'); // Trigger fade-in
-            }, 10);
-            sidebar.style.transform = 'translateX(0px)';
-        }
-    }
-
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', toggleSidebar);
-    }
-    
-    if (backdrop) {
-        backdrop.addEventListener('click', toggleSidebar);
-    }
-
-    // --- Responsive Behavior ---
-    function handleResize() {
-        if (window.innerWidth >= 992) {
-            // Desktop: Sidebar sentiasa terbuka
-            sidebar.style.transform = 'translateX(0px)';
-            backdrop.style.display = 'none'; // Sembunyikan backdrop
-        } else if (sidebar.style.transform === 'translateX(0px)' || window.getComputedStyle(sidebar).getPropertyValue('transform') === 'matrix(1, 0, 0, 1, 0, 0)') {
-            // Mobile: Biarkan terbuka jika sudah dibuka, jika tidak, pastikan ia tersembunyi
-            // Tiada tindakan, biarkan ia di kedudukan semasa (0px jika terbuka)
-        } else {
-             sidebar.style.transform = 'translateX(-280px)';
-             backdrop.style.display = 'none';
-        }
-    }
-
-    window.addEventListener('load', () => {
-        handleResize();
-        // Cek jika perlu kekal dalam mod Edit selepas load
-        if (shouldKeepEditMode) {
-            switchToEditMode();
-        }
+    toggleBtn?.addEventListener('click', () => {
+        sidebar.style.transform = 'translateX(0)';
+        backdrop.style.display = 'block';
+        setTimeout(() => backdrop.classList.add('show'), 10);
     });
 
-    window.addEventListener('resize', handleResize);
+    backdrop?.addEventListener('click', () => {
+        sidebar.style.transform = 'translateX(-280px)';
+        backdrop.classList.remove('show');
+        setTimeout(() => backdrop.style.display = 'none', 300);
+    });
 </script>
 
-</body>
+
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_tech.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'dashboard_tech.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-table-columns"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="check_out.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'check_out.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-dolly"></i>
+        <span>Manage Request</span>
+    </a>
+    <a href="manageItem_tech.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'manageItem_tech.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-box-archive"></i>
+        <span>Manage Items</span>
+    </a>
+    <a href="report.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'report.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Report</span>
+    </a>
+    <a href="profile_tech.php" class="active">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav></body>
 </html>
+
+

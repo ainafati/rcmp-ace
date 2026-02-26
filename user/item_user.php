@@ -57,16 +57,27 @@ if ($res_cat) {
     }
     $res_cat->free();
 }
-
+// 1. Tangkap category dari URL (contoh: ?category=Audio+Visual)
+$category_filter = isset($_GET['category']) ? $_GET['category'] : '';
 
 $items_for_dropdown = [];
+
+// 2. Bina Query yang boleh tapis
 $sql_all_items = "
     SELECT 
         i.item_id, i.item_name, c.category_name, i.category_id, i.image_url 
     FROM item i
     JOIN categories c ON i.category_id = c.category_id
-    ORDER BY c.category_name, i.item_name ASC
 ";
+
+// Jika user klik category kat sidebar, kita tambah filter WHERE
+if (!empty($category_filter)) {
+    $safe_category = $conn->real_escape_string($category_filter);
+    $sql_all_items .= " WHERE c.category_name = '$safe_category'";
+}
+
+$sql_all_items .= " ORDER BY c.category_name, i.item_name ASC";
+
 $res_items = $conn->query($sql_all_items);
 if ($res_items) {
     while ($row = $res_items->fetch_assoc()) {
@@ -92,646 +103,611 @@ $conn->close();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+	    <link rel="stylesheet" href="../css/style.css">
+
 <style>
-    /* =========================================================================
-       1. VARIABLE & BASE STYLES
-       ========================================================================= */
-    :root {
-        --primary-color: #06b6d4; 
-        --primary-light: #f0f9ff; 
-        --primary-hover: #0891b2; 
-        --bg-light-gray: #f8fafc;
-        --card-bg: #ffffff;
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --shadow-light: 0 4px 10px rgba(0, 0, 0, 0.04);
+
+/* =========================================================================
+   2. DESKTOP/LAPTOP VIEW (DEFAULT)
+   ========================================================================= */
+
+/* ❌ PAKSA SEMBUNYI KAT LAPTOP - Letak kat luar media query */
+.mobile-bottom-nav {
+    display: none !important;
+    visibility: hidden;
+}
+
+.main-content {
+    min-height: 100vh;
+    background-color: #f1f5f9;
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-attachment: fixed;
+    padding: 2rem;
+    background-repeat: repeat;
+}
+
+@media (min-width: 992px) {
+    .booking-slide-wrapper {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 25px;
+    }
+}
+
+/* =========================================================================
+   3. MOBILE VIEW (MAX-WIDTH: 991px)
+   ========================================================================= */
+@media (max-width: 991.98px) {
+    /* Sorok Sidebar */
+    .sidebar, #admin-sidebar, #sidebar-wrapper {
+        display: none !important;
     }
 
-    body {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        background-color: var(--bg-light-gray);
-        color: var(--text-dark);
-        min-height: 100vh;
-        overflow-x: hidden;
-    }
-
-    /* =========================================================================
-       2. LAYOUT: SIDEBAR & TOPBAR
-       ========================================================================= */
-    
-    /* ➡️ SIDEBAR */
-    .sidebar {
-        width: 280px;
-        height: 100vh;
-        position: fixed;
-        top: 0;
-        left: 0;
-        background: var(--card-bg);
-        padding: 20px;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-        z-index: 1050;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        transition: transform 0.3s ease-in-out;
-        overflow-y: auto;
-    }
-
-    .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
-    .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
-    .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-
-    .sidebar a {
-        display: flex; align-items: center; gap: 15px;
-        color: var(--text-muted); text-decoration: none;
-        padding: 14px 18px; margin-bottom: 6px;
-        border-radius: 10px; font-weight: 500; font-size: 15px;
-        transition: all 0.2s;
-    }
-    .sidebar a.active {
-        background: var(--primary-light);
-        color: var(--primary-color) !important;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
-    }
-    .sidebar a:hover:not(.active) {
-        background: #eef1f4;
-        color: var(--text-dark);
-    }
-    .sidebar a.logout-link { color: #ef4444; font-weight: 600; margin-top: 20px; }
-    .sidebar a i { width: 20px; text-align: center; }
-
-
-    /* ➡️ KATEGORI FILTER STYLES (Sub-Menu) */
-    .category-submenu {
-        padding-left: 15px;
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-in-out;
-    }
-    .category-submenu.show {
-        max-height: 500px;
-    }
-    .category-submenu .category-filter-link {
-        padding: 8px 18px;
-        font-size: 14px;
-        font-weight: 500;
-        margin-bottom: 2px;
-    }
-    .category-submenu .active-category-filter {
-        background: var(--primary-light);
-        color: var(--primary-color) !important;
-        font-weight: 700;
-    }
-    .category-submenu .category-filter-link:hover:not(.active-category-filter) {
-          background: #eef1f4;
-          color: var(--text-dark);
-    }
-    .sidebar .item-availability-link i.fa-angle-down {
-        transition: transform 0.3s;
-    }
-    /* Ikon panah ke bawah (tertutup) */
-    .sidebar .item-availability-link.collapsed i.fa-angle-down {
-        transform: rotate(-90deg);
-    }
-
-
-    /* ➡️ CONTENT WRAPPER */
     .main-content {
-        margin-left: 280px;
-        transition: margin-left 0.3s ease-in-out;
+        margin-left: 0 !important;
+        padding: 15px 15px 100px 15px !important; 
     }
-    .container-fluid { padding: 30px; }
 
-    /* ➡️ TOPBAR */
-    .topbar {
-        background: var(--card-bg);
-        padding: 15px 30px;
+    /* ✅ MUNCULKAN BOTTOM NAV SEBAGAI APPS BAR (THEMED DARK) */
+.mobile-bottom-nav {
+    display: flex !important;
+    visibility: visible !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    /* TUKAR KAT SINI: Guna warna gelap sidebar (#1e293b atau #0f172a) */
+    background: #1e293b !important; 
+    border-top: 1px solid rgba(255, 255, 255, 0.1); /* Border nipis supaya tak nampak kaku */
+    z-index: 10000;
+    justify-content: space-around;
+    padding: 12px 0; /* Tambah padding sikit bagi nampak luas */
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.2);
+}
+
+.mobile-bottom-nav a, 
+.mobile-bottom-nav a.nav-item {
+    /* Warna icon masa tak tekan (kelabu cerah) */
+    color: #94a3b8 !important; 
+    text-decoration: none !important;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    transition: all 0.3s ease;
+}
+
+/* Warna bila AKTIF (Cyan menyala) */
+.mobile-bottom-nav a.active,
+.mobile-bottom-nav a.nav-item.active {
+    color: #06b6d4 !important; 
+}
+
+.mobile-bottom-nav i {
+    font-size: 20px;
+}
+    .mobile-bottom-nav i {
+        font-size: 20px;
+    }
+
+    /* Mobile Slider Logic */
+    .booking-slide-wrapper {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #e2e8f0;
-        z-index: 999;
-        position: sticky;
-        top: 0;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        margin: 0 -15px;
     }
-    .topbar h3 { font-weight: 600; margin: 0; color: var(--text-dark); font-size: 22px; }
-    .topbar .user-profile { display: flex; align-items: center; gap: 12px; }
-    .topbar .user-name { font-weight: 600; font-size: 15px; color: var(--text-dark); }
-    .profile-img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
-
-
-    /* =========================================================================
-       3. FORMS & CARDS
-       ========================================================================= */
-    .card {
-        border-radius: 16px;
-        padding: 25px;
-        box-shadow: var(--shadow-light);
-        background: var(--card-bg);
-        margin-bottom: 25px;
-        border: 1px solid #e2e8f0;
-    }
-    .card h5 { font-weight: 600; color: var(--text-dark); margin-bottom: 5px; }
-    .text-primary { color: var(--primary-color) !important; }
+    .booking-slide-wrapper::-webkit-scrollbar { display: none; }
     
-    /* 💥 PENALAAN UTAMA: Saiz Butang Navigasi */
-    .btn { 
-        border-radius: 6px; /* Lebih kecil dari 8px */
-        padding: 8px 16px; /* Padding lebih kecil dari 10px 20px */
-        font-weight: 600;
-        font-size: 15px;
+    .slide-column {
+        flex: 0 0 100%;
+        scroll-snap-align: start;
+        padding: 0 15px;
     }
-    
-    .btn-primary {
-        background-color: var(--primary-color);
-        border-color: var(--primary-color);
-        font-weight: 600;
-    }
-    .btn-primary:hover {
-        background-color: var(--primary-hover);
-        border-color: var(--primary-hover);
-    }
-    .btn i {
-        font-size: 1.1em; /* Saiz ikon yang baik untuk butang */
-        vertical-align: middle;
-    }
-    /* 💥 TAMAT PENALAAN BUTANG NAVIGASI */
+}
 
+/* =========================================================================
+   4. UI COMPONENTS (STEPPER, FORM, CARDS)
+   ========================================================================= */
+.reservation-card {
+    background: white; border-radius: 24px;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+    padding: 35px; max-width: 800px; margin: 0 auto;
+}
 
-    .form-label { font-weight: 500; color: #334155; }
-    .form-control, .form-select {
-        border-radius: 8px;
-        padding: 10px 12px;
-        min-height: 48px; 
-        border-color: #e2e8f0; 
-    }
+.stepper-wrapper {
+    display: flex; justify-content: space-between;
+    margin-bottom: 30px; position: relative;
+}
 
-    /* Nav Tabs Styling for Steps */
-    .nav-tabs { 
-        border-bottom: none; 
-        margin-bottom: 25px;
-        padding: 0;
-    }
-    .nav-tabs .nav-link {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        margin-right: 8px;
-        color: var(--text-muted);
-        background-color: var(--card-bg);
-        padding: 10px 15px;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
-    .nav-tabs .nav-link.active {
-        border-color: var(--primary-color) !important;
-        background-color: var(--primary-light);
-        color: var(--primary-color);
-    }
-    .nav-tabs .nav-link.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        background-color: #f1f5f9;
-    }
+.stepper-wrapper::before {
+    content: ""; position: absolute;
+    top: 25px; left: 10%; right: 10%;
+    height: 2px; background: var(--step-inactive);
+    z-index: 0;
+}
 
-    /* Select2 Styling Fixes */
-    .select2-container--bootstrap-5 .select2-selection {
-        border-radius: 8px !important;
-        padding: 0.375rem 0.75rem !important; 
-        min-height: 48px !important; 
-        border: 1px solid #e2e8f0 !important; 
-    }
-    .select2-container--bootstrap-5 .select2-selection--single {
-        height: 48px !important;
-    }
-    .select2-container--bootstrap-5 .select2-selection__rendered {
-        line-height: 46px !important; 
-    }
-    .select2-container--bootstrap-5 .select2-selection__arrow {
-        width: 30px !important;
-        height: 46px !important; 
-    } 
-    
-    /* 💥 PENALAAN UTAMA: Item List Display (Step 2 & 3) */
-    .category-image-box { 
-        width: 60px; /* Saiz Imej Dikurangkan */
-        height: 60px; /* Saiz Imej Dikurangkan */
-        border-radius: 8px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        overflow: hidden; 
-        border: 1px solid #e2e8f0;
-        margin-right: 15px;
-        flex-shrink: 0; 
-    } 
-    .category-thumb-img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover; 
-    }
+.step-item {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; border: none; background: none; cursor: pointer;
+}
 
-    /* Padding untuk setiap item dalam senarai */
-    .list-group-item {
-        padding-top: 15px !important; 
-        padding-bottom: 15px !important;
-    }
+.step-counter {
+    width: 45px; height: 45px;
+    border-radius: 50%; background: white;
+    border: 2px solid var(--step-inactive);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 8px; transition: 0.3s;
+    color: var(--step-text); font-weight: bold;
+}
 
-    .list-group-flush .list-group-item { padding-left: 0; padding-right: 0; border-color: #f1f5f9; }
+.step-item.active .step-counter {
+    background: var(--primary-color); color: white; border-color: var(--primary-color);
+}
 
-    /* 1. Badge Kuantiti (Contoh: '1 unit(s)') */
-    .list-group-item .badge {
-        font-size: 0.78rem !important; /* Saiz teks lebih kecil */
-        padding: 0.4rem 0.6rem !important; /* Padding lebih kecil */
-        font-weight: 600;
-    }
+/* Category Submenu */
+#categorySubmenu {
+    display: none;
+    padding-left: 20px;
+    overflow: hidden; 
+}
 
-    /* 2. Butang Buang (Tong Sampah) */
-    .list-group-item .remove-item-btn {
-        padding: 0; 
-        font-size: 0.8rem; 
-        border-radius: 6px;
-        line-height: 1; 
-        height: 30px; /* Saiz kotak kekal kecil */
-        width: 30px; /* Saiz kotak kekal kecil */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid #dc3545; /* Border merah standard */
-        background-color: #fef2f2; /* Latar belakang sangat ringan */
-        color: #dc3545; /* Warna ikon merah standard */
-        transition: all 0.2s;
-    }
+.arrow-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
 
-    /* Hover state untuk Butang Buang */
-    .list-group-item .remove-item-btn:hover {
-        background-color: #dc3545;
-        color: white;
-    }
+.arrow-rotate { transform: rotate(180deg); }
 
-    /* Pastikan ikon di dalam butang juga kecil */
-    .list-group-item .remove-item-btn i {
-        font-size: 0.85rem;
-    }
-    /* 💥 TAMAT PENALAAN ITEM LIST */
+/* T&C Link Animation */
+.tc-link {
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 2px 5px;
+    background-color: #fff3cd;
+    border-radius: 4px;
+    animation: pulse-blue 2s infinite;
+}
 
+@keyframes pulse-blue {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); color: #0056b3; }
+    100% { transform: scale(1); }
+}
 
-    /* =========================================================================
-       4. MOBILE STYLES
-       ========================================================================= */
-    .menu-toggle-btn { display: none; }
-    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1040; display: none; } 
+/* Form Styling */
+.form-control, .form-select {
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    background-color: #fcfcfd;
+}
 
-    @media (max-width: 992px) {
-        .sidebar {
-            transform: translateX(-280px);
-        }
-        .sidebar.active {
-            transform: translateX(0);
-        }
-        .sidebar.active ~ #overlay {
-            display: block;
-        }
-        .main-content {
-            margin-left: 0;
-            width: 100%;
-        }
-        
-        .menu-toggle-btn {
-            display: inline-block;
-            order: -1;
-            font-size: 20px;
-            background: none;
-            border: none;
-            color: #1e293b;
-            padding: 0;
-        }
-        
-        .topbar {
-            padding: 10px 15px;
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            align-items: center;
-            gap: 15px;
-        }
-        .topbar h3 {
-            font-size: 18px;
-            text-align: left;
-        }
-        .topbar .user-profile {
-            order: 3;
-            justify-self: end;
-        }
-        .topbar .user-name {
-            display: none;
-        }
-        .container-fluid {
-            padding: 15px;
-        }
-        .card {
-            padding: 15px;
-        }
-        .col-lg-7, .col-lg-5 { 
-            flex: 0 0 100% !important;
-            max-width: 100% !important;
-        }
-        .d-grid {
-            display: grid !important;
-            grid-template-columns: 1fr;
-            gap: 10px !important;
-        }
-        .nav-tabs .nav-link {
-             margin-bottom: 5px;
-        }
-    }
-</style>
-</head>
+.category-image-box { 
+    width: 60px; height: 60px; border-radius: 8px; 
+    overflow: hidden; border: 1px solid #e2e8f0;
+    margin-right: 15px; flex-shrink: 0; 
+}
+.category-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+
+/* --- TAMBAHAN UNTUK BUTTON & TEXT --- */
+
+/* 1. Warna Tulisan 'Available Equipment' */
+/* (Tukar warna ni ikut tema Cyan/Blue kau) */
+h5.fw-bold.mb-0, 
+.inventory-title { 
+    color: #1e293b !important; /* Warna gelap slate */
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+}
+
+/* 2. Button Confirm (Step Akhir) */
+#confirmReservationBtn, 
+.btn-primary.w-100 {
+    background: linear-gradient(135deg, #06b6d4 0%, #0d6efd 100%) !important; /* Gradient Cyan ke Blue */
+    border: none !important;
+    padding: 14px !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.2) !important;
+}
+
+#confirmReservationBtn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.3) !important;
+    filter: brightness(1.1);
+}
+
+/* 3. Button 'Add' atau 'Select' kat Inventory */
+.btn-outline-primary {
+    border-color: #06b6d4 !important;
+    color: #06b6d4 !important;
+    border-radius: 8px !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: #06b6d4 !important;
+    color: #fff !important;
+}
+
+/* --- 1. TULISAN 'AVAILABLE EQUIPMENT' --- */
+.inventory-title-wrapper h5 {
+    color: #06b6d4 !important; /* Warna Cyan */
+    font-weight: 700 !important;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* --- 2. KOTAK GAMBAR (FIX BIAR PENUH) --- */
+.category-image-box {
+    width: 65px !important; 
+    height: 65px !important;
+    border-radius: 12px !important; /* Bagi nampak moden sikit */
+    overflow: hidden;
+    border: 1px solid #f1f5f9;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+
+.category-thumb-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important; /* PENTING: Ini yang buat gambar penuh kotak */
+    display: block;
+}
+
+/* --- 3. BUTTON CONFIRM & LOCK CONTEXT --- */
+#confirmReservationBtn, 
+button[type="submit"].btn-primary,
+.btn-confirm-lock {
+    background: linear-gradient(135deg, #06b6d4 0%, #0d6efd 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 15px !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3) !important;
+}
+
+#confirmReservationBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4) !important;
+    filter: brightness(1.1);
+}
+
+/* --- 4. ALTERNATIF: Kalau gambar pecah (Macam Tripod tu) --- */
+.category-thumb-img[src=""], 
+.category-thumb-img:not([src]) {
+    display: none;
+}
+</style></head>
 <body>
 
 <div id="overlay"></div>
 
-<div class="sidebar">
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
-            <div class="logo-text"><strong>UniKL User</strong><span>Equipment System</span></div>
-        </div>
-        
-        <a href="dashboard_user.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        
-        <a href="item_user.php" class="active item-availability-link collapsed" id="itemAvailabilityToggle">
-            <i class="fa-solid fa-box"></i> Item Availability
+    <div class="logo-icon">
+        <i class="fa-solid fa-wrench"></i>
+    </div>
+    <div class="logo-text">
+        <strong class="brand-name">UniKL User</strong><br>
+        <span>Equipment System</span>
+    </div>
+</div>
+<div class="sidebar-nav">
+    <a href="dashboard_user.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'dashboard_user.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-house"></i> Dashboard
+    </a>
+
+  <a href="item_user.php" class="active item-availability-link collapsed" id="itemAvailabilityToggle">
+            <i class="fa-solid fa-calendar-plus"></i>Book Equipment
             <i class="fa-solid fa-angle-down ms-auto" style="font-size: 12px;"></i>
         </a>
-        
-        <div class="category-submenu" id="categorySubmenu">
-            <a href="#" class="category-filter-link active-category-filter" data-category="">
-                <i class="fa-solid fa-layer-group me-2"></i> All Items
-            </a>
-            <?php foreach ($categories as $category): ?>
-                <a href="#" class="category-filter-link" data-category="<?= htmlspecialchars($category['category_name']) ?>">
-                    <i class="fa-solid fa-tag me-2"></i> <?= htmlspecialchars($category['category_name']) ?>
-                </a>
-            <?php endforeach; ?>
-        </div>
+		
+		<div class="category-submenu ps-4" id="categorySubmenu" style="display: none;">
+    <a href="#" class="category-filter-link py-2 d-block text-decoration-none" 
+       data-category="" 
+       style="color: #cbd5e1; font-size: 0.9rem;">
+        <i class="fa-solid fa-layer-group me-2"></i> All Items
+    </a>
 
-        <a href="history.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-        
-    </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <?php foreach ($categories as $category): ?>
+        <a href="#" class="category-filter-link py-2 d-block text-decoration-none" 
+           data-category="<?= htmlspecialchars($category['category_name']) ?>" 
+           style="color: #cbd5e1; font-size: 0.9rem;">
+            <i class="fa-solid fa-tag me-2"></i> <?= htmlspecialchars($category['category_name']) ?>
+        </a>
+    <?php endforeach; ?>
 </div>
+    <a href="history.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'history.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-clock-rotate-left"></i> My Loan
+    </a>
+</div>
+    </div>
+    
+<div class="sidebar-footer">
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+</div> 	
+</div>
+
 <div class="main-content">
-    <div class="topbar">
-        <button class="menu-toggle-btn" id="menuToggle">
-            <i class="fa fa-bars"></i>
-        </button>
-        <h3>Item Availability</h3>
-        <div class="user-profile">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>
-            <a href="profile.php" title="Go to My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
-            </a>
+<div class="topbar">
+    <div class="topbar-left">
+        <nav aria-label="breadcrumb">
+            <h4 class="fw-bold">Reservation</h4>
+        </nav>
+    </div>
+
+    <div class="topbar-right">
+       
+        <a href="profile.php" class="user-pill text-decoration-none d-flex align-items-center">
+    <div class="text-end me-2 d-none d-md-block">
+        <div class="user-name fw-bold" style="color: #1e293b; line-height: 1.2;">
+            <?= htmlspecialchars($displayName) ?>
+        </div>
+        <div style="font-size: 0.7rem; color: #64748b;">
+            Student / Staff
         </div>
     </div>
 
-    <div class="container-fluid">
-        <div class="row">
-            
-            <div class="col-lg-5 order-lg-2">
-                <div class="card">
-                    <h5><i class="fa-solid fa-boxes-stacked me-2 text-primary"></i> Available Item List</h5>
-                    <p class="text-muted small">View items available for loan. Select a category in the sidebar to filter.</p>
-                    
-                    <div class="list-group list-group-flush" id="displayItemList">
-                        </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-7 order-lg-1">
-                <form id="reserveForm">
-                    <input type="hidden" name="person_id" value="<?= isset($person_id) ? $person_id : '' ?>">
-                    <input type="hidden" name="all_items" id="allItems">
-
-                    <ul class="nav nav-tabs" id="myTab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="context-tab" data-bs-toggle="tab" data-bs-target="#context-tab-pane" type="button" role="tab" aria-controls="context-tab-pane" aria-selected="true">
-                                <i class="fa-solid fa-1 me-1"></i> Context
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link disabled" id="items-tab" data-bs-toggle="tab" data-bs-target="#items-tab-pane" type="button" role="tab" aria-controls="items-tab-pane" aria-selected="false">
-                                <i class="fa-solid fa-2 me-1"></i> Add Items
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link disabled" id="review-tab" data-bs-toggle="tab" data-bs-target="#review-tab-pane" type="button" role="tab" aria-controls="review-tab-pane" aria-selected="false">
-                                <i class="fa-solid fa-3 me-1"></i> Review & Submit
-                            </button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="myTabContent">
-                        
-                        <div class="tab-pane fade show active" id="context-tab-pane" role="tabpanel" aria-labelledby="context-tab" tabindex="0">
-                            <div class="card" id="ContextCard">
-                                <h5><i class="fa-solid fa-file-pen me-2 text-primary"></i> <strong>Step 1: Define & Lock Context</strong></h5>
-                                <p class="text-muted small">Specify the borrowing dates and the main purpose for this <strong>single</strong> submission.</p>
-                                <hr>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="reserveDate">1. Borrow Date</label>
-                                        <input type="text" id="reserveDate" class="form-control" name="reserve_date" placeholder="Select a date..." required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="returnDate">2. Return Date</label>
-                                        <input type="text" id="returnDate" class="form-control" name="return_date" placeholder="Select a date..." required>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label" for="program_type">3. Program Type / Priority</label>
-                                    <select name="program_type" id="program_type" class="form-select" required>
-                                        <option value="" disabled selected>-- Select Type --</option>
-                                        <option value="3">Academic Project/Class</option>
-                                        <option value="2">Club/Association Program</option>
-                                        <option value="1">Official University Ceremony</option>
-                                    </select>
-                                    <div id="priorityWarning" class="alert alert-warning py-1 mt-2 small" style="display:none;">
-									⚠️ <strong>Important:</strong> This request is only valid for this type of program. If you are ordering an item for <strong>Different Priority</strong>, please complete this request first and create a New Request.
-                                    </div>
-                                </div>
-
-                                <div class="mb-1">
-                                    <label class="form-label" for="reason">4. Intended Use</label>
-                                    <textarea id="reason" name="reason" class="form-control" placeholder="e.g., For Final Year Project presentation or Club event" required></textarea>
-                                </div>
-								
-								<div class="mb-3 mt-3">
-    <label class="form-label" for="location">5. Usage Location</label>
-    <div class="input-group">
-        <span class="input-group-text bg-light"><i class="fa-solid fa-location-dot text-primary"></i></span>
-        <input type="text" id="location" name="location" class="form-control" placeholder="e.g., Block A, Level 3, Studio 1" required>
+    <div class="profile-avatar">
+        <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName ?? 'U') ?>&background=06b6d4&color=fff" 
+             class="rounded-circle" 
+             width="35">
     </div>
-    <div class="form-text small">Please specify the exact location where this equipment will be used.</div>
+</a>
+    </div>
 </div>
 
-                                <div class="d-grid mt-4">
-                                    <button type="button" class="btn btn-primary" id="confirmContextBtn">
-                                        <i class="fa-solid fa-lock me-2"></i> CONFIRM & LOCK CONTEXT
-                                    </button>
-                                </div>
-								
-								<div class="d-flex justify-content-end mt-4">
-                                    <button type="button" class="btn btn-primary btn-lg ms-3 d-none" id="nextToItemsBtn" disabled>
-                                        Next: Item Selection <i class="fa-solid fa-arrow-right-long ms-2"></i>
-                                    </button>
+<div class="container-fluid py-4">
+    <div class="booking-slide-wrapper">
+        
+        <div class="slide-column main-form-column">
+            <form id="reserveForm">
+                <input type="hidden" name="person_id" value="<?= isset($person_id) ? $person_id : '' ?>">
+                <input type="hidden" name="all_items" id="allItems">
+
+                <div class="stepper-wrapper mb-4">
+                    <button type="button" class="step-item active" id="step1-nav">
+                        <div class="step-counter"><i class="fa-solid fa-file-lines"></i></div>
+                        <div class="step-label">Context</div>
+                    </button>
+                    <button type="button" class="step-item" id="step2-nav" disabled>
+                        <div class="step-counter"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="step-label">Add Items</div>
+                    </button>
+                    <button type="button" class="step-item" id="step3-nav" disabled>
+                        <div class="step-counter"><i class="fa-solid fa-clipboard-check"></i></div>
+                        <div class="step-label">Review</div>
+                    </button>
+                </div>
+
+                <div class="reservation-card border-0 shadow-sm p-4 bg-white" style="border-radius: 20px; min-height: 450px;">
+                    
+                    <div class="tab-pane-custom active-step" id="step1-content">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="fw-bold mb-0"><i class="fa-solid fa-circle-1 text-primary me-2"></i>Define Context</h5>
+                            <span class="badge bg-primary-light text-primary d-lg-none animate-hint">
+                                Items <i class="fa-solid fa-arrow-right ms-1"></i>
+                            </span>
+                        </div>
+                        <p class="text-muted small mb-4">Specify the borrowing dates and location.</p>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Borrow Date</label>
+                                <input type="date" class="form-control" name="reserve_date" id="reserveDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Return Date</label>
+                                <input type="date" class="form-control" name="return_date" id="returnDate" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">Program Type</label>
+                                <select class="form-select" id="program_type" name="program_type" required>
+                                    <option value="">-- Select Type --</option>
+                                    <option value="3">Academic Project/Class</option>
+                                    <option value="4">Official Event</option>
+                                    <option value="5">Club/Society Activity</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">Usage Location</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-location-dot text-primary"></i></span>
+                                    <input type="text" class="form-control border-start-0" id="location" name="location" placeholder="e.g., Block A, Level 3" required>
                                 </div>
                             </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">Purpose/Reason</label>
+                                <textarea class="form-control" id="reason" name="reason" rows="2" placeholder="Briefly explain..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary w-100 mt-4 py-3 fw-bold shadow-sm" id="confirmContextBtn">
+                            <i class="fa-solid fa-lock me-2"></i> CONFIRM & LOCK CONTEXT
+                        </button>
+                    </div>
+
+                    <div class="tab-pane-custom d-none" id="step2-content">
+                        <h5 class="fw-bold mb-1"><i class="fa-solid fa-circle-2 text-primary me-2"></i>Select Items</h5>
+                        <p class="text-muted small mb-4">Choose items from the inventory.</p>
+                        
+                        <div class="bg-light p-3 rounded-3 mb-4 border border-dashed">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold">Search Item</label>
+                                    <select id="item_select" class="form-select select2-ins-card" style="width: 100%;">
+                                        <option value="">-- Search and select --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Qty</label>
+                                    <input type="number" id="quantity" class="form-control" min="1" value="1">
+                                </div>
+                            </div>
+                            <div id="availability-status" class="mt-2"></div>
+                            <button type="button" class="btn btn-primary btn-sm w-100 mt-3" id="addMoreBtn" disabled>
+                                <i class="fa-solid fa-plus me-1"></i> Add to Request List
+                            </button>
                         </div>
 
-<div class="tab-pane fade" id="items-tab-pane" role="tabpanel" aria-labelledby="items-tab" tabindex="0">
-    <div class="card mb-4" id="ItemSelectionCard">
-        <h5><i class="fa-solid fa-list-check me-2 text-primary"></i> <strong>Step 2: Select Items & Check Qty</strong> </h5>
-        <p class="text-muted small">Choose the items needed for the dates and purpose confirmed in Step 1.</p>
-        <hr>
-        
-        <div class="row">
-            <div class="col-md-8 mb-3">
-                <label class="form-label">1. Select Item</label>
-                <select id="item_select" class="form-select" style="width: 100%;">
-                    <option value="">-- Search and select an item --</option>
-                </select>
+                        <h6 class="fw-bold mb-3 small text-uppercase">Current Request List</h6>
+                        <div id="itemsList" class="mb-4"></div>
+
+                        <div class="d-flex justify-content-between pt-3 border-top">
+                            <button type="button" id="prevToContextBtn" class="btn btn-link text-decoration-none text-muted small">
+                                <i class="fa-solid fa-arrow-left me-1"></i> Edit Context
+                            </button>
+                            <button type="button" class="btn btn-primary px-4 shadow-sm" id="nextToReviewBtn" disabled>
+                                Next Step <i class="fa-solid fa-chevron-right ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane-custom d-none" id="step3-content">
+                        <div class="text-center mb-4">
+                            <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="fa-solid fa-check-double fa-lg"></i>
+                            </div>
+                            <h5 class="fw-bold">Final Review</h5>
+                        </div>
+                        <div class="bg-light p-3 rounded-3 mb-4 small border-start border-primary border-4">
+                            <div id="contextSummary"></div>
+                        </div>
+                        <div id="itemsReviewList" class="mb-4 border rounded-3 p-2 bg-white" style="max-height: 200px; overflow-y: auto;"></div>
+                        <div class="form-check p-3 bg-light rounded-3 mb-4" id="tncTrigger">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" id="agreeTerms">
+                            <label class="form-check-label small" for="agreeTerms">I agree to the Terms & Conditions</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-8"><button type="button" class="btn btn-primary btn-lg w-100 fw-bold" id="finalSubmitBtn" disabled>SUBMIT</button></div>
+                            <div class="col-4"><button type="button" class="btn btn-outline-secondary btn-lg w-100" id="backToItemsBtn">BACK</button></div>
+                        </div>
+                    </div>
+                </div> 
+            </form>
+        </div>
+
+        <div class="slide-column side-inventory-column">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 20px; overflow: hidden;">
+                <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-primary"><i class="fa-solid fa-boxes-stacked me-2"></i>Available Equipment</h6>
+                        <small class="text-muted">Live preview</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light d-lg-none" onclick="document.querySelector('.booking-slide-wrapper').scrollLeft = 0;">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                </div>
+                
+                <div class="list-group list-group-flush" id="displayItemList" style="max-height: 70vh; overflow-y: auto;">
+                    <?php if (!empty($items_for_dropdown)): ?>
+                        <?php foreach ($items_for_dropdown as $item): ?>
+                            <div class="list-group-item d-flex align-items-center py-3 px-4 item-hover">
+                                <div class="category-image-box me-3">
+                                    <img src="<?= htmlspecialchars($item['image_url'] ?: '../assets/img/no-image-placeholder.png') ?>" class="rounded-3 shadow-sm" style="width: 50px; height: 50px; object-fit: cover;">
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0 small fw-bold text-dark"><?= htmlspecialchars($item['item_name']) ?></h6>
+                                    <small class="text-muted" style="font-size: 11px;"><?= htmlspecialchars($item['category_name']) ?></small>
+                                </div>
+                                <div class="badge bg-light text-success border" style="font-size: 10px;">Available</div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
-
-            <div class="col-md-4 mb-3"> 
-                <label class="form-label" for="quantity">2. Quantity</label>
-                <input type="number" id="quantity" class="form-control" name="quantity" min="1" value="1">
-            </div>
-        </div>
-        
-        <div class="row mb-3">
-            <div class="col-md-12" id="availability-status">
-            </div>
-        </div>
-        
-        <div class="d-grid d-md-flex gap-2 mt-4">
-            <button type="button" class="btn btn-primary flex-grow-1" id="addMoreBtn" disabled><i class="fa-solid fa-cart-plus me-2"></i> <strong>Add Item to Request List</strong></button>
         </div>
 
-        <hr class="mt-4">
-        
-        <h6 class="mt-3"><i class="fa-solid fa-basket-shopping me-2"></i> Requested Items (Current Submission)</h6>
-        <div id="itemsList">
-            <div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p class="mb-0">Your request list is currently empty.</p></div>
-        </div>
-        
-    </div>
-	
-	<div class="d-flex justify-content-between mt-4">
-        <button type="button" id="prevToContextBtn" class="btn btn-secondary">
-    <i class="fa-solid fa-chevron-left me-2"></i> Previous: Context
-</button>
-
-        <button type="button" class="btn btn-primary btn-lg" id="nextToReviewBtn" disabled>
-            Next: Review & Submit <i class="fa-solid fa-arrow-right-long ms-2"></i>
-        </button>
-    </div>
-</div>
-
-<div class="tab-pane fade" id="review-tab-pane" role="tabpanel" aria-labelledby="review-tab" tabindex="0">
-    <div class="card">
-        <h5><i class="fa-solid fa-clipboard-list me-2 text-primary"></i> <strong>Step 3: Review & Submit (1 Submission)</strong> </h5>
-        <p class="text-muted small">Review your reservation context and the list of requested items before final submission.</p>
-        <hr>
-        
-        <h6><i class="fa-solid fa-file-lines me-2"></i> Context Summary</h6>
-        <div id="contextSummary">
-            <div class="alert alert-info py-2 small">Context details will appear here after being locked in Step 1.</div>
-        </div>
-        
-        <h6 class="mt-4"><i class="fa-solid fa-receipt me-2"></i> Requested Items (Final Receipt View)</h6>
-        <div id="itemsReviewList">
-            <div class="text-center text-muted p-4 border rounded"><i class="fa-solid fa-box-open fa-2x mb-2"></i><p class="mb-0">No items added. Please go back to Step 2.</p></div>
-        </div>
-        
-        <hr>
-        
-        <div class="form-check mt-3">
-            <input class="form-check-input" type="checkbox" value="" id="agreeTerms" disabled>
-            <label class="form-check-label" for="agreeTerms">
-                I have read and agree to the
-                <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal" class="text-primary fw-bold">Terms and Conditions</a>.
-            </label>
-        </div>
-
-        <div class="d-grid mt-4">
-            <button type="button" class="btn btn-primary" id="finalSubmitBtn" disabled><i class="fa-solid fa-paper-plane me-2"></i> <strong>Submit Final Request</strong></button>
-        </div>
-
-        <div class="d-grid mt-3">
-            <button type="button" class="btn btn-outline-secondary" id="backToItemsBtn">
-                <i class="fa-solid fa-arrow-left me-2"></i> Back to Add Items (Step 2)
-            </button>
-        </div>
-        
     </div>
 </div>
-</div>
-                </form>
+<div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title d-flex align-items-center" id="termsModalLabel">
+                    <i class="fa-solid fa-file-contract me-2"></i> Terms & Conditions
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
+            <div class="modal-body p-4" id="modalTermsContent">
+                <div class="alert alert-info border-0 shadow-sm small mb-4">
+                    <i class="fa-solid fa-circle-info me-2"></i> 
+                    Please read the following terms carefully before submitting your <strong>reservation</strong> request.
+                </div>
+
+                <div class="tnc-list">
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-1"></i></div>
+                        <div><strong>Eligibility:</strong> All equipment is available for reservation only to registered students and staff of UniKL with a valid ID.</div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-2"></i></div>
+                        <div><strong>Reservation Duration:</strong> The duration of the reservation is as specified in your request.</div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-3"></i></div>
+                        <div><strong>Responsibility:</strong> The party  making the reservation is fully responsible for the reserved equipment from the moment of collection until they are returned and checked in by a technician.</div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-4"></i></div>
+                        <div><strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.</div>
+                    </div>
+                    <div class="d-flex mb-3 text-danger">
+                        <div class="me-3"><i class="fa-solid fa-5 text-danger"></i></div>
+                        <div><strong>Damage or Loss:</strong> The  reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).</div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-6"></i></div>
+                        <div><strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine and a temporary suspension of reservation privileges.</div>
+                    </div>
+                    <div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-7"></i></div>
+                        <div><strong>Purpose of Use:</strong> Items are to be used for academic or official university purposes only, as specified in the reservation form.</div>
+                    </div>
+					<div class="d-flex mb-3">
+                        <div class="me-3 text-primary"><i class="fa-solid fa-7"></i></div>
+                        <div><strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.</div>
+                    </div>
+                </div>
+
+                <div class="bg-light p-3 rounded-3 mt-4 text-center border">
+                    <p class="mb-0 small fw-bold">By checking the box below, you acknowledge that you have read and agree to be bound by all the terms stated above.</p>
+                </div>
+            </div> 
+
+            <div class="modal-footer flex-column bg-light border-top-0 p-4">
+                <div class="form-check mb-3 w-100 d-flex justify-content-center">
+                    <input class="form-check-input me-2 shadow-none" type="checkbox" id="modalAgreeCheck" style="transform: scale(1.2);">
+                    <label class="form-check-label fw-bold" for="modalAgreeCheck">
+                        I have read and agree to the Terms & Conditions
+                    </label>
+                </div>
+                <button type="button" id="confirmTermsBtn" class="btn btn-primary btn-lg w-100 shadow-sm fw-bold" disabled>
+                    <i class="fa-solid fa-check-circle me-2"></i>Confirm & Agree
+                </button>
+            </div>
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions of <strong>Equipment Usage</strong></h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <p>Please read the following terms carefully before submitting your <strong>reservation</strong> request:</p>
-            <ol>
-                <li>
-                    <strong>Eligibility:</strong> All equipment is available for <strong>reservation</strong> only to registered students and staff of UniKL with a valid ID.
-                </li>
-                <li>
-                    <strong>Reservation Duration:</strong> The <strong>duration</strong> of the reservation is as specified in your request (i.e., from the Collection Date to the Return Date).
-                </li>
-                <li>
-                    <strong>Responsibility:</strong> The party making the reservation is fully responsible for the <strong>reserved equipment</strong> from the moment of collection until they are returned and checked in by a technician.
-                </li>
-                <li>
-                    <strong>Condition of Items:</strong> The reserving party must inspect the item(s) at the time of collection. Any existing damage must be reported immediately, or the reserving party may be held responsible.
-                </li>
-                <li>
-                    <strong>Damage or Loss:</strong> The reserving party will be held financially responsible for the full replacement cost of any lost, stolen, or damaged items (including all parts and accessories).
-                </li>
-                <li>
-                    <strong>Late Returns:</strong> Failure to return items by the specified return date will result in a fine (e.g. RM10 per item per day) and a temporary suspension of <strong>reservation</strong> privileges.
-                </li>
-                <li>
-                    <strong>Purpose of Use:</strong> Items are to be used for academic or official university purposes only, as specified in the reservation form.
-                </li>
-                <li>
-                    <strong>Collection:</strong> Approved items must be collected within 24 hours of the "Approved" status being issued, or the reservation may be cancelled.
-                </li>
-            </ol>
-            <p class="fw-bold">By checking the box, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions stated above.</p>
-        </div> 
-        <div class="modal-footer">
-            <button type="button" class="btn btn-primary" id="agreeTermsBtn" data-bs-dismiss="modal">I Understand</button>
-        </div>
-        </div>
-    </div>
-</div>
-
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -754,10 +730,31 @@ let reserveDatePicker;
 let returnDatePicker;
 
 $(document).ready(function() {
-    
-    
+    // Kita target span yang ada ID toggle (Arrow sahaja)
+    $('#itemAvailabilityToggle').on('click', function(e) {
+        // Elakkan event ni 'merebak' ke elemen lain
+        e.preventDefault();
+        e.stopPropagation();
 
-    
+        const submenu = $('#categorySubmenu');
+        const arrowIcon = $(this).find('.arrow-icon');
+
+        // Slide toggle submenu
+        submenu.stop(true, true).slideToggle(300);
+
+        // Pusingkan arrow
+        if (arrowIcon.hasClass('rotated')) {
+            arrowIcon.removeClass('rotated').css('transform', 'rotate(0deg)');
+        } else {
+            arrowIcon.addClass('rotated').css('transform', 'rotate(180deg)');
+        }
+    });
+
+    // Kekalkan submenu terbuka kalau user sedang tengok kategori spesifik
+    if (window.location.search.includes('category=')) {
+        $('#categorySubmenu').show();
+        $('.arrow-icon').addClass('rotated').css('transform', 'rotate(180deg)');
+    }
     $('#myTab button[data-bs-toggle="tab"]').on('click', function (e) {
         if ($(this).hasClass('disabled')) {
             e.preventDefault();
@@ -771,34 +768,56 @@ $(document).ready(function() {
             }
         }
     });
+    // Trigger check stok bila item dipilih
+$('#item_select').on('change', function() {
+    checkItemAvailability();
+});
+
+// Trigger check stok bila kuantiti ditaip/tukar
+$('#quantity').on('input change', function() {
+    checkItemAvailability();
+});
     
-    
-    reserveDatePicker = flatpickr("#reserveDate", {
-        dateFormat: "Y-m-d",
-        minDate: "today",
-        altInput: true,
-        altFormat: "F j, Y",
-        onChange: function(selectedDates, dateStr, instance) {
-            returnDatePicker.set('minDate', dateStr || new Date());
-            if ($('#items-tab').hasClass('active')) {
-                checkItemAvailability();
+// 1. Init Borrow Date Picker (Reserve Date)
+reserveDatePicker = flatpickr("#reserveDate", {
+    dateFormat: "Y-m-d",
+    minDate: "today", // [Auto-Validation] Halang pilih sebelum hari ini
+    altInput: true,
+    altFormat: "F j, Y",
+    onChange: function(selectedDates, dateStr) {
+        // [Logic Guard] Kemaskini minDate untuk Return Date secara dinamik
+        if (returnDatePicker) {
+            returnDatePicker.set('minDate', dateStr || "today");
+            
+            // Jika Return Date sedia ada lebih awal dari Borrow Date yang baru dipilih, 
+            // kita kosongkan Return Date supaya user pilih semula dengan betul.
+            if (returnDatePicker.selectedDates[0] < selectedDates[0]) {
+                returnDatePicker.clear();
             }
         }
-    });
+        
+        // Update context global
+        RESERVATION_CONTEXT.reserve_date = dateStr;
+        
+        // [Real-time Check] Trigger check ketersediaan stok
+        handleAvailabilityRecheck();
+    }
+});
 
-    returnDatePicker = flatpickr("#returnDate", {
-        dateFormat: "Y-m-d",
-        minDate: "today",
-        altInput: true,
-        altFormat: "F j, Y",
-        onChange: function(selectedDates, dateStr, instance) {
-            if ($('#items-tab').hasClass('active')) {
-                checkItemAvailability();
-            }
-        }
-    });
+// 2. Init Return Date Picker
+returnDatePicker = flatpickr("#returnDate", {
+    dateFormat: "Y-m-d",
+    minDate: "today", // [Auto-Validation] Default tetap hari ini
+    altInput: true,
+    altFormat: "F j, Y",
+    onChange: function(selectedDates, dateStr) {
+        // Update context global
+        RESERVATION_CONTEXT.return_date = dateStr;
 
-    
+        // [Real-time Check] Trigger check ketersediaan stok
+        handleAvailabilityRecheck();
+    }
+});
     $('#item_select').select2({
         theme: 'bootstrap-5',
         placeholder: 'Search and select an item...',
@@ -810,8 +829,7 @@ $(document).ready(function() {
         }))
     });
     
-
-function unlockContext() {
+	function unlockContext() {
     
     
     $('#ContextCard').find('input, select, textarea').prop('disabled', false).css('opacity', 1);
@@ -858,49 +876,55 @@ function unlockContext() {
 	
     
     function filterSelect2ByCategoryId(categoryId) {
-        const filteredData = ALL_ITEMS_DATA
-            .filter(item => categoryId === '' || item.category_id === categoryId)
-            .map(item => ({
-                id: item.item_id,
-                text: `${item.item_name} (${item.category_name})`,
-                itemData: item
-            }));
+    // Tapis data dari master list
+    const filteredData = ALL_ITEMS_DATA
+        .filter(item => categoryId === '' || item.category_id == categoryId)
+        .map(item => ({
+            id: item.item_id,
+            text: `${item.item_name} (${item.category_name})`,
+            itemData: item
+        }));
 
-        $('#item_select').empty().append(new Option('-- Search and select an item --', '')).select2({
-            theme: 'bootstrap-5',
-            placeholder: 'Search and select an item...',
-            dropdownParent: $('#ItemSelectionCard'),
-            data: filteredData
-        });
+    // Reset Select2
+    const $select = $('#item_select');
+    $select.empty(); // Buang option lama
+    $select.append(new Option('-- Search and select an item --', ''));
 
-        $('#availability-status').html('');
-        $('#addMoreBtn').prop('disabled', true);
-        $('#quantity').val(1);
+    // Re-initialize Select2 dengan data baru
+    $select.select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search and select an item...',
+        width: '100%',
+        data: filteredData
+    });
+}
+$('.category-filter-link').on('click', function(e) {
+    e.preventDefault();
+    
+    // 1. Visual update untuk sidebar
+    $('.category-filter-link').removeClass('active-category-filter').css('color', '#cbd5e1');
+    $(this).addClass('active-category-filter').css('color', '#06b6d4');
+    
+    const categoryName = $(this).data('category'); 
+    console.log("Kategori dipilih:", categoryName);
+
+    // 2. Filter list besar di sebelah kanan (Available Equipment)
+    filterItemList(categoryName); 
+
+    // 3. LOGIC FIX: Cari ID secara fleksibel (ignore case)
+    let categoryId = '';
+    if (categoryName && categoryName !== '') {
+        const foundItem = ALL_ITEMS_DATA.find(item => 
+            item.category_name.toLowerCase() === categoryName.toLowerCase()
+        );
+        categoryId = foundItem ? foundItem.category_id : '';
     }
 
-    
-    $('.category-filter-link').on('click', function(e) {
-        e.preventDefault();
-        
-        $('.category-filter-link').removeClass('active-category-filter');
-        $(this).addClass('active-category-filter');
-        
-        const categoryName = $(this).data('category');
-        const categoryId = ALL_ITEMS_DATA.find(item => item.category_name === categoryName)?.category_id || '';
-
-        filterItemList(categoryName);
-        filterSelect2ByCategoryId(categoryId);
-    });
-    
+    // 4. Update Dropdown Select2
+    filterSelect2ByCategoryId(categoryId);
+}); 
     filterItemList('');
     
-    
-    $('#itemAvailabilityToggle').on('click', function(e) {
-        e.preventDefault();
-        $('#categorySubmenu').toggleClass('show');
-        $(this).toggleClass('collapsed');
-    });
-
     
     $('#menuToggle').on('click', function() {
         $('.sidebar').toggleClass('active');
@@ -911,33 +935,51 @@ function unlockContext() {
         $('.sidebar').removeClass('active');
         $('#overlay').hide();
     });
+   
+
+// 1. Trigger Modal bila klik mana-mana bahagian dalam kotak T&C
+$(document).on('click', '#tncTrigger', function(e) {
+    e.preventDefault();
+    // Guna API Bootstrap untuk buka modal
+    var tncModal = new bootstrap.Modal(document.getElementById('termsModal'));
+    tncModal.show();
+});
+
+// 2. Dalam Modal: Enable butang 'Confirm' hanya bila checkbox DALAM modal ditick
+$(document).on('change', '#modalAgreeCheck', function() {
+    $('#confirmTermsBtn').prop('disabled', !$(this).is(':checked'));
+});
+
+// 3. Bila klik butang 'Confirm' dalam modal
+$(document).on('click', '#confirmTermsBtn', function() {
+    // Tick-kan checkbox kat luar secara programatik
+    $('#agreeTerms').prop('checked', true);
     
+    // Aktifkan butang Submit utama (Step 3)
+    $('#finalSubmitBtn').prop('disabled', false);
     
-    $('#termsModal').on('shown.bs.modal', function () {
-        if (REQUEST_ITEMS.length > 0) {
-            $('#agreeTerms').prop('disabled', false);
-        }
+    // Tutup modal
+    $('#termsModal').modal('hide');
+
+    // Feedback visual
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Terms Accepted',
+        showConfirmButton: false,
+        timer: 2000
     });
+});
 
-    $('#agreeTermsBtn').on('click', function() {
-        if (!$('#agreeTerms').prop('disabled')) {
-            $('#agreeTerms').prop('checked', true).trigger('change');
-        }
-    });
-
-
-    
-
-    
-    $('#program_type').on('change', function() {
-        if ($(this).val()) {
-            $('#priorityWarning').slideDown(200);
-        } else {
-            $('#priorityWarning').slideUp(200);
-        }
-    });
-
-    
+// 4. Reset modal kalau user tutup tanpa tekan Confirm
+$('#termsModal').on('hidden.bs.modal', function () {
+    if (!$('#agreeTerms').is(':checked')) {
+        $('#modalAgreeCheck').prop('checked', false);
+        $('#confirmTermsBtn').prop('disabled', true);
+    }
+});
+	
 function checkContextInputs() {
     return $('#reserveDate').val() && 
            $('#returnDate').val() && 
@@ -947,78 +989,90 @@ function checkContextInputs() {
 }
 
     
+// GANTIKAN bahagian navigasi sedia ada dengan ini
+function showStep(stepNumber) {
+    $('.tab-pane-custom').addClass('d-none'); // Sembunyi semua content
+    $('#step' + stepNumber + '-content').removeClass('d-none'); // Tunjuk content langkah terpilih
+    
+    // Update stepper UI
+    $('.step-item').removeClass('active');
+    for(let i=1; i<=stepNumber; i++) {
+        $('#step' + i + '-nav').addClass('active').prop('disabled', false);
+    }
+}
+
+// Langkah 1 -> 2
 $('#confirmContextBtn').on('click', function() {
     if (checkContextInputs()) {
-        
         RESERVATION_CONTEXT = {
             reserve_date: $('#reserveDate').val(),
             return_date: $('#returnDate').val(),
             program_type: $('#program_type').val(),
             program_type_text: $('#program_type option:selected').text().trim(),
             reason: $('#reason').val(),
-            location: $('#location').val(), // TAMBAH INI
+            location: $('#location').val(),
             person_id: $('input[name="person_id"]').val()
         };
 
-            
-            $('#ContextCard').find('input, select, textarea').prop('disabled', true).css('opacity', 0.6);
-            
-            
-            $('#confirmContextBtn').html('<i class="fa-solid fa-check-double me-2"></i> CONTEXT IS LOCKED').removeClass('btn-primary').addClass('btn-success').prop('disabled', true);
-            
-            
-            $('#nextToItemsBtn').removeClass('d-none').prop('disabled', false); 
-
-            
-            $('#items-tab').removeClass('disabled');
-            new bootstrap.Tab(document.getElementById('items-tab')).show();
-            
-            checkItemAvailability();
-        } else {
-            Swal.fire('Incomplete Context', 'Please fill in all the required fields (Dates, Program Type, and Purpose) in Step 1.', 'warning');
-        }
-    });
-
-    
-
-    
-    $('#nextToItemsBtn').on('click', function() {
-        if ($('#confirmContextBtn').is(':disabled')) {
-              new bootstrap.Tab(document.getElementById('items-tab')).show();
-        } else {
-            $('#confirmContextBtn').trigger('click');
-        }
-    });
-
-    
-    $('#prevToContextBtn').on('click', function() {
+      $('#step1-content').find('input, select, textarea').prop('disabled', true).css('opacity', 0.6);
+        $(this).html('<i class="fa-solid fa-lock me-2"></i> CONTEXT LOCKED').addClass('btn-success').prop('disabled', true);
         
-        unlockContext(); 
+        showStep(2); 
+
+        // TOAST UNTUK STEP 1
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Context Locked & Saved',
+            showConfirmButton: false,
+            timer: 2000
+        });
         
-        
-        new bootstrap.Tab(document.getElementById('context-tab')).show();
-    });
-    
-    
-    $('#nextToReviewBtn').on('click', function() {
-        if (REQUEST_ITEMS.length > 0) {
-            updateReviewTab(); 
-            new bootstrap.Tab(document.getElementById('review-tab')).show();
-        } else {
-            Swal.fire('No Items', 'Please add at least one item to your request list before proceeding to review.', 'warning');
-        }
-    });
+        checkItemAvailability();
+    } else {
+        // Warning jika tak lengkap pun boleh buat toast
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'warning',
+            title: 'Please fill all fields',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    }
+});
 
-    
 
-    
-    $('#item_select, #quantity').on('change input', function() {
-        if ($('#confirmContextBtn').is(':disabled')) {
-            checkItemAvailability();
-        }
-    });
+// Langkah 2 -> 1 (Edit Context)
+$('#prevToContextBtn').on('click', function() {
+    // Unlock input Step 1
+    $('#step1-content').find('input, select, textarea').prop('disabled', false).css('opacity', 1);
+    $('#confirmContextBtn').html('<i class="fa-solid fa-lock me-2"></i> CONFIRM & LOCK CONTEXT').removeClass('btn-success').prop('disabled', false);
+    showStep(1);
+});
 
-    
+// Langkah 2 -> 3
+$('#nextToReviewBtn').on('click', function() {
+    if (REQUEST_ITEMS.length > 0) {
+        updateReviewTab(); 
+        showStep(3);
+    } else {
+        Swal.fire('No Items', 'Add at least one item first.', 'warning');
+    }
+});
+
+// Langkah 3 -> 2
+$('#backToItemsBtn').on('click', function() {
+    showStep(2);
+});
+
+$('#item_select').select2({
+    theme: 'bootstrap-5',
+    placeholder: 'Search and select an item...',
+    width: '100%', // Paksa lebar 100%
+    dropdownParent: $('#step2-content') // Setkan terus ke ID step tersebut
+});    
     function displayAvailability(availableQty, requestedQty, itemName) {
         const statusDiv = $('#availability-status');
         statusDiv.empty();
@@ -1100,46 +1154,62 @@ $('#confirmContextBtn').on('click', function() {
             }
         });
     }
+$('#addMoreBtn').on('click', function() {
+    const item_id = $('#item_select').val();
+    const quantity = parseInt($('#quantity').val());
+    const selectedItem = ALL_ITEMS_DATA.find(item => item.item_id == item_id);
 
+    if (!item_id || isNaN(quantity) || quantity <= 0 || !selectedItem) {
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            title: 'Please select valid item/quantity',
+            showConfirmButton: false,
+            timer: 3000
+        });
+        return;
+    }
     
-    $('#addMoreBtn').on('click', function() {
-        const item_id = $('#item_select').val();
-        const quantity = parseInt($('#quantity').val());
-        const selectedItem = ALL_ITEMS_DATA.find(item => item.item_id == item_id);
-
-        if (!item_id || isNaN(quantity) || quantity <= 0 || !selectedItem) {
-            Swal.fire('Error', 'Please select a valid item and quantity.', 'error');
-            return;
-        }
-        
-        const existingIndex = REQUEST_ITEMS.findIndex(item => item.item_id == item_id);
-        
-        if (existingIndex !== -1) {
-            REQUEST_ITEMS[existingIndex].quantity = quantity;
-            Swal.fire('Updated!', `${selectedItem.item_name} quantity updated to ${quantity}.`, 'success');
-        } else {
-            REQUEST_ITEMS.push({
-                item_id: item_id,
-                item_name: selectedItem.item_name,
-                category_name: selectedItem.category_name,
-                image_url: selectedItem.image_url,
-                quantity: quantity
-            });
-            Swal.fire('Added!', `${selectedItem.item_name} (x${quantity}) added to your request list.`, 'success');
-        }
-
-        
-        $('#item_select').val(null).trigger('change');
-        $('#quantity').val(1);
-        $('#availability-status').empty();
-        $('#addMoreBtn').prop('disabled', true);
-
-        updateReviewTab();
-    });
-
-
+    const existingIndex = REQUEST_ITEMS.findIndex(item => item.item_id == item_id);
     
-    
+    if (existingIndex !== -1) {
+        REQUEST_ITEMS[existingIndex].quantity = quantity;
+        // TOAST UPDATE
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Quantity Updated',
+            showConfirmButton: false,
+            timer: 2000
+        });
+    } else {
+        REQUEST_ITEMS.push({
+            item_id: item_id,
+            item_name: selectedItem.item_name,
+            category_name: selectedItem.category_name,
+            image_url: selectedItem.image_url,
+            quantity: quantity
+        });
+        // TOAST ADDED
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Item Added to List',
+            showConfirmButton: false,
+            timer: 2000
+        });
+    }
+
+    $('#item_select').val(null).trigger('change');
+    $('#quantity').val(1);
+    $('#availability-status').empty();
+    $('#addMoreBtn').prop('disabled', true);
+
+    updateReviewTab();
+});
     
     $('#backToItemsBtn').on('click', function() {
         new bootstrap.Tab(document.getElementById('items-tab')).show();
@@ -1166,7 +1236,6 @@ function updateReviewTab() {
         itemsListHtml_Step2 = '<div class="text-center text-muted p-4"><i class="fa-solid fa-list-check fa-2x mb-2"></i><p class="mb-0">Your request list is currently empty.</p></div>';
         itemsListHtml_Step3_Review = '<div class="text-center text-muted p-4 border rounded"><i class="fa-solid fa-box-open fa-2x mb-2"></i><p class="mb-0">No items added. Please go back to Step 2.</p></div>';
         
-        $('#agreeTerms').prop('disabled', true).prop('checked', false).trigger('change');
         
     } else {
         itemsListHtml_Step2 = '<ul class="list-group list-group-flush">';
@@ -1216,7 +1285,6 @@ function updateReviewTab() {
         itemsListHtml_Step2 += '</ul>';
         itemsListHtml_Step3_Review += '</ul>';
 
-        $('#agreeTerms').prop('checked', false).prop('disabled', true);
     }
     
     
@@ -1243,27 +1311,34 @@ function updateReviewTab() {
     $('.remove-item-btn').on('click', removeItemFromList);
 }
 
+function removeItemFromList() {
+    const indexToRemove = $(this).data('index');
     
-    function removeItemFromList() {
-        const indexToRemove = $(this).data('index');
-        
-        Swal.fire({
-            title: 'Confirm Removal',
-            text: "Are you sure you want to remove this item from the list?",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#06b6d4',
-            cancelButtonColor: '#ef4444',
-            confirmButtonText: 'Yes, Remove It!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                REQUEST_ITEMS.splice(indexToRemove, 1);
-                updateReviewTab();
-                Swal.fire('Removed!', 'The item has been removed.', 'success');
-            }
-        });
-    }
-
+    Swal.fire({
+        title: 'Confirm Removal?',
+        text: "Remove this item from list?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#06b6d4',
+        cancelButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, Remove It!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            REQUEST_ITEMS.splice(indexToRemove, 1);
+            updateReviewTab();
+            
+            // VERSI TOAST TEPI
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'Item Removed',
+                showConfirmButton: false,
+                timer: 2000
+            });
+        }
+    });
+}
     
     $('#agreeTerms').on('change', function() {
         $('#finalSubmitBtn').prop('disabled', !$(this).is(':checked'));
@@ -1271,6 +1346,27 @@ function updateReviewTab() {
 
     
     $('#finalSubmitBtn').on('click', function() {
+		    // Jika list kosong
+    if (REQUEST_ITEMS.length === 0) {
+        Swal.fire('Error', 'Your request list is empty.', 'error');
+        return;
+    }
+    
+    // Jika belum setuju T&C (Safety Check)
+    if (!$('#agreeTerms').is(':checked')) {
+        Swal.fire({
+            title: 'Terms & Conditions',
+            text: 'You must read and agree to the terms before submitting.',
+            icon: 'info',
+            confirmButtonText: 'Read T&C'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $('#termsModal').modal('show');
+            }
+        });
+        return;
+    }
+
         if (REQUEST_ITEMS.length === 0) {
             Swal.fire('Error', 'Your request list is empty. Please add items in Step 2.', 'error');
             return;
@@ -1361,27 +1457,36 @@ function updateReviewTab() {
 
     
     
+function filterItemList(categoryName) {
+    // 1. Cari target container (Make sure ID ni ada dalam HTML kau)
+    const displayList = $('#displayItemList'); 
+    if (displayList.length === 0) return; // Exit kalau ID tak jumpa
+
+    displayList.empty();
     
-    function filterItemList(categoryName) {
-        const displayList = $('#displayItemList');
-        displayList.empty();
-        
-        const filteredItems = ALL_ITEMS_DATA.filter(item => 
-            categoryName === '' || item.category_name === categoryName
-        );
+    // 2. Tapis data. Kalau categoryName kosong atau "All Items", tunjuk semua.
+    const filteredItems = ALL_ITEMS_DATA.filter(item => {
+        return (categoryName === '' || 
+                categoryName === 'All Items' || 
+                item.category_name === categoryName);
+    });
 
-        if (filteredItems.length === 0) {
-            displayList.html('<p class="text-center text-muted p-3">No items found in this category.</p>');
-            return;
-        }
+    // 3. Kalau kosong, tunjuk mesej
+    if (filteredItems.length === 0) {
+        displayList.html('<p class="text-center text-muted p-3">No items found in this category.</p>');
+        return;
+    }
 
+    // 4. Loop dan masukkan HTML
     filteredItems.forEach(item => {
         const imagePath = item.image_url ? `../${item.image_url}` : '../assets/default-image.jpg';
         
         const itemHtml = `
-            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center py-3" onclick="selectItemFromList(${item.item_id}); return false;">
-                <div class="category-image-box">
-                    <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img">
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center py-3" 
+               onclick="selectItemFromList(${item.item_id}); return false;">
+                <div class="category-image-box me-3">
+                    <img src="${imagePath}" alt="${item.item_name}" class="category-thumb-img" 
+                         style="width:50px; height:50px; object-fit:cover; border-radius:8px;">
                 </div>
                 <div>
                     <strong class="d-block">${item.item_name}</strong>
@@ -1392,8 +1497,7 @@ function updateReviewTab() {
         `;
         displayList.append(itemHtml);
     });
-    }
-
+}
     
     window.selectItemFromList = function(itemId) {
         $('#item_select').val(itemId).trigger('change');
@@ -1405,5 +1509,24 @@ function updateReviewTab() {
     filterItemList(''); 
 });
 </script>
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_user.php" class="nav-item">
+        <i class="fa-solid fa-house"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="item_user.php" class="nav-item active">
+        <i class="fa-solid fa-calendar-plus"></i>
+        <span>Book Equipment</span>
+    </a>
+    <a href="history.php" class="nav-item">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>My Loan</span>
+    </a>
+    <a href="profile.php" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav>
 </body>
 </html>
+

@@ -359,25 +359,42 @@ function sendNewReservationNotification($technician_email, $reserve_id, $user_na
         
         $mail->Body = "
             <html>
-            <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
-                <div style='max-width: 600px; margin: 0 auto; border: 1px solid #ffcc00; padding: 20px; background-color: #fffacd;'>
-                    <h3 style='color: #ff9900;'>New Reservation Request Requires Action</h3>
-                    <p>A user has submitted a new asset reservation request that requires your approval.</p>
+            <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7f6; padding: 20px;'>
+                <div style='max-width: 600px; margin: 0 auto; border-top: 5px solid #003366; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
                     
-                    <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; margin: 15px 0; border-collapse: collapse; border: 1px solid #ccc;'>
-                        <tr><td style='width: 35%; padding: 8px;'><strong>Reservation ID:</strong></td><td style='width: 65%; padding: 8px;'><strong>{$reserve_id}</strong></td></tr>
-                        <tr><td style='padding: 8px;'><strong>Requested By:</strong></td><td style='padding: 8px;'>{$user_name}</td></tr>
-                        <tr><td style='padding: 8px;'><strong>Item Requested:</strong></td><td style='padding: 8px;'>{$item_name}</td></tr>
-                        <tr><td style='padding: 8px;'><strong>Reservation Date:</strong></td><td style='padding: 8px;'>{$reserve_date}</td></tr>
-                    </table>
+                    <h2 style='color: #003366; margin-top: 0;'>New Reservation Request</h2>
+                    <p style='font-size: 15px;'>A new asset reservation request has been submitted and requires your <strong>approval</strong>.</p>
+                    
+                    <div style='background-color: #f8f9fa; border-left: 4px solid #003366; padding: 15px; margin: 20px 0;'>
+                        <table border='0' cellpadding='5' cellspacing='0' style='width: 100%; border-collapse: collapse;'>
+                            
+                            <tr>
+                                <td style='color: #666; padding: 5px 0;'><strong>Requested By</strong></td>
+                                <td style='padding: 5px 0;'>{$user_name}</td>
+                            </tr>
+                            <tr>
+                                <td style='color: #666; padding: 5px 0;'><strong>Items</strong></td>
+                                <td style='padding: 5px 0;'>{$item_name}</td>
+                            </tr>
+                            <tr>
+                                <td style='color: #666; padding: 5px 0;'><strong>Date</strong></td>
+                                <td style='padding: 5px 0;'>{$reserve_date}</td>
+                            </tr>
+                        </table>
+                    </div>
 
-                    <p style='margin-top: 20px;'>Please click the button below to review and approve/reject this request:</p>
+                    <p style='margin-top: 25px;'>Please click the button below to review the request details:</p>
                     
-                    <a href='{$link_to_approval}' style='display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px; font-weight: bold;'>
-                        Review Request Now
-                    </a>
-                    <hr style='border: 0; border-top: 1px solid #ddd; margin: 20px 0;'>
-                    <p style='font-size: 12px; color: #999;'>Please confirm the status of this request as soon as possible.</p>
+                    <div style='text-align: center; margin: 30px 0;'>
+                        <a href='{$link_to_approval}' style='display: inline-block; padding: 12px 30px; color: #ffffff; background-color: #003366; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>
+                            Review Request Now
+                        </a>
+                    </div>
+
+                    <hr style='border: 0; border-top: 1px solid #eee; margin: 30px 0;'>
+                    <p style='font-size: 12px; color: #888; text-align: center;'>
+                        This is an automated notification from UniKL NEXCHECK Inventory System.
+                    </p>
                 </div>
             </body>
             </html>

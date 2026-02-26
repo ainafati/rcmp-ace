@@ -1,0 +1,930 @@
+    /* KEKALKAN SEMUA STYLES LAMA */
+    :root {
+        /* Warna Utama (Cyan/Teal) */
+        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
+        --primary-light: #f0f9ff; /* Biru Sangat Muda untuk Latar Belakang Aktif */
+        --primary-hover: #0891b2; /* Cyan 700 */
+        --danger-color: #ef4444; /* Merah untuk Logout */
+        
+        /* Warna Sedia Ada (Kekal Sama) */
+        --bg-light-gray: #f8fafc;
+        --text-dark: #1e293b; 
+        --text-muted: #64748b;
+    }
+    
+    /* BASE & TYPOGRAPHY */
+    body { font-family: 'Inter', sans-serif; background-color: var(--bg-light-gray); color: #334155; min-height: 100vh; }
+    h3, h5, .modal-title { font-weight: 600; color: var(--text-dark); }
+    .card { border-radius: 12px; border: 1px solid #e5e7eb; }
+    
+    /* UTILITY COLORS (Diselaraskan) */
+    .bg-primary-blue { background-color: var(--primary-color); } /* Diganti dengan Cyan */
+    .text-primary-blue { color: var(--primary-color); } /* Diganti dengan Cyan */
+    .text-green { color: #10b981; }
+    .text-orange { color: #f97316; }
+    .text-red { color: #ef4444; }
+    .text-amber { color: #f59e0b; }
+
+    /* DEFINISI SIDEBAR (MOBILE & DESKTOP) */
+    .sidebar { 
+        width: 250px; 
+        position: fixed; 
+        top: 0; 
+        bottom: 0; 
+        left: 0; 
+        background: #ffffff; 
+        padding: 20px 0; 
+        border-right: 1px solid #e5e7eb; 
+        display: flex; 
+        flex-direction: column; 
+        z-index: 1050; /* Naikkan Z-index sedikit untuk overlay/toggle */
+        transition: transform 0.3s ease; /* Tambah Transisi */
+    }
+    .sidebar-header { padding: 0 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    
+    /* LOGO ICON: KOTAK CYAN/TEAL */
+    .logo-icon { 
+        width: 40px; height: 40px; 
+        background-color: var(--primary-color); /* Menggunakan Cyan */
+        color: white; 
+        border-radius: 10px; 
+        display: flex; align-items: center; justify-content: center; 
+        font-size: 20px; 
+    }
+
+    /* Logo Text Styles */
+    .logo-text strong { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); }
+    .logo-text span { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
+    
+	/* Tambah ini dalam tag <style> anda */
+.fc-daygrid-event {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    padding: 2px 5px !important;
+}
+
+/* Pastikan warna oren buffer period dipaksa keluar */
+.fc-event-buffer { 
+    background-color: #f59e0b !important; 
+    border-color: #f59e0b !important;
+}
+
+    /* Sidebar Links Container */
+    .sidebar-nav { margin-top: 30px; padding: 0 15px; flex-grow: 1; } 
+    .sidebar-footer { padding: 0 15px; margin-top: auto; }
+
+/* Badge Dashboard */
+.count {
+    background: linear-gradient(45deg, var(--primary-color), #0ea5e9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 3rem !important;
+}
+
+
+    .sidebar a { 
+        display: flex; align-items: center; gap: 12px; 
+        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
+        margin-bottom: 8px; border-radius: 8px; 
+        font-weight: 500; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative; 
+    }
+
+    /* ACTIVE & HOVER STYLE (Menggunakan Cyan) */
+    .sidebar a.active, .sidebar a:hover:not(.logout-link) { 
+        background: var(--primary-color); /* Cyan Penuh */
+        color: #fff; 
+		    transform: translateX(5px); /* Slide effect bila hover */
+
+    }
+
+    /* BADGE STYLES */
+    .sidebar a .badge { margin-left: auto; background-color: var(--danger-color); color: white; }
+    .sidebar a.active .badge { background-color: #ffffff; color: var(--danger-color); }
+
+
+    /* LOGOUT BUTTON: MERAH TEKS SAHAJA */
+    .sidebar-footer a.logout-link {
+        background: transparent !important; 
+        color: var(--danger-color) !important; /* Warna Merah */
+        border-radius: 8px;
+        font-weight: 500 !important; 
+        padding: 12px 15px;
+        margin-top: 25px; 
+        justify-content: flex-start; 
+    }
+    .sidebar-footer a.logout-link:hover {
+        background: #fee2e2 !important; /* Latar belakang hover Merah Pudar */
+        color: var(--danger-color) !important;
+    }
+
+    /* MAIN LAYOUT & TOPBAR (Kekal Sama, guna primary-color baru) */
+    .main-content { margin-left: 250px; min-height: 100vh; /* Pastikan ia meliputi seluruh ketinggian */ }
+
+/* --- TOPBAR REVOLUTION (FIXED VERSION) --- */
+.topbar {
+    background: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 10px 25px;
+    display: flex !important; /* Paksa flex */
+    flex-direction: row !important; /* Paksa baris */
+    align-items: center !important;
+    justify-content: space-between !important; /* Ini kunci utama */
+    min-height: 70px;
+    position: sticky;
+    top: 15px;
+    margin: 0 20px 25px 20px;
+    border-radius: 18px;
+    z-index: 1000;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Cari dalam CSS kau bahagian .topbar h3 */
+.topbar h3 {
+    margin: 0 !important;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    /* white-space: nowrap;  <-- BUANG LINE NI */
+    flex-shrink: 1; /* Biar dia boleh mengecil kalau perlu */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Kalau panjang sangat, dia akan jadi "Tajuk Pa..." */
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, #1e293b, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.card-summary {
+    min-height: 130px; /* Gunakan MIN-height, bukan height */
+    height: auto !important; /* Biar dia memanjang ke bawah kalau content banyak */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    word-wrap: break-word; /* Paksa teks panjang turun bawah */
+}
+
+/* Pastikan nombor (count) tak langgar icon */
+.card-summary .count {
+    font-size: 2rem !important; /* Kecilkan sikit kalau rasa besar sangat */
+    margin-right: 40px; /* Beri ruang untuk icon-wrapper dkt kanan */
+}
+
+/* 2. Container Kanan - Tolak ke hujung */
+.topbar-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px; /* Jarak antara Bell dan Profile */
+    margin-left: auto; /* MAGIC TRICK: Tolak semua ke kanan */
+}
+
+/* 3. Cantikkan Notification & Profile */
+.notification-wrapper {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #64748b;
+    transition: 0.2s;
+}
+
+.user-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 6px 6px 12px;
+    background: #f1f5f9;
+    border-radius: 12px;
+    text-decoration: none !important;
+}
+
+.user-pill:hover {
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+
+.user-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+/* Notification Badge Glow */
+.notification-wrapper {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    background: #ffffff;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.notification-wrapper:hover {
+    background: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.notification-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background: #ef4444;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+}
+
+/* Sidebar Toggle Button (Mobile) */
+#sidebarToggle {
+    width: 40px;
+    height: 40px;
+    background: #f1f5f9;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #334155;
+}
+   .container-fluid { padding: 30px; }
+    .topbar h3 { margin-right: auto; font-weight: 700; color: var(--text-dark); }
+    
+    /* ... (CSS Summary Card, FullCalendar, Chart, Badge kekal sama) ... */
+    
+	
+    .card-summary {
+    background: linear-gradient(145deg, #ffffff, #f0f4f8); /* Gradient halus */
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+        padding: 20px;
+        text-align: left;
+        height: 100%;
+        transition: transform 0.2s, box-shadow 0.2s;
+        position: relative;
+		border: none !important; /* Buang border keras */
+    box-shadow: 8px 8px 16px #d1d9e6, -8px -8px 16px #ffffff; /* Neumorphism soft style */
+
+    }
+    .card-summary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+    .card-summary .icon-wrapper {
+        position: absolute; top: 20px; right: 20px;
+        width: 35px; height: 35px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .card-summary .count { font-size: 2.5rem; font-weight: 700; line-height: 1.1; margin-bottom: 5px; }
+    .card-summary .label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; }
+    
+    /* Specific Card Styling (Menggunakan primary-color baru) */
+    .card-total-assets .icon-wrapper { background-color: var(--primary-light); color: var(--primary-color); }
+    .card-available .icon-wrapper { background-color: #d1fae5; color: #10b981; }
+    .card-checked-out .icon-wrapper { background-color: #fff7ed; color: #f97316; }
+    .card-overdue .icon-wrapper { background-color: #fee2e2; color: #ef4444; }
+    .card-maintenance .icon-wrapper { background-color: #fefce8; color: #f59e0b; } 
+    
+    /* FullCalendar Customization */
+    #calendar-container { padding: 20px; }
+
+    
+    /* Chart Bar Styling */
+    .loan-chart-item { margin-bottom: 15px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
+    .loan-chart-item .label { width: 30%; font-weight: 500; }
+    .loan-chart-item .bar-wrapper { flex-grow: 1; margin: 0 10px; position: relative; }
+    .loan-chart-bar { background-color: #e5e7eb; height: 10px; border-radius: 5px; overflow: hidden; }
+    .loan-chart-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+    .loan-chart-item .value { font-weight: 600; color: var(--text-dark); width: 10%; text-align: right; }
+    .loan-chart-footer { border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; font-weight: 600; font-size: 1rem; }
+    .loan-chart-total { color: var(--text-dark); font-size: 1.2rem; }
+    
+    /* Chart colors (Menggunakan primary-color baru) */
+    .bg-blue-fill { background-color: var(--primary-color); }
+    .bg-green-fill { background-color: #10b981; }
+    .bg-orange-fill { background-color: #f97316; }
+    .bg-red-fill { background-color: #ef4444; }
+    
+/* --- VERSI KALENDAR TAK MACAM JADUAL BELAJAR --- */
+#calendar {
+    background: #f1f5f9; /* Tukar ke Slate-100 (Bukan putih) */
+    padding: 25px;
+    border-radius: 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); /* Efek tenggelam sikit */
+}
+
+/* Kotak tarikh (Inner Cells) kita bagi putih balik supaya nampak kontras */
+.fc .fc-daygrid-day {
+    background-color: #ffffff !important;
+}
+
+/* Header hari (Sun, Mon...) kita bagi background gelap sikit biar nampak 'Header' */
+.fc .fc-col-header-cell {
+    background: #e2e8f0; /* Kelabu sikit */
+    border: none !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+    color: #475569 !important;
+    padding: 12px 0 !important;
+    font-size: 0.8rem !important;
+    font-weight: 800 !important;
+}
+
+/* Hilangkan border-border petak yang buat dia nampak macam jadual sekolah */
+.fc-theme-standard td, .fc-theme-standard th {
+    border: 1px solid #f1f5f9 !important; /* Border warna lembut gila */
+}
+
+/* Tarikh hari ini (Today) bagi glow sikit */
+.fc-day-today {
+    background-color: #f8fafc !important; /* Putih bersih */
+    box-shadow: inset 0 0 0 2px var(--primary-color); /* Border biru kat dalam */
+}
+
+/* Nombor tarikh */
+.fc .fc-daygrid-day-number {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700 !important;
+    color: #94a3b8 !important;
+    font-size: 0.9rem;
+}
+
+/* Hover effect pada kotak tarikh */
+.fc-daygrid-day:hover {
+    background-color: #f8fafc !important;
+    transform: scale(1.01);
+    z-index: 5;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+dropdown-menu-end {
+    left: auto !important; 
+    right: 0 !important;
+}
+
+#notificationList {
+    width: 320px; 
+    max-height: 400px; 
+    overflow-y: auto; 
+    overflow-x: hidden; 
+}
+
+/* Force wrap for the notification message */
+.dropdown-item p {
+    white-space: normal;
+}
+
+/* START: New Styles for Compact Layout */
+.h-100 {
+    height: 100% !important;
+}
+#taskSummary h6 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+#taskSummary ul li {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 0.85rem;
+    line-height: 1.4; /* Tambah jarak antara baris teks */
+    border-bottom: 1px solid #f1f5f9; /* Tambah pemisah supaya tak nampak bercampur */
+    word-break: break-word; /* Paksa patah balik kalau perkataan terlalu panjang */
+}
+
+@media (max-width: 991.98px) {
+    #admin-sidebar {
+        /* Paksa sorok ke kiri luar skrin */
+        transform: translateX(-110%); 
+        margin: 0 !important; /* Buang margin 15px tadi supaya rapat ke tepi skrin */
+        border-radius: 0; /* Full height bila mobile */
+        height: 100vh !important;
+        width: 260px;
+    }
+    
+	/* Bila user tekan button, class 'show' akan ditambah guna JS */
+    #admin-sidebar.show {
+        transform: translateX(0);
+    }
+	#calendar-container {
+        padding: 10px; /* Kurangkan padding kalendar */
+        width: 100%;
+        overflow-x: auto; /* Benarkan scroll jika FullCalendar itu sendiri terlalu lebar */
+    }
+	
+    /* Sidebar mesti tersembunyi secara default, dan muncul apabila kelas .toggled dikeluarkan */
+    .sidebar {
+        /* Pindahkan sidebar ke luar skrin secara default pada skrin kecil */
+        transform: translateX(-250px); 
+        transition: transform 0.3s ease;
+        z-index: 1050; /* Pastikan ia berada di atas segala-galanya apabila dibuka */
+    }
+
+    /* Keadaan apabila toggle diklik (sidebar tersembunyi) */
+    .sidebar.toggled {
+        /* Kembali ke kedudukan asal (tersembunyi) */
+        transform: translateX(-250px); 
+    }
+    
+    /* Keadaan apabila toggle diklik (sidebar dipaparkan) */
+    .sidebar:not(.toggled) {
+        transform: translateX(0); /* Alihkan ke skrin */
+    }
+
+.main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+#sidebarOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+        display: none;
+    }
+
+    #sidebarOverlay.active {
+        display: block;
+    }
+
+    /* 4. Topbar Button & Heading Adjustment */
+    .topbar {
+        padding-left: 15px; /* Kurangkan padding pada mobile */
+        padding-right: 15px;
+		justify-content: space-between !important;
+        z-index: 1030; /* Pastikan topbar berada di atas main content */
+    }
+    
+    .topbar h3 {
+        font-size: 1.2rem; /* Kecilkan tajuk */
+    }
+
+    /* 5. Kurangkan padding container-fluid */
+    .container-fluid {
+        padding: 15px;
+    }
+}
+#admin-sidebar {
+    margin: 15px;
+    border-radius: 20px;
+    height: calc(100vh - 30px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    background-color: #1a2235 !important;
+    color: #ffffff !important;
+    min-width: 250px;
+    transition: all 0.3s ease-in-out;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1050;
+}
+
+/* Pastikan Header (UniKL Technician) nampak terang */
+.sidebar-header, .logo-text strong, .sidebar-brand h5 {
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.logo-text span {
+    color: #94a3b8 !important; /* Warna kelabu cair untuk 'System Support' */
+}
+
+/* --- SIDEBAR REFINEMENT --- */
+#admin-sidebar {
+    margin: 15px;
+    border-radius: 20px;
+    height: calc(100vh - 30px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    background-color: #1a2235 !important; /* Warna Gelap Premium */
+    color: #ffffff !important;
+    min-width: 250px;
+    transition: all 0.3s ease-in-out;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-nav a {
+    display: flex !important;
+    align-items: center !important; /* Paksa icon, teks, & badge duduk center horizontal */
+    gap: 10px; /* Jarak antara teks "Manage Requests" dan badge */
+    padding: 12px 15px;
+    text-decoration: none;
+    position: relative;
+}
+/* Hover & Active State */
+.sidebar-nav a:hover, .sidebar-nav a.active {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+}
+
+.sidebar-nav a.active {
+    background: var(--primary-color) !important; /* Warna Cyan kau */
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+}
+
+/* Badge merah sebijik macam gambar */
+.sidebar-nav a .badge {
+    background-color: #ef4444 !important; /* Merah terang */
+    color: white !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    padding: 2px 8px !important; /* Kecil dan bulat sikit */
+    border-radius: 50px !important; /* Jadikan dia lonjong/bulat macam dalam gambar */
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    min-width: 20px;
+}
+
+
+/* Kalau link tu ACTIVE, badge tukar warna sikit supaya harmoni */
+.sidebar-nav a.active .badge {
+    background-color: white !important;
+    color: var(--primary-color) !important;
+    box-shadow: none;
+}
+#admin-sidebar .nav-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Menu yang Aktif (Dashboard) */
+#admin-sidebar .nav-link.active {
+    background-color: #3b82f6 !important; /* Biru terang */
+    color: #ffffff !important;
+    border-radius: 8px;
+    margin: 5px 10px;
+}
+
+
+/* Cari class atau ID yang pegang nama tu, contohnya: */
+.sidebar-brand h5, .sidebar-brand span {
+    color: #ffffff !important; /* Paksa jadi putih */
+    font-weight: bold;
+}
+
+/* Warna Logo Section */
+.sidebar-header {
+color: #ffffff !important;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+/* Hilangkan teks event dalam kalendar (sbb kita nak dia keluar kat side panel je) */
+.fc-event-title {
+    display: none !important;
+}
+
+/* --- 1. EFEK HOVER & BOX BOOKING --- */
+
+/* Tarikh ada booking: Hijau Lembut */
+.fc-daygrid-day.has-booking {
+    background-color: #ecfdf5 !important; /* Hijau sangat lembut */
+    transition: background 0.3s ease;
+}
+
+/* Efek Hover: Kotak Kelabu bila cursor lalu */
+.fc-daygrid-day:hover {
+    background-color: #f1f5f9 !important; /* Kelabu lembut */
+    cursor: pointer;
+}
+
+/* Kekalkan highlight hari ini (Today) */
+.fc-day-today {
+    background-color: #eff6ff !important; /* Biru cair */
+}
+
+/* --- 2. TITIK (DOTS) - KEMASKAN BIAR TAK PELIK --- */
+/* Kita buat dots ni duduk dalam satu baris yang kemas kat bawah nombor */
+.fc-daygrid-day-events {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 5px !important;
+    min-height: 10px !important;
+}
+
+/* --- 3. SIDEBAR DAILY DETAILS (LEBIH KEMAS) --- */
+#daily-details-content {
+    padding: 10px;
+}
+
+.detail-item {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #06b6d4; /* Cyan accent */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.detail-item .item-title {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+    display: block;
+}
+
+.detail-item .item-meta {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.detail-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #475569;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+/* Cantikkan Progress Bar */
+.progress {
+    background-color: #f1f5f9;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.progress-bar {
+    border-radius: 10px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Legend untuk Chart */
+.loan-chart-item span {
+    font-size: 0.9rem;
+    color: #475569;
+}
+/* Guna selector panjang untuk menang lawan style asal */
+div.modal-body table.asset-detail-table tbody td a.btn-outline-primary,
+div.modal-body table.asset-detail-table tbody td a.asset-code-link {
+    all: unset !important; /* Buang semua gaya asal button */
+    display: inline-block !important;
+    color: #2563eb !important; /* Biru Link */
+    font-weight: 700 !important;
+    font-family: 'Inter', sans-serif !important;
+    text-decoration: none !important;
+    padding: 2px 5px !important;
+    cursor: pointer !important;
+    transition: color 0.2s ease !important;
+}
+
+div.modal-body table.asset-detail-table tbody td a:hover {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+}
+
+/* Row hover biar nampak sleek */
+.asset-detail-table tbody tr:hover td {
+    background-color: #f8fafc !important;
+}
+
+/* Badge Status (Versi Pastel Profesional) */
+.badge.rounded-pill {
+    border: none !important;
+    padding: 6px 14px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+}
+
+
+/* Warna Status yang lebih "Matang" */
+.badge-status-available { background-color: #dcfce7 !important; color: #166534 !important; }
+.badge-status-checked-out { background-color: #dbeafe !important; color: #1e40af !important; }
+.badge-status-maintenance { background-color: #fef3c7 !important; color: #92400e !important; }
+.badge-status-danger { background-color: #fee2e2 !important; color: #991b1b !important; }
+.badge-status-default { background-color: #f1f5f9 !important; color: #475569 !important; }
+
+/* 1. MODAL CONTAINER - Bagi dia terapung & smooth */
+.modal-content {
+    border: none !important;
+    border-radius: 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+    overflow: hidden;
+}
+
+/* 2. HEADER - Kita bagi warna gradient halus atau clean white dengan padding besar */
+.modal-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding: 25px 30px !important;
+}
+
+.modal-title {
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+    color: #1e293b !important;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-title i {
+    background: #f0f9ff;
+    color: #06b6d4;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+/* 3. BODY & TABLE - Bagi nampak 'airy' */
+.modal-body {
+    padding: 30px !important;
+}
+
+.info-secondary {
+    color: #64748b;
+    font-size: 0.95rem;
+    margin-bottom: 25px;
+}
+
+/* TABLE STYLING */
+.table {
+    border-collapse: separate !important;
+    border-spacing: 0 8px !important; /* Bagi jarak antara row */
+}
+
+.table thead th {
+    background: #f8fafc !important;
+    border: none !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding: 15px !important;
+}
+
+.table tbody tr {
+    transition: all 0.2s;
+    background: #ffffff;
+}
+
+.table tbody tr td {
+    padding: 18px 15px !important;
+    vertical-align: middle !important;
+    border-top: 1px solid #f1f5f9 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Row hover effect */
+.table tbody tr:hover {
+    background-color: #f8fafc !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+/* Status Badge - Macam 'MAINTENANCE' dalam gambar kau */
+.badge {
+    padding: 8px 14px !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 0.75rem !important;
+}
+
+.bg-amber-soft {
+    background-color: #fffbeb !important;
+    color: #b45309 !important;
+    border: 1px solid #fef3c7 !important;
+}
+
+/* 4. FOOTER */
+.modal-footer {
+    border-top: 1px solid #f1f5f9 !important;
+    padding: 20px 30px !important;
+}
+
+.btn-secondary {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border: none !important;
+    padding: 10px 25px !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+}
+
+/* Container Utama */
+.container-fluid {
+    background-color: #f8fafc !important; 
+    padding: 20px 40px !important;
+}
+
+/* Table Style - Separated Rows */
+.table {
+    border-collapse: separate !important;
+    border-spacing: 0 8px !important; /* Jarak antara row dikurangkan */
+    background: transparent !important;
+}
+
+/* Header Table - Lebih halus */
+.table thead th {
+    border: none !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    font-size: 0.65rem !important; /* Kecil & Sharp */
+    letter-spacing: 1.2px;
+    padding: 10px 20px !important;
+}
+
+/* --- FIX UNTUK SKRIN HITAM --- */
+body {
+    background-color: #f8fafc !important; /* Warna cerah */
+}
+
+.main-content {
+    background-color: #f8fafc !important; /* Paksa warna cerah */
+    min-height: 100vh;
+    margin-left: 250px; /* Ikut lebar sidebar desktop */
+    transition: all 0.3s ease;
+}
+
+/* Fix Card History */
+.card.shadow-sm {
+    background-color: #ffffff !important;
+    border: none !important;
+    border-radius: 16px !important;
+    padding: 20px;
+}
+
+/* Pastikan Sidebar Desktop sentiasa nampak */
+@media (min-width: 992px) {
+    #admin-sidebar {
+        transform: translateX(0) !important;
+        display: flex !important;
+    }
+}
+
+/* Fix Overlay Mobile */
+#sidebarOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1040;
+    display: none;
+}
+#sidebarOverlay.active {
+    display: block;
+}
+
+/* Pastikan link kategori dalam sub-menu nampak kemas */
+.category-filter-link {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+/* Warna bila kategori tu dipilih (Active) */
+.category-filter-link.active-category-filter {
+    background: var(--primary-light) !important;
+    color: var(--primary-color) !important;
+    font-weight: 700 !important;
+    border-left: 3px solid var(--primary-color);
+}
+
+/* Hover effect untuk kategori */
+.category-filter-link:hover {
+    background: #f1f5f9;
+    color: var(--text-dark);
+}
+.brand-name {
+    font-size: 1.1rem !important; /* Guna rem supaya dia scale dengan baik */
+    font-weight: 700 !important;
+    line-height: 1.2;
+    display: inline-block;
+}

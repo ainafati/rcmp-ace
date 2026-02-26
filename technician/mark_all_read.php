@@ -12,8 +12,11 @@ if (!isset($_SESSION['person_id'])) {
 $current_tech_id = (int)$_SESSION['person_id'];
 
 try {
-    $stmt = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE person_id = ? AND is_read = 0");
-    
+// Tukar query update kau kepada ini:
+$stmt = $conn->prepare("UPDATE notifications 
+                        SET is_read = 1 
+                        WHERE (person_id = ? OR recipient_role_id = 2) 
+                        AND is_read = 0");    
     if ($stmt) {
         $stmt->bind_param("i", $current_tech_id);
         $stmt->execute();

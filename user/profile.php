@@ -2,29 +2,17 @@
 session_start();
 include '../config.php';
 
-if (!$conn) {
-    $_SESSION['error'] = "Database connection error.";
-    header("Location: ../login.php");
-    exit();
-}
-
-if (!isset($_SESSION['person_id'])) {
+if (!$conn || !isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
 }
 
 $person_id = (int) $_SESSION['person_id'];
-
-$user = null;
-
-// 1. PASTIKAN QUERY ADA COLUMN 'id'
 $stmt = $conn->prepare("SELECT id, name, email, phoneNum FROM person WHERE person_id = ?");
-if ($stmt) {
-    $stmt->bind_param("i", $person_id);
-    $stmt->execute();
-    $user = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-}
+$stmt->bind_param("i", $person_id);
+$stmt->execute();
+$user = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$user) {
     session_destroy();
@@ -32,26 +20,10 @@ if (!$user) {
     exit();
 }
 
-// 2. LOGIK NAMA PENDEK
+// Logic Nama Pendek
 $fullName = $user['name'] ?? 'Guest User';
-$lowerName = strtolower($fullName);
-$posBinti = strpos($lowerName, ' binti ');
-$posBin = strpos($lowerName, ' bin ');
-
-if ($posBinti !== false) {
-    $shortName = substr($fullName, 0, $posBinti);
-} elseif ($posBin !== false) {
-    $shortName = substr($fullName, 0, $posBin);
-} else {
-    $shortName = $fullName;
-}
-$displayName = trim($shortName);
-
-// Tambah person_id (Primary Key) ke array user untuk hidden input
+$displayName = trim(preg_split('/ (bin|binti) /i', $fullName)[0]);
 $user['person_id'] = $person_id;
-
-// JANGAN TUTUP $conn di sini jika anda ada query lain di bawah (seperti history atau categories)
-// $conn->close(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -61,346 +33,391 @@ $user['person_id'] = $person_id;
     <title>My Profile — UniKL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-    /* --- CSS STYLES --- */
-    :root {
-        --primary-color: #06b6d4; 
-        --primary-light: #f0f9ff; 
-        --primary-hover: #0891b2; 
-        --bg-light-gray: #f4f7f9; 
-        --card-bg: #ffffff; 
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
-        --danger-color: #ef4444; 
-    }
-    
-    body {
-        font-family: 'Inter', sans-serif;
-        background-color: var(--bg-light-gray);
-        color: var(--text-dark);
-        min-height: 100vh;
-    }
-    
-    .sidebar {
-        width: 280px; position: fixed; top: 0; bottom: 0; left: 0;
-        background: var(--card-bg); padding: 20px;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05); z-index: 1050; 
-        display: flex; flex-direction: column; justify-content: space-between;
-        /* Default pada desktop, tiada transform. Transform hanya diletakkan di media query */
-        transition: transform 0.3s ease-in-out;
-    }
+    <link rel="stylesheet" href="../css/style.css">
 
-    /* KAWALAN DESKTOP (Lebar > 992px) */
-    .main-content { 
-        margin-left: 280px; /* Kuncinya di sini: margin wajib untuk desktop */
-    }
+    <style>
+	.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
     
-    /* KOD BARU/DIUBAHSUAI UNTUK KAWALAN SIDEBAR PADA MOBILE */
-    .sidebar.active {
-        transform: translateX(0px) !important;
-    }
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
     
-    .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 35px; }
-    .logo-icon { width: 45px; height: 45px; background-color: var(--primary-color); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .logo-text strong { display: block; font-size: 18px; color: var(--text-dark); font-weight: 700; }
-    .logo-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
     
-    .sidebar a {
-        display: flex; align-items: center; gap: 15px;
-        color: var(--text-muted); text-decoration: none;
-        padding: 14px 18px; margin-bottom: 6px;
-        border-radius: 10px; font-weight: 500; font-size: 15px;
-        transition: all 0.2s;
-    }
-    .sidebar a.active {
-        background: var(--primary-light);
-        color: var(--primary-color);
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.1);
-    }
-    .sidebar a:hover:not(.active) { background: #eef1f4; color: var(--text-dark); }
-    .sidebar a.logout-link { color: var(--danger-color); font-weight: 600; margin-top: 20px; }
-    .sidebar a i { width: 20px; text-align: center; }
-
-    .topbar { 
-        background: var(--card-bg); 
-        padding: 18px 30px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        border-bottom: 1px solid #eef1f4; 
-        z-index: 1040; 
-        position: sticky; 
-        top: 0; 
-    }
-    .topbar h3 { font-weight: 700; margin: 0; color: var(--text-dark); font-size: 24px; }
-    .container-fluid { padding: 30px; }
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
     
-    .user-profile { display: flex; align-items: center; justify-content: center; }
-    .user-profile .user-name { font-weight: 700 !important; color: var(--text-dark); margin-right: 10px; }
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 2rem;
     
-    .card {
-        border-radius: 12px; box-shadow: var(--shadow-light);
-        background: var(--card-bg); margin-bottom: 25px;
-        border: none; padding: 25px;
-    }
-    .card h5 { font-weight: 600; color: var(--text-dark); }
-    
-    .profile-header-card { text-align: center; padding: 40px 25px; }
-    .avatar {
-        width: 120px; height: 120px; border-radius: 50%;
-        background: var(--primary-light);
-        color: var(--primary-color);
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto 20px auto;
-        font-size: 55px; font-weight: 600;
-        border: 4px solid var(--primary-color);
-    }
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
 
-    .basic-info strong { font-size: 1.5rem; font-weight: 700; display: block; margin-bottom: 5px; }
-    .basic-info span { color: var(--text-muted); font-size: 0.95rem; }
+        :root {
+            --primary-cyan: #06b6d4;
+            --bg-light: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
 
-    .info-card-container { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
-    .info-card {
-        padding: 15px 20px;
-        background-color: var(--bg-light-gray);
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        border: 1px solid #eef1f4;
-    }
-    .info-icon-wrapper {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        flex-shrink: 0;
-    }
-    .info-icon-wrapper.id-wrapper {
-        background-color: var(--text-muted);
-    }
+        body {
+            background-color: var(--bg-light);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
 
-    .info-details strong {
-        display: block;
-        font-size: 13px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        margin-bottom: 2px;
-    }
-    .info-details span {
-        font-weight: 600;
-        color: var(--text-dark);
-        font-size: 16px;
-    }
+        /* Card Container */
+        .profile-container {
+            padding-top: 20px;
+            padding-bottom: 100px; /* Space for mobile nav */
+        }
 
-    .form-control:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 0.25rem rgba(6, 182, 212, 0.25);
-    }
-    .btn { border-radius: 8px; padding: 10px 20px; font-weight: 600; }
-    .btn-primary {
-        background-color: var(--primary-color);
-        border: none;
-        transition: background-color 0.2s;
-    }
-    .btn-primary:hover { background-color: var(--primary-hover); }
+        .card {
+            border: none;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+            background: #ffffff;
+            overflow: hidden;
+            padding: 30px;
+        }
 
-    /* MEDIA QUERIES UNTUK RESPONSIVITI MOBILE (< 992px) */
-    @media (max-width: 992px) {
-        .sidebar { transform: translateX(-280px); left: 0; width: 280px; } 
-        .main-content { margin-left: 0; width: 100%; }
-        .topbar { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .topbar h3 { font-size: 20px; }
-        .container-fluid { padding: 15px; }
-    }
-    
-    /* KAWALAN BACKDROP */
-    #sidebar-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        opacity: 0;
-        visibility: hidden;
-        z-index: 1045; 
-        transition: opacity 0.3s ease-in-out;
-        display: none; 
-    }
+        /* Profile Header Section */
+        .profile-header-alt {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #f1f5f9;
+        }
 
-    #sidebar-backdrop.active {
-        opacity: 1;
-        visibility: visible;
-    }
-</style>
+        .profile-header-alt img {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            object-fit: cover;
+            border: 4px solid #f0fdfa;
+        }
+
+        /* Info Grid Layout */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            padding: 18px;
+            background: #fdfdfd;
+            border: 1px solid #f1f5f9;
+            border-radius: 18px;
+            transition: 0.3s;
+        }
+
+        .info-item:hover {
+            border-color: var(--primary-cyan);
+            background: #fff;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .icon-box {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .icon-id { background: #eff6ff; color: #3b82f6; }
+        .icon-mail { background: #fef2f2; color: #ef4444; }
+        .icon-phone { background: #f0fdf4; color: #22c55e; }
+        .icon-user { background: #faf5ff; color: #a855f7; }
+
+        .info-content strong {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .info-content span {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* Form Styling */
+        .form-label { font-weight: 600; font-size: 14px; color: var(--text-main); }
+        .form-control {
+            border-radius: 12px;
+            padding: 12px 15px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .form-control:focus {
+            background: #fff;
+            border-color: var(--primary-cyan);
+            box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+        }
+
+        /* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+.mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    /* TUKAR: Warna gelap ikut tema sidebar laptop */
+    background: #1e293b !important; 
+    border-top: 1px solid rgba(255, 255, 255, 0.1); 
+    padding: 12px 0 25px; /* Kekalkan padding bawah untuk iPhone */
+    z-index: 1000;
+    box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
+    justify-content: space-around;
+}
+
+.mobile-bottom-nav a {
+    flex: 1;
+    text-align: center;
+    text-decoration: none !important;
+    /* Warna icon masa tak aktif (kelabu) */
+    color: #94a3b8 !important; 
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.3s ease;
+}
+
+.mobile-bottom-nav a i { 
+    font-size: 22px; /* Besarkan sikit biar puas hati */
+}
+
+/* Warna bila menu Profile ni aktif (Cyan) */
+.mobile-bottom-nav a.active { 
+    color: #06b6d4 !important; 
+}
+
+/* Effect bila user sentuh/click */
+.mobile-bottom-nav a:active {
+    transform: scale(0.9);
+}
+
+        @media (min-width: 992px) {
+            .mobile-bottom-nav { display: none; }
+        }
+    </style>
 </head>
 <body>
 
-<div class="offcanvas-backdrop fade" id="sidebar-backdrop"></div>
+<div id="overlay"></div>
 
-<div class="sidebar" id="offcanvasSidebar">
+<div class="sidebar" id="admin-sidebar">
     <div>
         <div class="sidebar-header">
-            <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
-            <div class="logo-text"><strong>UniKL User</strong><span>Equipment System</span></div>
-        </div>
-        <a href="dashboard_user.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="item_user.php"><i class="fa-solid fa-box"></i> Item Availability</a>
-        <a href="history.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
+    <div class="logo-icon">
+        <i class="fa-solid fa-wrench"></i>
     </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    <div class="logo-text">
+        <strong class="brand-name">UniKL User</strong><br>
+        <span>Equipment System</span>
+    </div>
+</div>
+<div class="sidebar-nav">
+    <a href="dashboard_user.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'dashboard_user.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-house"></i> Dashboard
+    </a>
+
+  <a href="item_user.php" class="item-availability-link collapsed" id="itemAvailabilityToggle">
+            <i class="fa-solid fa-calendar-plus"></i>Book Equipment
+            <i class="fa-solid fa-angle-down ms-auto" style="font-size: 12px;"></i>
+        </a>
+		
+		<div class="category-submenu ps-4" id="categorySubmenu" style="display: none;">
+    <a href="#" class="category-filter-link py-2 d-block text-decoration-none" 
+       data-category="" 
+       style="color: #cbd5e1; font-size: 0.9rem;">
+        <i class="fa-solid fa-layer-group me-2"></i> All Items
+    </a>
+
+    <?php foreach ($categories as $category): ?>
+        <a href="#" class="category-filter-link py-2 d-block text-decoration-none" 
+           data-category="<?= htmlspecialchars($category['category_name']) ?>" 
+           style="color: #cbd5e1; font-size: 0.9rem;">
+            <i class="fa-solid fa-tag me-2"></i> <?= htmlspecialchars($category['category_name']) ?>
+        </a>
+    <?php endforeach; ?>
+</div>
+    <a href="history.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'history.php') ? 'active' : '' ?>">
+        <i class="fa-solid fa-clock-rotate-left"></i> My Loan
+    </a>
+</div>
+    </div>
+    
+<div class="sidebar-footer">
+    <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+</div> 	
 </div>
 
 <div class="main-content">
-    <div class="topbar">
-        <button class="btn btn-sm btn-outline-primary d-lg-none" type="button" id="sidebarToggle">
-            <i class="fa-solid fa-bars"></i>
-        </button>
+<div class="topbar">
+    <div class="topbar-left">
+        <nav aria-label="breadcrumb">
+            <h4 class="fw-bold">My Profile</h4>
+        </nav>
+    </div>
 
-        <h3>My Profile</h3>
-        <div class="user-profile">
-<span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-    <?= htmlspecialchars($displayName) ?>
-</span>            
-            <a href="profile.php" title="My Profile" style="color: inherit; text-decoration: none;">
-                <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
-            </a>
+    <div class="topbar-right">
+    <?php 
+        // Ambil nama file sekarang, contoh: 'profile.php'
+        $current_page = basename($_SERVER['PHP_SELF']); 
+    ?>
+    
+   <a href="profile.php" class="user-pill text-decoration-none d-flex align-items-center">
+    <div class="text-end me-2 d-none d-md-block">
+        <div class="user-name fw-bold" style="color: #1e293b; line-height: 1.2;">
+            <?= htmlspecialchars($displayName) ?>
+        </div>
+        <div style="font-size: 0.7rem; color: #64748b;">
+            Student / Staff
         </div>
     </div>
 
-    <div class="container-fluid">
+    <div class="profile-avatar">
+        <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName ?? 'U') ?>&background=06b6d4&color=fff" 
+             class="rounded-circle" 
+             width="35">
+    </div>
+</a>
+</div>
+</div>
+
+    <div class="container profile-container">
         <div class="row justify-content-center">
             <div class="col-lg-10">
-                <div class="row">
-                    <div class="col-lg-4">
-                        <div class="card profile-header-card h-100">
-                            <div class="avatar">
-                                <?= htmlspecialchars(strtoupper(substr($user['name'], 0, 1))) ?>
+                <div class="card">
+                    <?php if (isset($_SESSION['message'])): ?>
+                        <div class="alert alert-success border-0 rounded-4 mb-4">
+                            <i class="fa-solid fa-check-circle me-2"></i><?= $_SESSION['message']; unset($_SESSION['message']); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div id="viewMode">
+                        <div class="profile-header-alt">
+                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff&bold=true" alt="Avatar">
+                            <div>
+                                <h4 class="fw-bold mb-1" style="text-transform: capitalize;"><?= htmlspecialchars($displayName) ?></h4>
+                                <p class="text-muted mb-0 small"><i class="fa-solid fa-circle-check text-success me-1"></i> Verified UniKL Member</p>
                             </div>
-                            <div class="basic-info">
-                                <strong><?= htmlspecialchars($user['name']) ?></strong>
-                                <span><?= htmlspecialchars($user['email']) ?></span>
+                            <button id="editBtn" class="btn btn-primary ms-auto rounded-pill px-4">
+                                <i class="fa-solid fa-user-pen me-2"></i> Edit
+                            </button>
+                        </div>
+
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="icon-box icon-id"><i class="fa-solid fa-fingerprint"></i></div>
+                                <div class="info-content">
+                                    <strong>Identification ID</strong>
+                                    <span><?= htmlspecialchars($user['id']) ?></span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="icon-box icon-mail"><i class="fa-solid fa-envelope"></i></div>
+                                <div class="info-content">
+                                    <strong>Email Address</strong>
+                                    <span><?= htmlspecialchars($user['email']) ?></span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="icon-box icon-phone"><i class="fa-solid fa-phone"></i></div>
+                                <div class="info-content">
+                                    <strong>Phone Number</strong>
+                                    <span><?= htmlspecialchars($user['phoneNum']) ?></span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="icon-box icon-user"><i class="fa-solid fa-id-badge"></i></div>
+                                <div class="info-content">
+                                    <strong>Full Name</strong>
+                                    <span><?= htmlspecialchars($user['name']) ?></span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-lg-8">
-                        <div class="card">
-                            <?php if (isset($_SESSION['message'])): ?>
-                                <div class="alert alert-success"><i class="fa-solid fa-check-circle me-2"></i><?= $_SESSION['message']; unset($_SESSION['message']); ?></div>
-                            <?php endif; ?>
-                            <?php if (isset($_SESSION['error'])): ?>
-                                <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                            <?php endif; ?>
-
-                            <div id="viewMode">
-                                <div class="d-flex justify-content-between align-items-center mb-4">
-                                    <h5><i class="fa-solid fa-id-card me-2 text-primary"></i> Contact Information</h5>
-                                    <button id="editBtn" class="btn btn-primary"><i class="fa-solid fa-pen me-2"></i> Edit Profile</button>
-                                </div>
-                                
-                                <div class="info-card-container">
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper id-wrapper"><i class="fa-solid fa-hashtag"></i></div>
-                                        <div class="info-details">
-                                            <strong>ID</strong>
-<span><?= htmlspecialchars($user['id'] ?? '') ?></span>
-                                        </div>
-                                    </div>
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper"><i class="fa-solid fa-envelope"></i></div>
-                                        <div class="info-details">
-                                            <strong>Email Address</strong>
-                                            <span><?= htmlspecialchars($user['email']) ?></span>
-                                        </div>
-                                    </div>
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper"><i class="fa-solid fa-phone"></i></div>
-                                        <div class="info-details">
-                                            <strong>Phone Number</strong>
-                                            <span><?= htmlspecialchars($user['phoneNum']) ?></span>
-                                        </div>
-                                    </div>
-                                    <div class="info-card">
-                                        <div class="info-icon-wrapper" style="background-color: var(--text-muted);"><i class="fa-solid fa-user-tag"></i></div>
-                                        <div class="info-details">
-                                            <strong>Full Name</strong>
-                                            <span><?= htmlspecialchars($user['name']) ?></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="editMode" style="display: none;">
-                                <h5><i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Update Your Details</h5>
-                                <hr>
-                                <form action="update_profile.php" method="POST">
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="id" class="form-label">ID</label>
-                                            <input type="text" class="form-control" name="id" value="<?= htmlspecialchars($user['id']) ?>" readonly>
-                                            <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> ID (Staff/Student ID) cannot be changed.</small>
-                                        </div>
-                                        
-                                        <input type="hidden" name="person_id" value="<?= htmlspecialchars($user['person_id']) ?>">
-
-                                        <div class="col-md-6 mb-3">
-                                            <label for="name" class="form-label">Full Name</label>
-                                            <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($user['name']) ?>" readonly>
-                                            <small class="form-text text-muted"><i class="fa-solid fa-lock me-1"></i> Full name cannot be changed.</small>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="email" class="form-label">Email Address</label>
-                                            <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($user['email']) ?>" required>
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="phoneNum" class="form-label">Phone Number</label>
-                                            <input type="text" class="form-control" name="phoneNum" value="<?= htmlspecialchars($user['phoneNum']) ?>" required>
-                                        </div>
-                                    </div>
-                                    
-                                    <hr class="mt-4">
-                                    <p class="text-muted fw-bold">Change Password (optional)</p>
-                                    
-                                    <div class="alert alert-info py-2" role="alert">
-                                        <h6 class="alert-heading fw-bold mb-1"><i class="fa-solid fa-key me-2"></i>Password Requirements:</h6>
-                                        <ul class="list-unstyled mb-0" style="margin-left: -5px; font-size: 0.95rem;">
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must be at least <strong>8 characters</strong> long.</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>number</strong> (0-9).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>uppercase letter</strong> (A-Z).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>lowercase letter</strong> (a-z).</li>
-                                            <li><i class="fa-solid fa-check me-2 text-success"></i> Must include <strong>special character</strong> (!@#$%..).</li>
-                                        </ul>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="new_password" class="form-label">New Password</label>
-                                            <input type="password" class="form-control" name="new_password" placeholder="Leave blank to keep current">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                            <input type="password" class="form-control" name="confirm_password">
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save me-2"></i> Save Changes</button>
-                                    <button type="button" id="cancelBtn" class="btn btn-secondary"><i class="fa-solid fa-xmark me-2"></i> Cancel</button>
-                                </form>
-                            </div>
+                    <div id="editMode" style="display: none;">
+                        <div class="d-flex align-items-center mb-4">
+                            <h5 class="fw-bold mb-0">Update Profile Details</h5>
                         </div>
+                        <form action="update_profile.php" method="POST">
+                            <input type="hidden" name="person_id" value="<?= $person_id ?>">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">ID (Read-only)</label>
+                                    <input type="text" class="form-control" value="<?= htmlspecialchars($user['id']) ?>" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Full Name (Read-only)</label>
+                                    <input type="text" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" name="phoneNum" class="form-control" value="<?= htmlspecialchars($user['phoneNum']) ?>" required>
+                                </div>
+                                <div class="col-12 mt-4">
+    <p class="fw-bold small text-muted text-uppercase mb-2">Security Settings</p>
+    
+    <div class="alert alert-info border-0 shadow-sm rounded-4 mb-3" style="background-color: #f0f9ff;">
+        <div class="d-flex">
+            <i class="fa-solid fa-circle-info mt-1 me-2 text-info"></i>
+            <div>
+                <strong class="small d-block mb-1 text-info">Password Requirements:</strong>
+                <ul class="mb-0 small ps-3 text-muted">
+                    <li>At least <strong>8 characters</strong> long</li>
+                    <li>At least one <strong>uppercase</strong> (A-Z) & <strong>lowercase</strong> (a-z)</li>
+                    <li>At least one <strong>number</strong> (0-9) & <strong>special character</strong> (@$!%*?)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small">New Password</label>
+            <input type="password" name="new_password" class="form-control" placeholder="Leave blank to keep current">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" placeholder="Re-type new password">
+        </div>
+    </div>
+</div>
+                            </div>
+                            <div class="mt-4 pt-3 border-top">
+                                <button type="submit" class="btn btn-primary px-4 rounded-pill">Save Changes</button>
+                                <button type="button" id="cancelBtn" class="btn btn-light px-4 rounded-pill ms-2">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -408,92 +425,23 @@ $user['person_id'] = $person_id;
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_user.php"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+    <a href="item_user.php"><i class="fa-solid fa-calendar-plus"></i><span>Book Equipment</span></a>
+    <a href="history.php"><i class="fa-solid fa-clock-rotate-left"></i><span>My Loan</span></a>
+    <a href="profile.php" class="active"><i class="fa-solid fa-user"></i><span>Profile</span></a>
+</nav>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // 1. LOGIK PERTUKARAN MOD VIEW/EDIT
     const viewMode = document.getElementById('viewMode');
     const editMode = document.getElementById('editMode');
     const editBtn = document.getElementById('editBtn');
     const cancelBtn = document.getElementById('cancelBtn');
 
-    const hasSessionAlert = <?php echo (isset($_SESSION['error']) || isset($_SESSION['message'])) ? 'true' : 'false'; ?>;
-
-    if (hasSessionAlert) {
-        viewMode.style.display = 'none';
-        editMode.style.display = 'block';
-        window.scrollTo(0, 0); 
-    }
-
-    if (editBtn && cancelBtn) {
-        editBtn.addEventListener('click', () => {
-            viewMode.style.display = 'none';
-            editMode.style.display = 'block';
-        });
-
-        cancelBtn.addEventListener('click', () => {
-            editMode.style.display = 'none';
-            viewMode.style.display = 'block';
-        });
-    }
-
-    
-    // 2. LOGIK KAWALAN SIDEBAR (OFF-CANVAS) - DIBETULKAN UNTUK MENGHORMATI DESKTOP CSS
-    const sidebar = document.getElementById('offcanvasSidebar');
-    const toggleBtn = document.getElementById('sidebarToggle');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    
-    // Fungsi untuk mengawal sidebar HANYA pada mobile
-    function toggleSidebar() {
-        if (window.innerWidth <= 992) {
-            const isActive = sidebar.classList.contains('active');
-
-            sidebar.classList.toggle('active');
-
-            if (!isActive) {
-                backdrop.classList.add('active');
-                backdrop.style.display = 'block'; 
-            } else {
-                backdrop.classList.remove('active');
-                setTimeout(() => { 
-                    backdrop.style.display = 'none'; 
-                }, 300); 
-            }
-        }
-    }
-    
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', toggleSidebar);
-    }
-
-    if (backdrop) {
-        backdrop.addEventListener('click', toggleSidebar); 
-    }
-
-    // Fungsi run-once pada muatan (LOAD)
-    function initializeSidebar() {
-        if (window.innerWidth <= 992) {
-             // Sembunyikan sidebar pada muatan jika mobile
-             sidebar.style.transform = 'translateX(-280px)'; 
-        } else {
-             // Pastikan sidebar berada di tempat yang betul pada desktop
-             sidebar.style.transform = 'translateX(0px)';
-             // Hapus kelas aktif jika ada (untuk mencegah isu selepas resize)
-             sidebar.classList.remove('active');
-             backdrop.classList.remove('active');
-             backdrop.style.display = 'none';
-        }
-    }
-
-    // PENTING: Panggil fungsi pada muatan
-    initializeSidebar(); 
-    
-    // Mengendalikan perubahan saiz skrin
-    window.addEventListener('resize', initializeSidebar);
-    
+    editBtn.onclick = () => { viewMode.style.display = 'none'; editMode.style.display = 'block'; };
+    cancelBtn.onclick = () => { editMode.style.display = 'none'; viewMode.style.display = 'block'; };
 });
 </script>
-
 </body>
 </html>

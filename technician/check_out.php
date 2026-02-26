@@ -3,45 +3,66 @@ session_start();
 include '../config.php';
 include '../logger.php';
 
+
+function get_pending_count($conn) {
+    // Guna TRIM dan LOWER supaya dia tak kisah huruf besar/kecil atau space terbiar
+    $sql = "SELECT COUNT(id) AS total FROM reservation_items WHERE LOWER(TRIM(status)) = 'pending'";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        return (int)$row['total'];
+    }
+    return 0;
+}
+
+// --- 1. SET VARIABLES ---
+date_default_timezone_set('Asia/Kuala_Lumpur');
+$currentDate = date('Y-m-d');
+$currentTime = date('H:i');
+
+// --- PROSES PEMBERSIHAN (Hanya jalan selepas 6 petang) ---
+if ($currentTime >= '10:00') {
+
+    // SITUASI 1: Part Approve (Pending -> Voided/Lapsed)
+    // Reason: Technician tak approve sampai hari kejadian berlalu
+    $sql_void_pending = "UPDATE reservation_items ri
+                         JOIN reservations r ON ri.reserve_id = r.reserve_id
+                         SET ri.status = 'Voided', 
+                             ri.rejection_reason = 'System: Your request was not processed within the required timeframe. Please submit a new request if the items are still needed.'
+                         WHERE ri.status = 'Pending' 
+                         AND r.reserve_date < '$currentDate'";
+    
+    $conn->query($sql_void_pending);
+
+    // SITUASI 2: Part Check Out (Approved -> Rejected/Auto-Cancelled)
+    // Reason: User tak datang ambil barang
+    $sql_find_abandoned = "SELECT ri.id FROM reservation_items ri
+                           JOIN reservations r ON ri.reserve_id = r.reserve_id
+                           WHERE ri.status = 'Approved' 
+                           AND r.reserve_date < '$currentDate'";
+    
+    $abandoned_res = $conn->query($sql_find_abandoned);
+
+    if ($abandoned_res && $abandoned_res->num_rows > 0) {
+        while ($row = $abandoned_res->fetch_assoc()) {
+            $ri_id = $row['id'];
+            
+            // Update status & Beri alasan spesifik
+            $conn->query("UPDATE reservation_items SET 
+                            status = 'Rejected', 
+                            rejection_reason = 'System: Auto-cancelled due to non-collection by user' 
+                          WHERE id = '$ri_id'");
+            
+            // Lepaskan Asset
+            $conn->query("UPDATE assets SET status = 'Available' WHERE asset_id IN (SELECT asset_id FROM reservation_assets WHERE reservation_item_id = '$ri_id')");
+        }
+    }
+}
+
 // Ambil data session untuk logger
 $user_role = $_SESSION['logged_in_role'] ?? 'System';
 $person_id = $_SESSION['person_id'] ?? 0;
 
-// --- LOGIK AUTO-CANCEL ---
-$today_date = date('Y-m-d');
-
-$sql_check_expired = "
-    SELECT ri.id, ri.reserve_id, ri.item_id 
-    FROM reservation_items ri
-    JOIN reservations r ON ri.reserve_id = r.reserve_id
-    WHERE ri.status = 'Approved' 
-    AND r.reserve_date < '$today_date'
-";
-$expired_res = $conn->query($sql_check_expired);
-
-if ($expired_res && $expired_res->num_rows > 0) {
-    while ($row = $expired_res->fetch_assoc()) {
-        $ri_id = $row['id'];
-        
-        // 1. Update status item jadi Rejected
-        $update_item = "UPDATE reservation_items SET 
-                        status = 'Rejected', 
-                        rejection_reason = 'Auto-Cancelled: Failed to collect the item on the scheduled date' 
-                        WHERE id = '$ri_id'";
-        $conn->query($update_item);
-
-        // 2. Lepaskan asset
-        $update_asset = "UPDATE assets 
-                         SET status = 'Available' 
-                         WHERE asset_id IN (
-                             SELECT asset_id FROM reservation_assets WHERE reservation_item_id = '$ri_id'
-                         )"; 
-        $conn->query($update_asset);
-        
-        // 3. Rekod aktiviti - PASTIKAN NAMA FUNGSI SAMA DENGAN logger.php
-        log_activity($conn, $user_role, $person_id, "Auto-Cancel", "Item ID $ri_id terbatal automatik.");
-    }
-}
 if (!isset($_SESSION['person_id'])) {
     header("Location: ../login.php");
     exit();
@@ -118,22 +139,18 @@ $sql = "SELECT
         LEFT JOIN person adm1 ON ri.approved_by = adm1.person_id
         LEFT JOIN person adm2 ON ri.checked_out_by = adm2.person_id
         LEFT JOIN person adm3 ON ri.checked_in_by = adm3.person_id
-        WHERE ri.status IN ($status_placeholders)
-        AND (
-            ri.status != 'Approved' 
-            OR (ri.status = 'Approved' AND r.reserve_date >= CURDATE())
-        )";
+        WHERE ri.status IN ($status_placeholders)";
 
 		
     $bind_types = str_repeat('s', count($statuses));
     $bind_values = $statuses;
 
-    if ($filter_date) {
-        $sql .= " AND DATE(r.created_at) = ?";
-        $bind_types .= 's';
-        $bind_values[] = $filter_date;
-    }
-
+  if ($filter_date) {
+    // Guna DATE() supaya dia tak keliru dengan format timestamp
+    $sql .= " AND DATE(r.reserve_date) = ?"; 
+    $bind_types .= 's';
+    $bind_values[] = $filter_date;
+}
     
     $sql .= " ORDER BY u.name ASC, r.reserve_id ASC, r.created_at ASC"; 
 
@@ -165,7 +182,7 @@ $sql = "SELECT
 $pending_requests = fetch_reservations_by_status($conn, ['Pending'], $filter_date);
 $approved_requests = fetch_reservations_by_status($conn, ['Approved'], $filter_date);
 $on_loan_requests = fetch_reservations_by_status($conn, ['Checked Out'], $filter_date);
-$completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected', 'Cancelled'], $filter_date);
+$completed_requests = fetch_reservations_by_status($conn, ['Returned', 'Rejected', 'Cancelled', 'Voided'], $filter_date);
 
 
 // --- KEMASKINI BAHAGIAN INI ---
@@ -188,45 +205,79 @@ $availableAssets_json = json_encode($availableAssets);
 
 function create_request_table($requests) {
     if (empty($requests)) {
-        echo '<div class="text-center text-muted py-5"><i class="fa-solid fa-inbox fa-2x mb-2"></i><br>No reservations found matching the criteria.</div>';
+        echo '
+        <div class="d-flex flex-column align-items-center justify-content-center py-5">
+            <div class="empty-state-icon mb-3" style="background: #f1f5f9; width: 80px; height: 80px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-box-open fa-3x" style="color: #cbd5e1;"></i>
+            </div>
+            <h6 class="fw-bold text-dark mb-1">No Records Found</h6>
+            <p class="text-muted small">No reservations found matching the criteria.</p>
+        </div>';
         return;
     }
 
-    // 1. Grouping Data
+    // 1. GROUPING SEMUA DATA DULU
     $grouped_by_user = [];
     foreach ($requests as $row) {
         $grouped_by_user[$row['user_name']][] = $row;
     }
 
+    // 2. LOGIC PAGINATION (Kira berdasarkan jumlah User)
+    $limit = 10; 
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    if ($page < 1) $page = 1;
+    $start_index = ($page - 1) * $limit;
+    
+    $total_users = count($grouped_by_user);
+    $total_pages = ceil($total_users / $limit);
+
+    // POTONG ARRAY (Ambil 5 user sahaja untuk page ni)
+    $current_page_users = array_slice($grouped_by_user, $start_index, $limit, true);
+
     $main_accordion_id = 'accordion_main_' . uniqid();
     echo '<div class="accordion" id="' . $main_accordion_id . '">';
 
-    $user_index = 0;
-    foreach ($grouped_by_user as $user_name => $user_items) {
+    // 3. LOOP USER (Guna $current_page_users)
+    $user_index = $start_index; 
+    foreach ($current_page_users as $user_name => $user_items) {
+        
         $grouped_by_reserve = [];
         foreach ($user_items as $item) {
             $grouped_by_reserve[$item['reserve_id']][] = $item;
         }
 
-$user_safe_id = preg_replace('/[^A-Za-z0-9]/', '', $user_name);
+        $user_safe_id = preg_replace('/[^A-Za-z0-9]/', '', $user_name) . $user_index;
         $user_collapse_id = 'collapse_user_' . $user_safe_id;
         $user_header_id = 'header_user_' . $user_safe_id;
         $inner_accordion_id = 'inner_accordion_' . $user_safe_id;
 
-        // --- LEVEL 1: USER ACCORDION ---
-        echo '<div class="accordion-item user-row shadow-sm mb-3 border-0 rounded-3 overflow-hidden">';
-        echo '  <h2 class="accordion-header" id="' . $user_header_id . '">';
-        echo '    <button class="accordion-button collapsed bg-light text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '">';
-        echo '      <div class="d-flex justify-content-between w-100 pe-3 align-items-center">';
-        echo '        <div><strong class="fs-6">' . htmlspecialchars($user_name) . '</strong> <small class="text-muted ms-1">(' . htmlspecialchars($user_items[0]['user_phone']) . ')</small></div>';
-        echo '        <span class="badge bg-primary rounded-pill">' . count($grouped_by_reserve) . ' Booking(s)</span>';
-        echo '      </div>';
-        echo '    </button>';
-        echo '  </h2>';
+       // --- LEVEL 1: USER ACCORDION (Design Siti Aminah) ---
+// --- LEVEL 1: USER ACCORDION (Ditambah class user-row untuk search) ---
+// Kita tambah class 'user-row' dan 'data-user-name' supaya JS boleh tapis level ni.
+echo '<div class="accordion-item shadow-sm mb-3 border-0 rounded-4 overflow-hidden user-row" 
+           data-user-name="' . htmlspecialchars($user_name) . '" 
+           style="border: 1px solid #eef2f7 !important;">';
+echo '  <div class="accordion-header" id="' . $user_header_id . '">';
+echo '    <button class="accordion-button collapsed bg-white py-3 px-4" type="button" data-bs-toggle="collapse" data-bs-target="#' . $user_collapse_id . '" style="box-shadow: none;">';
+echo '      <div class="d-flex align-items-center w-100">';
+// Avatar Biru
+echo '        <div class="rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; background: #eef4ff; color: #3b82f6;">';
+echo '           <i class="fa-solid fa-user"></i>';
+echo '        </div>';
+// Nama & Phone
+echo '        <div class="flex-grow-1">';
+echo '          <div class="fw-bold text-dark fs-6">' . htmlspecialchars($user_name) . '</div>';
+echo '          <div class="text-muted small"><i class="fa-solid fa-phone me-1" style="font-size: 0.7rem;"></i>' . htmlspecialchars($user_items[0]['user_phone']) . '</div>';
+echo '        </div>';
+// Badge Booking
+echo '        <span class="badge bg-light text-dark border rounded-pill px-3 py-2 fw-medium me-3" style="font-size: 0.8rem;">' . count($grouped_by_reserve) . ' Booking(s) <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i></span>';
+echo '      </div>';
+echo '    </button>';
+echo '  </div>';
 
-        echo '  <div id="' . $user_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $main_accordion_id . '">';
-        echo '    <div class="accordion-body p-3 bg-white">';
-        echo '      <div class="accordion" id="' . $inner_accordion_id . '">';
+echo '  <div id="' . $user_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $main_accordion_id . '">';
+echo '    <div class="accordion-body p-4 bg-white border-top">';
+echo '      <div class="accordion" id="' . $inner_accordion_id . '">';
 
         $reserve_index = 0;
         foreach ($grouped_by_reserve as $reserve_id => $reservation_items) {
@@ -235,31 +286,51 @@ $user_safe_id = preg_replace('/[^A-Za-z0-9]/', '', $user_name);
             $reserve_collapse_id = 'collapse_reserve_' . $user_index . '_' . $reserve_index;
             $status_check = strtolower(trim($reservation_items[0]['status']));
 
-            // --- LEVEL 2: RESERVATION ID CARD ---
-            echo '<div class="accordion-item booking-card ' . $priorityClass . ' shadow-sm mb-3 border">';
-            echo '  <div class="d-flex align-items-center bg-white py-3 px-3 w-100 justify-content-between rounded-3">';
-            
-            echo '    <div class="d-flex align-items-center flex-grow-1" data-bs-toggle="collapse" data-bs-target="#' . $reserve_collapse_id . '" style="cursor: pointer;">';
-            echo '      <div class="id-badge me-3">';
-            echo '        <span class="text-muted small fw-bold" style="font-size: 0.7rem;">ID</span>';
-            echo '        <span class="text-primary fw-bold ms-1">#' . htmlspecialchars($reserve_id) . '</span>';
-            echo '      </div>';
-            
-            echo '      <div class="d-none d-md-block text-start">';
-            echo '        <div class="text-muted small" style="font-size: 0.7rem;">Applied on</div>';
-            echo '        <div class="fw-bold small">' . date('d M Y', strtotime($reservation_items[0]['apply_date'])) . '</div>';
-            echo '      </div>';
-            
-            echo '      <i class="fa-solid fa-chevron-down ms-3 text-muted small"></i>';
-            echo '    </div>';
+           // --- LEVEL 2: RESERVATION ID CARD ---
+echo '<div class="mb-3">';
 
-            echo '    <div class="d-flex align-items-center" style="position: relative; z-index: 100;">';
-            if ($status_check === 'approved') {
-                echo '<button type="button" class="btn btn-primary btn-sm me-3 rounded-pill px-3 checkout-all-btn" data-reserve-id="' . $reserve_id . '"><i class="fa-solid fa-box-open me-1"></i> Check Out All</button>';
-            }
-            echo '      <span class="badge bg-light text-dark border rounded-pill fw-normal px-3 py-2"><i class="fa-solid fa-boxes-stacked me-1 text-secondary"></i> ' . count($reservation_items) . ' Item(s)</span>';
-            echo '    </div>';
-            echo '  </div>';
+// Tambah data-bs-toggle & data-bs-target supaya boleh klik untuk buka table
+echo '  <div class="d-flex align-items-center justify-content-between p-2 px-3 mb-0" 
+             style="background: #f8fafc; border-radius: 10px 10px 0 0; border: 1px solid #edf2f7; cursor: pointer;" 
+             data-bs-toggle="collapse" 
+             data-bs-target="#' . $reserve_collapse_id . '">';
+
+    echo '    <div class="d-flex align-items-center gap-3">';
+
+        // Paparan Nombor Giliran yang lebih "Sharp"
+        $display_number = $reserve_index + 1;
+        echo '      <div style="font-size: 0.75rem; min-width: 40px;">';
+        echo '        <span class="text-muted fw-bold">NO:</span> ';
+        echo '        <span class="text-primary fw-bold">' . $display_number . '</span>'; 
+        echo '      </div>';
+
+        // Tarikh (Kekalkan design kau tapi kecikkan sikit bagi balance)
+        echo '      <div class="d-none d-md-block text-start border-start ps-3">';
+        echo '        <div class="text-muted small" style="font-size: 0.65rem; line-height:1;">Applied on</div>';
+        echo '        <div class="fw-bold text-dark" style="font-size: 0.75rem;">' . date('d M Y', strtotime($reservation_items[0]['apply_date'])) . '</div>';
+        echo '      </div>';
+        
+        echo '      <i class="fa-solid fa-chevron-down ms-2 text-muted" style="font-size: 0.7rem;"></i>';
+    echo '    </div>';
+
+    // Bahagian Kanan (Butang & Badge Item)
+    echo '    <div class="d-flex align-items-center gap-2" onclick="event.stopPropagation();">'; 
+    // ^ event.stopPropagation supaya bila klik butang, dia tak tertutup/terbuka accordion tu.
+    
+    if ($status_check === 'approved') {
+        echo '<button type="button" class="btn btn-primary btn-sm rounded-pill px-3 checkout-all-btn" 
+                      style="font-size: 0.7rem;" 
+                      data-reserve-id="' . $reserve_id . '">
+                <i class="fa-solid fa-box-open me-1"></i> Check Out All
+              </button>';
+    }
+    
+    echo '      <span class="badge bg-white text-dark border rounded-pill fw-normal px-2 py-1" style="font-size: 0.7rem;">';
+    echo '        <i class="fa-solid fa-boxes-stacked me-1 text-secondary"></i> ' . count($reservation_items) . ' Item(s)';
+    echo '      </span>';
+    echo '    </div>';
+
+echo '  </div>'; // Tutup Header Bar
 
             // --- LEVEL 3: TABLE DETAIL ---
             echo '  <div id="' . $reserve_collapse_id . '" class="accordion-collapse collapse" data-bs-parent="#' . $inner_accordion_id . '">';
@@ -273,122 +344,116 @@ $user_safe_id = preg_replace('/[^A-Za-z0-9]/', '', $user_name);
             echo '          <th class="text-center" style="width: 10%;">Status</th>';
             echo '          <th class="text-center pe-3" style="width: 15%;">Actions</th>';
             echo '        </tr></thead><tbody>';
+			
+			
 foreach ($reservation_items as $row) {
     $status = strtolower(trim($row['status']));
     $id = $row['reservation_item_id'];
+    
+    // Warna Badge Priority (Ikut gambar: High = Red)
     $p_class = ($row['priority'] == 1) ? 'bg-danger' : (($row['priority'] == 2) ? 'bg-warning text-dark' : 'bg-info text-dark');
     $p_text = ($row['priority'] == 1) ? 'High' : (($row['priority'] == 2) ? 'Moderate' : 'Low');
 
-    $icon = 'fa-clock'; $color = '#ffc107'; $title = 'Pending';
-    if($status == 'approved'){ $icon = 'fa-check-circle'; $color = '#198754'; $title = 'Approved'; }
-    elseif($status == 'checked out' || $status == 'on loan'){ $icon = 'fa-box-open'; $color = '#0d6efd'; $title = 'On Loan'; }
-    elseif($status == 'returned'){ $icon = 'fa-hand-holding-heart'; $color = '#0dcaf0'; $title = 'Returned'; }
-    elseif($status == 'rejected'){ $icon = 'fa-times-circle'; $color = '#dc3545'; $title = 'Rejected'; }
+    // Status Icon Logic
+    $icon = 'fa-regular fa-clock'; $color = '#ffc107'; 
+    if($status == 'approved'){ $icon = 'fa-solid fa-circle-check'; $color = '#10b981'; }
 
-    echo "<tr id='row-{$id}' 
+    echo "<tr id='row-{$id}' class='border-bottom' 
             data-qty='{$row['quantity']}' 
             data-item-id='{$row['item_id']}' 
             data-user-name='" . htmlspecialchars($user_name) . "' 
-            data-itemname='" . htmlspecialchars($row['item_name']) . "'
-            data-approved-by='" . htmlspecialchars($row['approved_by_name'] ?? 'N/A') . "'
-            data-checked-out-by='" . htmlspecialchars($row['checked_out_by_name'] ?? 'N/A') . "'
-            data-checked-in-by='" . htmlspecialchars($row['checked_in_by_name'] ?? 'N/A') . "'>";
+            data-itemname='" . htmlspecialchars($row['item_name']) . "'>";
 
-    // 1. KOLOM ITEM / PRIORITY
-    echo "<td class='ps-3 py-3'>";
-    echo "  <div class='fw-bold text-dark'>" . htmlspecialchars($row['item_name']) . "</div>";
-    echo "  <span class='badge $p_class' style='font-size:0.6rem;'>$p_text</span>";
-    if (!empty($row['assigned_assets'])) {
-        echo "<div class='assigned-assets mt-2'>";
-        $assets_list = explode(', ', $row['assigned_assets']);
-        foreach ($assets_list as $asset_info) {
-            echo "<div class='badge border text-dark bg-light d-inline-block p-1 me-1 mb-1' style='font-size: 0.65rem; font-weight: 500;'>";
-            echo "<i class='fa-solid fa-barcode me-1 text-primary'></i>" . htmlspecialchars($asset_info);
-            echo "</div>";
-        }
-        echo "</div>";
-    }
+    // 1. KOLOM ITEM / PRIORITY (Design bersih dengan badge bulat)
+    echo "<td class='ps-4 py-4'>";
+    echo "  <div class='fw-bold text-dark fs-6 mb-1'>" . htmlspecialchars($row['item_name']) . "</div>";
+    echo "  <span class='badge $p_class rounded-pill px-2' style='font-size:0.65rem; font-weight:600;'>$p_text</span>";
     echo "</td>";
 
-    // 2. KOLOM LOCATION / PURPOSE
-    echo "<td>";
-    if (!empty($row['location'])) {
-        echo "<div class='text-primary small fw-bold mb-1'><i class='fa-solid fa-location-dot me-1'></i>" . htmlspecialchars(ucwords(strtolower($row['location']))) . "</div>";
-    }
-    if ($status === 'rejected' && !empty($row['rejection_reason'])) {
-        echo "<div class='text-danger small'><i class='fa-solid fa-circle-exclamation me-1'></i>" . htmlspecialchars($row['rejection_reason']) . "</div>";
-    } elseif (!empty($row['reservation_reason'])) {
-        echo "<div class='text-muted small'><i class='fa-solid fa-file-lines me-1'></i>" . htmlspecialchars(ucwords(strtolower($row['reservation_reason']))) . "</div>";
-    } else {
-        echo "<span class='text-muted opacity-50 small'>—</span>";
-    }
-    echo "</td>";
-
-    // 3. KOLOM QTY
-    echo "<td class='text-center fw-bold'>" . htmlspecialchars($row['quantity']) . "</td>";
-
-    // 4. KOLOM DURATION
-    $start = date('d M', strtotime($row['reserve_date']));
-    $end = date('d M Y', strtotime($row['return_date']));
-    echo "<td><div class='small fw-medium'><i class='fa-solid fa-calendar-days me-1 text-muted'></i> $start - $end</div></td>";
-
-// 5. KOLOM STATUS (Dynamic Audit Trail)
-echo "<td class='text-center'>";
-echo "  <div class='d-flex flex-column align-items-center justify-content-center' style='min-height: 50px;'>";
-echo "    <div title='$title' style='width:28px; height:28px; background:$color; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center;'>";
-echo "      <i class='fa-solid $icon' style='font-size:0.75rem;'></i>";
-echo "    </div>";
-
-if ($status !== 'pending') {
-    // Collect Data
-    $app_by = htmlspecialchars($row['approved_by_name'] ?? 'System');
-    $app_on = !empty($row['approved_on']) ? date('d M Y', strtotime($row['approved_on'])) : '-';
-    
-    $out_by = htmlspecialchars($row['checked_out_by_name'] ?? 'N/A');
-    $out_on = !empty($row['checked_out_on']) ? date('d M Y', strtotime($row['checked_out_on'])) : '-';
-    
-    $in_by  = htmlspecialchars($row['checked_in_by_name'] ?? 'N/A');
-    $in_on  = !empty($row['checked_in_on']) ? date('d M Y', strtotime($row['checked_in_on'])) : '-';
-
-    // Bina Content Popover secara dinamik
-    $popContent = "<b>1. Approved</b><br>By: $app_by<br>Date: $app_on";
-    
-    if ($status == 'checked out' || $status == 'on loan' || $status == 'returned') {
-        $popContent .= "<hr class='my-1'><b>2. Checked Out</b><br>By: $out_by<br>Date: $out_on";
-    }
-    
-    if ($status == 'returned') {
-        $popContent .= "<hr class='my-1'><b>3. Returned</b><br>By: $in_by<br>Date: $in_on";
-    }
-
-    echo "<button type='button' class='btn btn-link p-0 mt-1 text-muted info-popover' 
-            style='font-size: 0.65rem; text-decoration: none;'
-            data-bs-toggle='popover' 
-            data-bs-trigger='focus'
-            title='Transaction History' 
-            data-bs-content=\"$popContent\"
-            data-bs-html='true'>
-            <i class='fa-solid fa-circle-info me-1'></i>Details
-          </button>";
+// --- TAMBAH INI: Papar reason jika ada ---
+if (!empty($row['rejection_reason'])) {
+    echo "<div class='mt-2 p-2 rounded' style='background: #fff5f5; border-left: 3px solid #feb2b2; font-size: 0.7rem;'>";
+    echo "  <strong class='text-danger'>Reason:</strong> <span class='text-muted'>" . htmlspecialchars($row['rejection_reason']) . "</span>";
+    echo "</div>";
 }
-echo "  </div>";
 echo "</td>";
 
+    // 2. KOLOM LOCATION / PURPOSE (Guna icon kelabu)
+    echo "<td>";
+// Buang tanda ; selepas ?? ''
+echo "  <div class='text-muted small mb-1'><i class='fa-solid fa-location-dot me-1'></i>" . htmlspecialchars($row['location'] ?? '') . "</div>";
+    echo "  <div class='text-muted small' style='font-size: 0.75rem;'>" . htmlspecialchars($row['reservation_reason'] ?? 'Purpose not stated') . "</div>";
+    echo "</td>";
 
-// 6. KOLOM ACTIONS
-echo "<td class='text-center pe-3'>";
-if ($status === 'pending') {
-    echo "<div class='d-flex gap-1 justify-content-center'>";
-    echo "  <button class='btn btn-success btn-sm' onclick='event.stopPropagation(); openApproveModal($id)'><i class='fa-solid fa-check'></i></button>";
-    echo "  <button class='btn btn-danger btn-sm' onclick='event.stopPropagation(); openRejectModal($id)'><i class='fa-solid fa-xmark'></i></button>";
-    echo "</div>";
-} elseif ($status === 'approved') {
-    echo "<button class='btn btn-primary btn-sm rounded-circle' onclick='event.stopPropagation(); checkOutItem($id)' title='Release Asset'><i class='fa-solid fa-truck-ramp-box'></i></button>";
+
+    // 3. KOLOM QTY (Teks besar & bold)
+    echo "<td class='text-center fw-bold fs-5' style='color: #1e293b;'>" . htmlspecialchars($row['quantity']) . "</td>";
+
+    // 4. KOLOM DURATION (Tarikh range)
+    $start = date('d M', strtotime($row['reserve_date']));
+    $end = date('d M Y', strtotime($row['return_date']));
+    echo "<td><div class='small fw-medium text-dark'>$start - $end</div></td>";
+// 5. KOLOM STATUS (Icon dengan Tooltip/Hover)
+echo "<td class='text-center'>";
+    
+    // Logic untuk pilih Icon, Warna dan Teks Hover (Title)
+    $status_text = ucwords($status); // Tukar 'pending' jadi 'Pending'
+    $icon = 'fa-regular fa-clock'; 
+    $color = '#ffc107'; // Kuning (Default Pending)
+
+    if($status == 'approved'){ 
+        $icon = 'fa-solid fa-circle-check'; 
+        $color = '#10b981'; // Hijau
+    } elseif($status == 'rejected'){
+        $icon = 'fa-solid fa-circle-xmark'; 
+        $color = '#ef4444'; // Merah
+    } elseif($status == 'on loan' || $status == 'checked out'){
+        $icon = 'fa-solid fa-box-open'; 
+        $color = '#3b82f6'; // Biru
+   } elseif($status == 'returned'){
+        $icon = 'fa-solid fa-house-circle-check'; 
+        $color = '#6366f1'; // Indigo
+    } elseif($status == 'voided'){ // <--- TAMBAH INI
+        $icon = 'fa-solid fa-hourglass-end'; 
+        $color = '#94a3b8'; // Warna Kelabu (Slate)
+        $status_text = 'Voided: Technician did not approve in time';
+    }
+    // Paparkan Icon. 'title' akan keluar bila cursor duduk atas icon tu.
+    echo "<i class='$icon fs-5' 
+             style='color: $color; cursor: help;' 
+             data-bs-toggle='tooltip' 
+             data-bs-placement='top' 
+             title='$status_text'></i>";
+
+echo "</td>";
+    // 6. KOLOM ACTIONS (Button rounded-pill seperti gambar)
+    echo "<td class='text-center pe-4'>";
+    if ($status === 'pending') {
+        echo "<div class='d-flex gap-2 justify-content-center'>";
+        echo "  <button class='btn btn-success btn-sm rounded-pill px-3 d-flex align-items-center gap-1' onclick='event.stopPropagation(); openApproveModal($id)' style='background:#10b981; border:none;'>";
+        echo "      <i class='fa-regular fa-circle-check'></i> Approve</button>";
+        echo "  <button class='btn btn-danger btn-sm rounded-pill px-3 d-flex align-items-center gap-1' onclick='event.stopPropagation(); openRejectModal($id)' style='background:#ef4444; border:none;'>";
+        echo "      <i class='fa-regular fa-circle-xmark'></i> Reject</button>";
+        echo "</div>";
+    } elseif ($status === 'approved') {
+    // Kita tambah <span> pada tulisan 'Check Out' untuk kecilkan font dia
+    echo "<button class='btn btn-primary btn-sm rounded-pill px-3 d-flex align-items-center' onclick='event.stopPropagation(); checkOutItem($id)' style='font-size: 12px; gap: 5px;'>";
+    echo "<i class='fa-solid fa-truck-ramp-box'></i>";
+    echo "<span style='font-size: 11px; font-weight: 600;'>Check Out</span>";
+    echo "</button>";
 } elseif ($status === 'on loan' || $status === 'checked out'){
     // SINI: Aku dah buang button info biru yang buat dia nampak double tu
     echo "<button class='btn btn-warning btn-sm px-3 rounded-pill text-dark' onclick='event.stopPropagation(); checkInItem($id)' title='Return Asset'><i class='fa-solid fa-box-open me-1'></i>Return</button>";
 } else {
-    echo "<button class='btn btn-outline-secondary btn-sm rounded-pill px-3' onclick='openAuditModal($id)'><i class='fa-solid fa-clock-rotate-left me-1'></i> History</button>";
+    // Kita simpan nama-nama admin dalam attribute 'data-'
+    $app_name = htmlspecialchars($row['approved_by_name'] ?? 'Not available');
+    $out_name = htmlspecialchars($row['checked_out_by_name'] ?? 'Not available');
+    $in_name = htmlspecialchars($row['checked_in_by_name'] ?? 'Not available');
+
+    echo "<button class='btn btn-outline-secondary btn-sm rounded-pill px-3' 
+            onclick='openAuditModal(\"$app_name\", \"$out_name\", \"$in_name\")'>
+            <i class='fa-solid fa-clock-rotate-left me-1'></i> History
+          </button>";
 }
 echo "</td>";
 
@@ -407,6 +472,27 @@ echo "</td>";
         $user_index++;
     }
     echo '</div>';
+
+    // 4. RENDER BUTTON PAGING (Letak bawah sekali)
+    if ($total_pages > 1) {
+        echo '<div class="d-flex flex-column align-items-center mt-4">';
+        echo '  <nav><ul class="pagination pagination-sm mb-2">';
+        
+        $prev_dis = ($page <= 1) ? 'disabled' : '';
+        echo '<li class="page-item '.$prev_dis.'"><a class="page-link shadow-sm border-0 rounded-pill px-3 me-2" href="?page='.($page-1).'"><i class="fa-solid fa-angle-left"></i></a></li>';
+
+        for ($i = 1; $i <= $total_pages; $i++) {
+            $act = ($page == $i) ? 'active' : '';
+            echo '<li class="page-item '.$act.'"><a class="page-link shadow-sm border-0 mx-1 rounded-circle" style="width:32px; height:32px; text-align:center;" href="?page='.$i.'">'.$i.'</a></li>';
+        }
+
+        $next_dis = ($page >= $total_pages) ? 'disabled' : '';
+        echo '<li class="page-item '.$next_dis.'"><a class="page-link shadow-sm border-0 rounded-pill px-3 ms-2" href="?page='.($page+1).'"><i class="fa-solid fa-angle-right"></i></a></li>';
+        
+        echo '</ul></nav>';
+        echo '<small class="text-muted">Showing ' . ($start_index + 1) . ' to ' . min($start_index + $limit, $total_users) . ' of ' . $total_users . ' users</small>';
+        echo '</div>';
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -420,255 +506,229 @@ echo "</td>";
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-    /* --- DEFINISI WARNA TEMA (ROOT VARIABLES) --- */
-    :root {
-        --primary-color: #06b6d4; /* Cyan 600 (Biru Teal Gelap) */
-        --primary-light: #f0f9ff; /* Biru Sangat Muda */
-        --primary-hover: #0891b2; /* Cyan 700 */
-        --danger-color: #ef4444; /* Merah */
-        
-        --bg-light-gray: #f8fafc;
-        --card-bg: #ffffff;
-        --text-dark: #1e293b; 
-        --text-muted: #64748b; 
-        --border-color: #e5e7eb;
-    }
-
-    /* BASE & TYPOGRAPHY */
-    body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg-light-gray); color: #334155; }
-    .card h5, .modal-title, .topbar h3 { font-weight: 600; color: var(--text-dark); }
-    
-    /* SIDEBAR */
-    .sidebar { 
-        width: 250px; position: fixed; top: 0; bottom: 0; left: 0; 
-        background: var(--card-bg); padding: 20px; 
-        border-right: 1px solid var(--border-color); 
-        display: flex; flex-direction: column; justify-content: space-between; z-index: 1000;
-    }
-    .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
-    
-    /* LOGO ICON (Menggunakan --primary-color) */
-    .logo-icon { 
-        width: 40px; height: 40px; 
-        background-color: var(--primary-color); /* Cyan */
-        color: white; border-radius: 8px; 
-        display: flex; align-items: center; justify-content: center; font-size: 20px; 
-    }
-    
-    .logo-text strong { display: block; font-size: 16px; color: var(--text-dark); }
-    .logo-text span { font-size: 12px; color: #94a3b8; }
-    
-    .sidebar a { 
-        display: flex; align-items: center; gap: 12px; 
-        color: var(--text-muted); text-decoration: none; padding: 12px 15px; 
-        margin-bottom: 8px; border-radius: 8px; font-weight: 500; transition: all 0.2s ease-in-out; 
-    }
-    
-    /* ACTIVE & HOVER LINK (Menggunakan --primary-color) */
-    .sidebar a.active, .sidebar a:hover { 
-        background: var(--primary-color); /* Cyan */
-        color: #fff; 
-    }
-    
-    /* LOGOUT LINK */
-    .sidebar a.logout-link { 
-        color: var(--danger-color); font-weight: 600; margin-top: auto; 
-    }
-    .sidebar a.logout-link:hover { 
-        color: #fff; 
-        background: var(--danger-color); /* Merah */
-    }
-    
-    /* MAIN CONTENT & TOPBAR */
-    .main-content { margin-left: 250px; }
-    .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
-    .topbar h3 { font-weight: 600; color: var(--text-dark); margin: 0; font-size: 22px; }
-    .container-fluid { padding: 30px; }
-    
-    /* CARD & TABLE */
-    .card { border-radius: 16px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: var(--card-bg); margin-bottom: 25px; border: 1px solid #e2e8f0; }
-    .table thead th { background: var(--bg-light-gray); font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--text-muted); border: none; }
-    .table tbody td { border-bottom-color: #f1f5f9; }
-    .table tbody tr:last-child td { border-bottom: none; }
-    .info-secondary { font-size: 0.85rem; color: var(--text-muted); }
-
-    /* NAVIGATION TABS */
-    .nav-tabs .nav-link { color: #475569; font-weight: 500; border: none; border-bottom: 2px solid transparent;}
-    /* ACTIVE TAB (Menggunakan --primary-color) */
-    .nav-tabs .nav-link.active { 
-        color: var(--primary-color); 
-        border-bottom-color: var(--primary-color); /* Cyan */
-        background-color: transparent;
-    }
-    .nav-tabs { border-bottom-color: var(--border-color); }
-    .btn { border-radius: 8px; font-weight: 500;}
-
-    /* DATATABLES PAGINATION (Menggunakan --primary-color) */
-    .dataTables_wrapper .dataTables_paginate .page-item.active .page-link { 
-        background-color: var(--primary-color); /* Cyan */
-        border-color: var(--primary-color); /* Cyan */
-        color: white; 
-    }
-    .dataTables_wrapper .dataTables_paginate .page-link { 
-        color: var(--primary-color); /* Cyan */
-    }
-    .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
-    .dataTables_wrapper .form-control, .dataTables_wrapper .form-select { border-radius: 8px; font-size: 0.9rem; }
-    .dataTables_info { font-size: 0.9rem; color: var(--text-muted); padding-top: 0.5rem !important; }
-
-@media (max-width: 767.98px) {
-    /* Sasarkan butang "Check Out All" sahaja */
-    .checkout-all-btn {
-        /* Tukar saiz fon kepada yang lebih kecil */
-        font-size: 0.75rem !important; /* Contoh: 12px */
-        
-        /* Kurangkan padding butang untuk menjadikannya lebih nipis */
-        padding: 0.3rem 0.6rem !important;
-        
-        /* Pastikan ia tidak cuba mengambil lebar penuh */
-        max-width: fit-content;
-        
-        /* Pastikan teks kekal sebaris */
-        white-space: nowrap !important;
-        
-        /* Jarakkan dari elemen sebelah kiri jika ada */
-        margin-left: 5px;
-    }
-
-        .sidebar {
-            transform: translateX(-100%); 
-            transition: transform 0.3s ease-in-out;
-            z-index: 1050; 
-            box-shadow: 4px 0 12px rgba(0,0,0,0.1);
-        }
-        .sidebar.toggled {
-            transform: translateX(0);
-        }
-        .main-content {
-            margin-left: 0;
-        }
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1040;
-            display: none;
-        }
-        .sidebar-overlay.active {
-            display: block;
-        }
-    }
-    .btn.d-lg-none {
-        border: none;
-    }
-	/* 1. Warna Side Border ikut Priority */
-.booking-card {
-    border-left: 5px solid #dee2e6 !important; /* Default kelabu */
-    border-radius: 10px !important;
-    overflow: hidden;
-    background: #fff;
-    transition: all 0.2s ease-in-out;
+	<link rel="stylesheet" href="../css/style.css">
+	<style>
+.btn-checkout-custom {
+    width: 65px !important;  /* Kecikkan sikit dari 85px */
+    height: 65px !important;
+    border-radius: 50% !important;
+    font-size: 10px !important;
+    line-height: 1.1;
+    z-index: 10;
 }
 
-.booking-card.priority-high { border-left-color: #dc3545 !important; } /* Merah */
-.booking-card.priority-mid { border-left-color: #ffc107 !important; }  /* Kuning */
-
-.booking-card:hover {
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+/* Biar dia duduk jauh sikit dari teks NO: 1 */
+.d-flex.align-items-center.justify-content-between {
+    padding-top: 15px !important;
+    padding-bottom: 15px !important;
+}
+.btn-checkout-custom i {
+    font-size: 20px !important; /* Icon besar sikit dari tulisan */
 }
 
-/* 2. Gaya ID Badge yang nampak 'Pro' */
-.id-badge {
-    background: #f1f5f9;
-    padding: 4px 12px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    display: inline-flex;
-    align-items: center;
+.btn-checkout-custom:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4) !important;
 }
 
-/* 3. Button Group untuk Action (Optional - kalau nak butang rapat) */
-.action-group {
-    display: inline-flex;
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-/* --- SEARCH BOX STYLING --- */
-.search-box .input-group {
-    border-radius: 10px;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    border: 1px solid var(--border-color);
-}
-
-.search-box .input-group:focus-within {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15); /* Soft Cyan Glow */
-}
-
-#userSearchInput {
-    border: none;
-    padding: 10px 15px;
-    font-size: 0.9rem;
-}
-
-#userSearchInput:focus {
-    box-shadow: none; /* Buang default blue glow bootstrap */
-}
-
-.search-box .input-group-text {
-    background-color: #fff;
-    color: var(--text-muted);
-    padding-left: 15px;
-}
-/* Warna khas untuk status Auto-Cancelled dalam table */
-.status-auto-cancel {
-    background-color: #f8d7da; /* Merah lembut */
-    color: #842029;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: bold;
-    border: 1px solid #f5c2c7;
-}
-
-/* Responsive: Search bar penuh bila kat mobile */
+/* Responsif untuk Mobile */
 @media (max-width: 768px) {
-    .main-actions-header {
+    .btn-checkout-custom {
+        width: 70px !important;
+        height: 70px !important;
+    }
+    .btn-checkout-custom i {
+        font-size: 16px !important;
+    }
+    .btn-checkout-custom span {
+        font-size: 9px !important;
+    }
+}
+	.main-content {
+    /* Gunakan min-height supaya background sentiasa sekurang-kurangnya setinggi skrin */
+    min-height: 100vh; 
+    
+    /* Warna latar belakang utama */
+    background-color: #f1f5f9; 
+    
+    /* Pattern texture */
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    
+    /* PENTING: Supaya pattern tidak bergerak bila kita scroll (nampak lebih kemas) */
+    background-attachment: fixed;
+    
+    /* Tambah padding supaya content tidak rapat sangat dengan tepi skrin */
+    padding: 1rem 0.5rem;
+    
+    /* Memastikan background meliputi seluruh ruang */
+    background-repeat: repeat;
+}
+
+	/* Design untuk Nav Link (Tab) */
+.nav-pills .nav-link {
+    color: #64748b;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: none !important;
+    transition: all 0.3s ease;
+}
+
+/* Design untuk Nav Link yang Tengah Aktif */
+.nav-pills .nav-link.active {
+    background-color: white !important;
+    color: #1e293b !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Badge dalam tab */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.4em 0.7em;
+}
+
+/* Input search background */
+.bg-light {
+    background-color: #F4F7FE !important;
+}
+.modern-badge.badge-expired {
+    background: #f1f5f9; /* Kelabu lembut */
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+.bg-expired-soft {
+    background: #f8fafc;
+    border-left: 5px solid #94a3b8 !important;
+}
+
+/* --- MOBILE BOTTOM NAV (THEMED DARK) --- */
+@media (max-width: 991px) {
+    body {
+        padding-bottom: 80px; /* Ruang supaya content tak kena sorok dek bar */
+    }
+
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* TUKAR: Warna gelap macam sidebar laptop */
+        background: #1e293b !important; 
+        border-top: 1px solid rgba(255, 255, 255, 0.1); 
+        z-index: 10000;
+        justify-content: space-around;
+        padding: 12px 0;
+        box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
+    }
+
+    .mobile-bottom-nav a {
+        /* Warna icon & teks masa tak aktif */
+        color: #94a3b8 !important; 
+        text-decoration: none !important;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
         flex-direction: column;
-        align-items: flex-start !important;
-        gap: 15px;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        transition: 0.3s;
     }
-    .search-box {
+
+    /* Warna Cyan bila menu aktif/tekan */
+    .mobile-bottom-nav a.active {
+        color: #06b6d4 !important;
+    }
+
+    .mobile-bottom-nav a i {
+        font-size: 20px;
+    }
+
+    /* Tambah sikit effect bila user touch */
+    .mobile-bottom-nav a:active {
+        transform: scale(0.9);
+        opacity: 0.8;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Sembunyikan Header Table yang serabut tu */
+    thead {
+        display: none;
+    }
+    
+    /* Paksa setiap row jadi card */
+    tr.user-row {
+        display: block;
+        margin-bottom: 15px;
+        border: 1px solid #edf2f7 !important;
+        border-radius: 12px;
+        padding: 10px;
+        background: #ffffff;
+    }
+    
+    td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: none !important;
+        padding: 8px 5px !important;
         width: 100% !important;
+        text-align: left !important;
+    }
+
+    /* Tambah Label sebelum data (Contoh: Item: Laptop) */
+    td::before {
+        content: attr(data-label); /* Kau kena tambah data-label kat TD nanti */
+        font-weight: 700;
+        color: #64748b;
+        font-size: 11px;
+        text-transform: uppercase;
     }
 }
 
-.assigned-assets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    /* Sembunyikan kalau kat PC */
+    @media (min-width: 992px) {
+        .mobile-bottom-nav {
+            display: none !important;
+        }
+    }
+	
+	.toast-container {
+    z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
 }
 
-.assigned-assets .badge {
-    border-color: #e2e8f0 !important;
-    background-color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    color: #475569 !important;
+.toast {
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideInRight 0.5s ease-out;
 }
 
-.assigned-assets i {
-    opacity: 0.8;
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-header {
+    border-bottom: none;
+}
+
+/* Container untuk Search & Filter */
+.search-filter-container {
+    background: white;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    margin-bottom: 20px;
+}
+
+/* Input Search bagi nampak soft */
+#completedSearchInput, #userSearchInput {
+    border: 1px solid #e2e8f0 !important;
+    background-color: #f8fafc !important;
+    padding: 10px 15px;
 }
 </style>
 </head>
@@ -676,39 +736,61 @@ echo "</td>";
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div> 
 <div class="sidebar" id="admin-sidebar">
-    <div>
-        <div class="sidebar-header">
+    <div> <div class="sidebar-header">
             <div class="logo-icon"><i class="fa-solid fa-wrench"></i></div>
-            <div class="logo-text"><strong>UniKL Technician</strong><span>System Support</span></div>
+            <div class="logo-text"><strong>UniKL Technician</strong><br><span style="font-size: 0.85rem; color: #64748b;">System Support</span></div>
         </div>
-        <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
-        <a href="check_out.php" class="active"><i class="fa-solid fa-dolly"></i> Manage Requests</a>
-        <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
-        <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+        
+        <div class="sidebar-nav"> <a href="dashboard_tech.php"><i class="fa-solid fa-table-columns"></i> Dashboard</a>
+<a href="check_out.php" class="<?= (basename($_SERVER['PHP_SELF']) == 'check_out.php') ? 'active' : '' ?>">
+    <i class="fa-solid fa-dolly"></i>
+    <span>Manage Requests</span>
+    
+    <?php 
+    // Kita panggil function tu dan simpan dalam variable sekejap
+    $jumlah_pending = get_pending_count($conn); 
+    
+    if ($jumlah_pending > 0): 
+    ?>
+        <span class="badge"><?= $jumlah_pending ?></span>
+    <?php endif; ?>
+</a>         <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+            <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+        </div>
     </div>
-    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+    
+    <div class="sidebar-footer">
+        <a href="logout.php" class="logout-link"><i class="fa-solid fa-sign-out-alt"></i> Logout</a> 
+    </div>
 </div>
 
 <div class="main-content">
     <div class="topbar">
-        <div class="d-flex align-items-center">
-            <button class="btn d-lg-none me-3" id="sidebarToggle" aria-label="Toggle navigation menu">
-                <i class="fa-solid fa-bars"></i>
+        <div class="topbar-left">
+            <button id="sidebarToggle" class="btn d-none">
+                <i class="fas fa-bars"></i>
             </button>
-            <h3>Manage Requests</h3>
+            <h3 class="mb-0">Manage Requests</h3>
         </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="user-name me-2" style="text-transform: capitalize; font-weight: 600;">
-                <?= htmlspecialchars($displayName) ?>
-            </span>            
-            <a href="profile_tech.php" title="My Profile" aria-label="View My Profile">
-                <i class="fa-solid fa-user-circle fa-2x text-secondary"></i>
+
+        <div class="topbar-right">
+            <a href="profile_tech.php" class="user-pill text-decoration-none d-flex align-items-center">
+                <div class="text-end me-2 d-none d-md-block">
+                    <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1.2;">
+                        <?= htmlspecialchars($displayName) ?>
+                    </div>
+                    <small class="text-muted" style="font-size: 0.75rem;">Technician</small>
+                </div>
+                <div class="profile-avatar">
+                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35" alt="Profile">
+                </div>
             </a>
         </div>
     </div>
 
+       
     <div class="container-fluid">
-        <div class="card shadow-sm border-0 mb-3" style="padding: 15px 25px;">
+         <div class="card shadow-sm border-0 mb-3" style="padding: 15px 25px;">
             <div class="card-body p-0">
                 <div class="row align-items-center">
                     <div class="col-md-4">
@@ -729,31 +811,64 @@ echo "</td>";
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <div class="main-actions-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fa-solid fa-list-check me-2 text-primary"></i> Reservation Actions</h5>
-                    <div class="search-box" style="width: 320px;">
-                        <div class="input-group">
-                            <span class="input-group-text border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                            <input type="text" id="userSearchInput" class="form-control" placeholder="Search name or phone...">
-                        </div>
-                    </div>
-                </div>
+           <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <i class="fa-solid fa-box text-primary"></i>
+        <h6 class="fw-bold mb-0">Reservation Actions</h6>
+    </div>
 
-                <ul class="nav nav-tabs nav-fill mt-4" id="myTab" role="tablist">
-                    <li class="nav-item"><button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-tab-pane" type="button">New Requests <span class="badge rounded-pill text-bg-warning ms-1"><?= count($pending_requests) ?></span></button></li>
-                    <li class="nav-item"><button class="nav-link" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved-tab-pane" type="button">To Be Collected <span class="badge rounded-pill text-bg-primary ms-1"><?= count($approved_requests) ?></span></button></li>
-                    <li class="nav-item"><button class="nav-link" id="onloan-tab" data-bs-toggle="tab" data-bs-target="#onloan-tab-pane" type="button">On Loan <span class="badge rounded-pill text-bg-danger ms-1"><?= count($on_loan_requests) ?></span></button></li>
-                    <li class="nav-item"><button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-tab-pane" type="button">Archive</button></li>
-                </ul>
+    <ul class="nav nav-pills mb-4 p-1" id="myTab" role="tablist" style="background: #F8F9FC; border-radius: 12px; display: inline-flex; border: none; width: 100%;">
+        <li class="nav-item flex-fill" role="presentation">
+            <button class="nav-link active w-100 d-flex align-items-center justify-content-center gap-2" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending-tab-pane" type="button" style="border-radius: 10px;">
+                <i class="fa-regular fa-clock"></i> New Requests 
+                <span class="badge rounded-pill bg-warning text-dark"><?= count($pending_requests) ?></span>
+            </button>
+        </li>
+        <li class="nav-item flex-fill" role="presentation">
+            <button class="nav-link w-100 d-flex align-items-center justify-content-center gap-2" id="approved-tab" data-bs-toggle="pill" data-bs-target="#approved-tab-pane" type="button" style="border-radius: 10px;">
+                <i class="fa-regular fa-circle-check"></i> To Be Collected 
+                <span class="badge rounded-pill bg-success"><?= count($approved_requests) ?></span>
+            </button>
+        </li>
+        <li class="nav-item flex-fill" role="presentation">
+            <button class="nav-link w-100 d-flex align-items-center justify-content-center gap-2" id="onloan-tab" data-bs-toggle="pill" data-bs-target="#onloan-tab-pane" type="button" style="border-radius: 10px;">
+                <i class="fa-solid fa-boxes-stacked"></i> On Loan 
+                <span class="badge rounded-pill bg-primary"><?= count($on_loan_requests) ?></span>
+            </button>
+        </li>
+        <li class="nav-item flex-fill" role="presentation">
+            <button class="nav-link w-100 d-flex align-items-center justify-content-center gap-2" id="completed-tab" data-bs-toggle="pill" data-bs-target="#completed-tab-pane" type="button" style="border-radius: 10px;">
+                <i class="fa-solid fa-clock-rotate-left"></i> Loan Records
+            </button>
+        </li>
+    </ul>
 
-                <div class="tab-content pt-3" id="myTabContent">
-                    <div class="tab-pane fade show active" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
-                    <div class="tab-pane fade" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
-                    <div class="tab-pane fade" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
-                    <div class="tab-pane fade" id="completed-tab-pane" role="tabpanel"><?php create_request_table($completed_requests); ?></div>
-                </div>
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active" id="pending-tab-pane" role="tabpanel"><?php create_request_table($pending_requests); ?></div>
+        <div class="tab-pane fade" id="approved-tab-pane" role="tabpanel"><?php create_request_table($approved_requests); ?></div>
+        <div class="tab-pane fade" id="onloan-tab-pane" role="tabpanel"><?php create_request_table($on_loan_requests); ?></div>
+       <div class="tab-pane fade" id="completed-tab-pane" role="tabpanel">
+    <div class="row mb-3 mt-3">
+        <div class="col-md-12 d-flex justify-content-end">
+            <div class="input-group input-group-sm" style="width: 320px;">
+                <span class="input-group-text bg-white border-end-0" style="border-radius: 10px 0 0 10px;">
+                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                </span>
+                <input type="text" id="completedSearchInput" class="form-control border-start-0 ps-0" 
+                       placeholder="Search name or item in records..." 
+                       style="border-radius: 0; box-shadow: none; border-color: #dee2e6;">
+                <button class="btn btn-primary btn-sm px-3" type="button" id="btnSearchCompleted" style="border-radius: 0 10px 10px 0;">
+                    Search
+                </button>
             </div>
+        </div>
+    </div>
+
+    <?php create_request_table($completed_requests); ?>
+</div>
+		
+    </div>
+</div>
         </div>
     </div>
 </div>
@@ -1675,5 +1790,22 @@ $('#confirmCheckInBtn').on('click', function() {
 });
 
 </script>
-</body>
+
+<nav class="mobile-bottom-nav">
+    <a href="dashboard_tech.php" class="nav-item">
+        <i class="fa-solid fa-table-columns"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="check_out.php" class="nav-item active">
+        <i class="fa-solid fa-dolly"></i>
+        <span> Manage Requests</span>
+    </a>
+    <a href="manageItem_tech.php"><i class="fa-solid fa-box-archive"></i> Manage Items</a>
+            <a href="report.php"><i class="fa-solid fa-chart-line"></i> Report</a>
+    <a href="profile_tech.php" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+    </a>
+</nav></body>
+
 </html>

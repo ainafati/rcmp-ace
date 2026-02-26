@@ -95,6 +95,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-
+// Contoh logic dalam update_notification.php
+if ($_POST['action'] == 'dismiss_void') {
+    $id = $_POST['id'];
+    // Update column is_acknowledged atau is_read dalam database
+    $stmt = $conn->prepare("UPDATE reservation_items SET is_acknowledged = 1 WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false]);
+    }
+    exit;
+}
 echo json_encode($response);
 exit();
