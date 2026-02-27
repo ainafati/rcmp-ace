@@ -243,13 +243,13 @@ $tech_role_id = 2;
 // Selesaikan isu GROUP BY
 $conn->query("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))");
 
-// Ambil 10 notifikasi unik (tak berulang)
+// Ambil hanya notifikasi yang BELUM DIBACA (is_read = 0) untuk dropdown
 $sql_all_notif = "SELECT * FROM notifications 
-                  WHERE person_id = ? OR recipient_role_id = ? 
+                  WHERE (person_id = ? OR recipient_role_id = ?) 
+                  AND is_read = 0 
                   GROUP BY message, related_id 
                   ORDER BY created_at DESC 
                   LIMIT 10";
-
 $stmt_all = $conn->prepare($sql_all_notif);
 if ($stmt_all) {
     $stmt_all->bind_param("ii", $tech_id, $tech_role_id);
@@ -519,6 +519,34 @@ $conn->close();
         background-color: #bae6fd !important;
         color: #0369a1 !important;
     }
+	.notification-item:hover {
+    background-color: #f1f5f9 !important;
+}
+
+.notification-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background-color: #ef4444; /* Warna merah menyala */
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+#markAllReadBtn {
+    font-size: 0.75rem;
+    color: #64748b;
+    text-decoration: none;
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+#markAllReadBtn:hover {
+    color: #0f172a;
+    text-decoration: underline;
+}
 </style>
 
 </head>
@@ -578,13 +606,31 @@ $conn->close();
     </div>
 
     <div id="notifItemsContainer" style="max-height: 350px; overflow-y: auto;">
-        <?php if (!empty($all_notifications)): ?>
-            <?php foreach($all_notifications as $notif): ?>
-                <?php endforeach; ?>
-        <?php else: ?>
-            <li class="p-4 text-center text-muted small">No notifications</li>
-        <?php endif; ?>
-    </div>
+    <?php if (!empty($all_notifications)): ?>
+        <?php foreach($all_notifications as $notif): 
+            // DALAM DB AWAK GUNA is_read (0 = belum baca, 1 = dah baca)
+            $is_unread = ($notif['is_read'] == 0); 
+        ?>
+            <li class="notification-item p-3 border-bottom <?= $is_unread ? 'bg-light' : '' ?>" style="cursor: pointer;">
+                <div class="d-flex align-items-start text-start"> <div class="notif-icon me-3 mt-1">
+                        <i class="fa-solid fa-circle <?= $is_unread ? 'text-primary' : 'text-secondary opacity-50' ?>" style="font-size: 0.5rem;"></i>
+                    </div>
+                    <div class="notif-content flex-grow-1">
+                        <p class="mb-1 small text-dark" style="line-height: 1.4; font-weight: <?= $is_unread ? '600' : '400' ?>;">
+                            <?= htmlspecialchars($notif['message'] ?? 'No message content') ?>
+                        </p>
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">
+                            <i class="fa-regular fa-clock me-1"></i>
+                            <?= date('d M, h:i A', strtotime($notif['created_at'])) ?>
+                        </small>
+                    </div>
+                </div>
+            </li>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <li class="p-4 text-center text-muted small">No notifications found.</li>
+    <?php endif; ?>
+</div>
 
     <li class="mark-all-container">
         <a href="notifications_history.php" class="dropdown-item text-center small py-3 fw-bold text-primary" style="border-top: 1px solid #eee; background-color: #f8f9fa;">

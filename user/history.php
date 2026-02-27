@@ -10,6 +10,24 @@ if (!isset($_SESSION['person_id'])) {
 
 $person_id = (int)$_SESSION['person_id']; // Sekarang $person_id dah ada nilai
 
+
+// LOGIK NAMA PENDEK (Dah betul)
+$fullName = $user['name'] ?? 'Guest User';
+$lowerName = strtolower($fullName);
+
+$posBinti = strpos($lowerName, ' binti ');
+$posBin = strpos($lowerName, ' bin ');
+
+if ($posBinti !== false) {
+    $shortName = substr($fullName, 0, $posBinti);
+} elseif ($posBin !== false) {
+    $shortName = substr($fullName, 0, $posBin);
+} else {
+    $shortName = $fullName;
+}
+
+$displayName = trim($shortName);
+
 // --- 2. PROSES PEMBATALAN (SOFT DELETE) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cancel_id'])) {
     $cancel_id = (int)$_POST['cancel_id'];
@@ -67,8 +85,18 @@ $user_data = $stmt_user->get_result()->fetch_assoc();
 $stmt_user->close();
 
 $fullName = $user_data['name'] ?? 'Guest User';
-$displayName = trim(explode(' bin', explode(' binti', $fullName)[0])[0]);
 
+// 1. Buang " bin " atau " binti " dan semua teks selepasnya (Case Insensitive)
+$cleanName = preg_split('/\s+(bin|binti)\s+/i', $fullName)[0];
+
+// 2. Pecahkan nama kepada perkataan-perkataan individu
+$nameParts = explode(' ', trim($cleanName));
+
+// 3. Ambil 2 perkataan pertama sahaja
+$shortNameArray = array_slice($nameParts, 0, 2);
+
+// 4. Cantumkan semula dan tukar kepada Huruf Besar (Optional, ikut gambar anda)
+$displayName = strtoupper(implode(' ', $shortNameArray));
 // --- 2. LOGIK PAGINATION ---
 $limit = 5; 
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;

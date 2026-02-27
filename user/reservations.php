@@ -97,7 +97,7 @@ $itemsResult = mysqli_query($conn, $qItems);
    <div class="info-text">
     <div class="mb-2">
         <strong><?= htmlspecialchars($res['name'] ?? 'Unknown User') ?></strong> has requested items for 
-        <b class="text-primary"><?= htmlspecialchars($res['location']) ?></b>.
+<b class="text-primary"><?= htmlspecialchars($res['location'] ?? '') ?></b>.
     </div>
     
     <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border-left: 4px solid #64748b; font-size: 0.85rem;">

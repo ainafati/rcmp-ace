@@ -963,12 +963,12 @@ $stmt_void_alert->close();
         </ul>
     </div>
 
-    <a href="profile_tech.php" class="user-pill text-decoration-none">
+    <a href="profile.php" class="user-pill text-decoration-none">
         <div class="text-end me-2 d-none d-md-block">
             <div class="user-name" style="text-transform: capitalize; font-weight: 600; color: #1e293b; line-height: 1;">
                 <?= htmlspecialchars($displayName) ?>
             </div>
-            <small class="text-muted" style="font-size: 0.75rem;">Technician</small>
+            <small class="text-muted" style="font-size: 0.75rem;">Student/Staff</small>
         </div>
         <div class="profile-avatar">
             <img src="https://ui-avatars.com/api/?name=<?= urlencode($displayName) ?>&background=06b6d4&color=fff" class="rounded-circle" width="35">
@@ -1461,11 +1461,21 @@ function markAsRead(id) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Refresh bahagian notifikasi atau hilangkan dot merah
-            location.reload(); 
+            // Cara paling mudah: Refresh page untuk update semua UI (termasuk dashboard cards)
+            window.location.reload(); 
+        } else {
+            alert('Gagal mengemaskini notifikasi.');
+            // Reset butang jika gagal
+            const btn = document.getElementById('markAllReadBtn');
+            if(btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Mark As Read';
+            }
         }
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => {
+        console.error('Error:', error);
+    });
 }
 
 // Fungsi Dismiss Toast (Kekalkan di luar DOMContentLoaded jika dipanggil via onclick HTML)
