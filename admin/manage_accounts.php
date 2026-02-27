@@ -103,6 +103,7 @@ $accounts = $result->fetch_all(MYSQLI_ASSOC);
 	    <link rel="stylesheet" href="../css/style.css">
 
 <style>
+
 /* Pastikan cell jadual tidak memotong dropdown */
 #userTable td {
     overflow: visible !important;
@@ -703,6 +704,7 @@ input[value="Admin"]:checked + .admin-label {
     z-index: 1060; /* Pastikan dia duduk atas sekali dari modal/sidebar */
 }
 
+
 .toast {
     border-radius: 12px;
     overflow: hidden;
@@ -717,7 +719,142 @@ input[value="Admin"]:checked + .admin-label {
 .toast-header {
     border-bottom: none;
 }
+@media (max-width: 768px) {
+    /* Sembunyikan header jadual yang asal */
+    #userTable thead {
+        display: none;
+    }
 
+    /* Ubah setiap baris (tr) menjadi seperti "Card" */
+    #userTable tbody tr {
+        display: block;
+        margin-bottom: 1.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        padding: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    /* Ubah setiap cell (td) menjadi block */
+    #userTable tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        padding: 8px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        width: 100%;
+    }
+
+    /* Hilangkan border pada cell terakhir */
+    #userTable tbody td:last-child {
+        border-bottom: none;
+        justify-content: center; /* Butang action letak tengah */
+        padding-top: 15px;
+    }
+
+    /* Tambah Label sebelum data menggunakan pseudo-element */
+    #userTable tbody td::before {
+        content: attr(data-label); /* Ambil label dari attribute data-label */
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        color: #64748b;
+        float: left;
+        text-align: left;
+    }
+
+    /* Pastikan avatar dan nama nampak kemas dalam mobile */
+    .avatar-circle {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+
+    /* Kotak filter atas (Search & Filter) */
+    .d-flex.align-items-center.justify-content-between.mb-4.p-3.bg-white {
+        flex-direction: column; /* Susun ke bawah */
+        gap: 15px !important;
+    }
+
+    .position-relative.flex-grow-1 {
+        max-width: 100% !important;
+        width: 100%;
+    }
+    
+    .d-flex.align-items-center.gap-4 {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px !important;
+    }
+}
+@media (max-width: 768px) {
+    /* Container utama filter */
+    .filter-container {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 15px !important;
+        gap: 15px !important;
+    }
+
+    /* Bahagian Search Input */
+    .search-wrapper {
+        max-width: 100% !important;
+        width: 100%;
+    }
+
+    /* Membungkus kumpulan filter (Role & Status) */
+    .filter-group-wrapper {
+        flex-direction: column;
+        gap: 12px !important;
+        width: 100%;
+    }
+
+    /* Label "ROLE:" dan "STATUS:" */
+    .filter-label {
+        font-size: 0.7rem;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    /* Kotak butang filter (All, User, dll) */
+    .btn-group-filter {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .filter-pill {
+        flex: 1; /* Butang akan bahagi ruang sama rata */
+        padding: 6px 2px !important;
+        font-size: 0.7rem !important;
+    }
+}
+@media (max-width: 576px) {
+    .topbar {
+        padding: 10px 0;
+    }
+    
+    .topbar h3 {
+        font-size: 1.2rem;
+    }
+
+    /* Sembunyikan "Administrator" text */
+    .user-pill .text-end {
+        display: none !important;
+    }
+
+    /* Kecilkan butang Add Account */
+    .btn-add-account {
+        padding: 8px 12px !important;
+        font-size: 0.8rem !important;
+    }
+    
+    .btn-add-account span {
+        display: none; /* Sembunyikan teks "Add Account", biar icon sahaja */
+    }
+}
 </style>
 	
 </head>
@@ -783,17 +920,17 @@ input[value="Admin"]:checked + .admin-label {
             </div>
         <?php endif; ?>
 
-        <div class="d-flex align-items-center justify-content-between mb-4 p-3 bg-white shadow-sm" style="border-radius: 15px; gap: 20px;">
-    <div class="position-relative flex-grow-1" style="max-width: 350px;">
+<div class="filter-container d-flex align-items-center justify-content-between mb-4 p-3 bg-white shadow-sm" style="border-radius: 15px; gap: 20px;">
+    <div class="search-wrapper position-relative flex-grow-1" style="max-width: 350px;">
         <i class="fa-solid fa-magnifying-glass position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
         <input type="text" id="searchInput" class="form-control ps-5 py-2 border-0 bg-light" 
                style="border-radius: 10px;" placeholder="Search by name, email..." onkeyup="filterTable()">
     </div>
 
-    <div class="d-flex align-items-center gap-4">
-        <div class="d-flex align-items-center gap-2">
-            <span class="small fw-bold text-muted">ROLE:</span>
-            <div class="p-1 bg-light d-flex gap-1" style="border-radius: 12px;">
+    <div class="filter-group-wrapper d-flex align-items-center gap-4">
+        <div class="w-100">
+            <span class="filter-label small fw-bold text-muted">ROLE:</span>
+            <div class="p-1 bg-light d-flex gap-1 btn-group-filter" style="border-radius: 12px;">
                 <input type="radio" class="btn-check" name="roleFilter" id="roleAll" value="" checked onchange="filterTable()">
                 <label class="btn btn-sm filter-pill" for="roleAll">All</label>
 
@@ -801,16 +938,16 @@ input[value="Admin"]:checked + .admin-label {
                 <label class="btn btn-sm filter-pill" for="roleUser">User</label>
 
                 <input type="radio" class="btn-check" name="roleFilter" id="roleTech" value="Technician" onchange="filterTable()">
-                <label class="btn btn-sm filter-pill" for="roleTech">Technician</label>
+                <label class="btn btn-sm filter-pill" for="roleTech">Tech</label>
 
                 <input type="radio" class="btn-check" name="roleFilter" id="roleAdmin" value="Admin" onchange="filterTable()">
                 <label class="btn btn-sm filter-pill" for="roleAdmin">Admin</label>
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-            <span class="small fw-bold text-muted">STATUS:</span>
-            <div class="p-1 bg-light d-flex gap-1" style="border-radius: 12px;">
+        <div class="w-100">
+            <span class="filter-label small fw-bold text-muted">STATUS:</span>
+            <div class="p-1 bg-light d-flex gap-1 btn-group-filter" style="border-radius: 12px;">
                 <input type="radio" class="btn-check" name="statusFilter" id="statusAll" value="" checked onchange="filterTable()">
                 <label class="btn btn-sm filter-pill" for="statusAll">All</label>
 
@@ -818,7 +955,7 @@ input[value="Admin"]:checked + .admin-label {
                 <label class="btn btn-sm filter-pill" for="statusActive">Active</label>
 
                 <input type="radio" class="btn-check" name="statusFilter" id="statusSuspended" value="Suspended" onchange="filterTable()">
-                <label class="btn btn-sm filter-pill" for="statusSuspended">Suspended</label>
+                <label class="btn btn-sm filter-pill" for="statusSuspended">Susp</label>
             </div>
         </div>
     </div>
@@ -830,59 +967,50 @@ input[value="Admin"]:checked + .admin-label {
                             <th>Name</th><th>Email & Phone</th><th>Status</th><th>Role</th><th>Actions</th>
                         </tr>
                     </thead>
+					
 <tbody>
     <?php if (count($accounts) > 0): ?>
         <?php foreach ($accounts as $a): ?>
             <?php 
-                // --- BETULKAN DI SINI: Takrifkan variable untuk setiap baris ---
                 $roles_list = strtolower($a['roles_list']);
                 $isTech = str_contains($roles_list, 'technician');
                 $isAdmin = str_contains($roles_list, 'admin');
+                $status = strtolower($a['status']);
             ?>
-<tr data-role="<?= strtolower(trim($a['roles_list'])) ?>" 
-    data-status="<?= strtolower(trim($a['status'])) ?>">
+            <tr data-role="<?= $roles_list ?>" data-status="<?= $status ?>">
+                <td>
+    <div class="d-flex align-items-center">
+        <div class="avatar-circle me-3">
+            <?= strtoupper(substr($a['name'], 0, 1)) ?>
+        </div>
+        
+        <div class="d-flex flex-column">
+            <span class="fw-bold text-dark" style="line-height: 1.2;">
+                <?= htmlspecialchars($a['name']) ?>
+            </span>
+            <small class="text-muted">
+                ID: <?= htmlspecialchars($a['id'] ?? 'N/A') ?>
+            </small>
+        </div>
+    </div>
+</td>
 
-	<td>
-                    <div class="d-flex align-items-center">
-                        <div class="avatar-circle me-3">
-                            <?= strtoupper(substr($a['name'], 0, 1)) ?>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-dark" style="font-size: 1.05rem;"><?= htmlspecialchars($a['name']) ?></div>
-                            <div class="text-muted small">ID: <?= htmlspecialchars(isset($a['id']) ? $a['id'] : 'N/A') ?></div>
-                        </div>
+                <td>
+                    <div class="small">
+                        <div class="mb-1"><i class="fa-regular fa-envelope text-muted me-2"></i><?= htmlspecialchars($a['email']) ?></div>
+                        <div><i class="fa-solid fa-phone text-muted me-2"></i><?= htmlspecialchars($a['phoneNum'] ?? 'N/A') ?></div>
                     </div>
                 </td>
 
-                <td>
-                    <div class="mb-1">
-                        <i class="fa-regular fa-envelope text-muted me-2"></i>
-                        <span class="text-secondary"><?= htmlspecialchars($a['email']) ?></span>
-                    </div>
-                    <div>
-                        <i class="fa-solid fa-phone text-muted me-2"></i>
-                        <span class="text-secondary"><?= htmlspecialchars(isset($a['phoneNum']) ? $a['phoneNum'] : 'N/A') ?></span>
-                    </div>
-                </td>
-
-                <td>
+                <td class="text-center">
                     <?php 
-                        $status = strtolower($a['status']);
                         $dotClass = ($status === 'active') ? 'dot-active' : 'dot-suspended';
-                        $statusText = ucfirst($a['status']);
                     ?>
-                    <span class="status-dot <?= $dotClass ?>" title="<?= $statusText ?>"></span>
+                    <span class="status-dot <?= $dotClass ?>" title="<?= ucfirst($status) ?>"></span>
                 </td>
 
-<td class="text-center align-middle">
-    <?php 
-        // Logic pengesanan role tetap kena ada dalam loop
-        $roles_raw = strtolower($a['roles_list']);
-        $isTech = str_contains($roles_raw, 'technician');
-        $isAdmin = str_contains($roles_raw, 'admin');
-    ?>
-
-    <div class="dropdown">
+                <td class="text-center">
+                    <div class="dropdown">
         <div class="role-exclusive-pill" data-bs-toggle="dropdown" aria-expanded="false">
             <div class="dot-group">
                 <span class="dot-static dot-user"></span>
@@ -937,27 +1065,33 @@ input[value="Admin"]:checked + .admin-label {
 </form>
         </div>
     </div>
-</td>
-                <td>
-                    <div class="action-btn-group">
-                        <button class="btn-edit" title="Edit Profile"
-                            onclick="editUser('<?= $a['person_unique_id'] ?>', '<?= htmlspecialchars(addslashes($a['name'])) ?>', '<?= htmlspecialchars(addslashes($a['email'])) ?>', '<?= htmlspecialchars(addslashes(isset($a['id']) ? $a['id'] : '')) ?>', '<?= htmlspecialchars(addslashes(isset($a['phoneNum']) ? $a['phoneNum'] : '')) ?>', '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>', '<?= htmlspecialchars(addslashes($a['status'])) ?>')">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                        <form action="delete_user.php" method="POST" style="display:inline;" onsubmit="return confirm('Padam akaun ni?');">
-                            <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
-                            <button type="submit" class="btn-delete" title="Remove Account">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
+                </td>
+
+                <td class="text-center">
+                    <div class="action-btn-group justify-content-center">
+                       <button class="btn-edit" title="Edit Profile"
+    onclick="editUser(
+        '<?= $a['person_unique_id'] ?>', 
+        '<?= htmlspecialchars(addslashes($a['name'])) ?>', 
+        '<?= htmlspecialchars(addslashes($a['email'])) ?>', 
+        '<?= htmlspecialchars(addslashes($a['id'] ?? '')) ?>', 
+        '<?= htmlspecialchars(addslashes($a['phoneNum'] ?? '')) ?>', 
+        '<?= htmlspecialchars(addslashes($a['roles_list'])) ?>', 
+        '<?= htmlspecialchars(addslashes($a['status'])) ?>'
+    )">
+    <i class="fa-solid fa-pen-to-square"></i>
+</button>
+                        <form action="delete_user.php" method="POST" class="d-inline" onsubmit="return confirm('Padam?')">
+                             <input type="hidden" name="id" value="<?= $a['person_unique_id'] ?>">
+                             <button type="submit" class="btn-delete"><i class="fa-solid fa-trash-can"></i></button>
                         </form>
                     </div>
                 </td>
             </tr>
         <?php endforeach; ?>
-    <?php else: ?>
-        <tr><td colspan="5" class="text-center py-5">No accounts found.</td></tr>
     <?php endif; ?>
-</tbody>                </table>
+</tbody>    
+               </table>
 				
 				
 				<div class="d-flex justify-content-between align-items-center mt-3">
